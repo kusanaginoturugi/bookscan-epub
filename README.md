@@ -32,10 +32,20 @@ ruby bin/compare-ocr.rb \
 ruby bin/compare-ocr.rb --details \
   work/ndl/page-012/page-012-000.json \
   work/paddle/page-012/page-012-000_res.json
+
+# 原本画像と2つのOCRを1画面でレビュー（Firefoxで直接開ける）
+ruby bin/build-review.rb \
+  work/sample/page-012-000.jpg \
+  work/ndl/page-012/page-012-000.json \
+  work/paddle/page-012/page-012-000_res.json \
+  review/page-012.html
+firefox-developer-edition review/page-012.html
 ```
 
 PaddleOCR 3.7.0 の PP-OCRv6 では日本語の `--lang` は `ja` ではなく `japan`。各OCRのJSONは別々に保存し、比較時に座標で縦列を対応付ける。比較値は食い違いの量であり、正解率ではない。
 
 NDLOCR-LiteのJSONと同じ場所にXMLがあれば、比較スクリプトは本文に対応しないPaddleOCR領域をルビ・ノンブルとして分類する。ページ12ではルビ「きぜん」とノンブル「10」を分類できた。
+
+レビューHTMLは画像を埋め込んだ単独ファイル。列ごとに差を黄色で示し、列を選ぶと原本の位置を赤枠で表示する。生成物は `review/` に置き、Gitには含めない。
 
 設計と進捗は [docs/progress.md](docs/progress.md) に記録する。

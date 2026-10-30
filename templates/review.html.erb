@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OCRレビュー | PDF <%= page %>ページ</title>
+  <style>
+    :root { color-scheme: light; font-family: system-ui, "Noto Sans CJK JP", sans-serif; color: #1d2935; background: #f4f5f6; }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    header { background: #172939; color: white; padding: 14px 22px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+    h1 { font-size: 1.12rem; margin: 0; }
+    header p { margin: 0; color: #d4dde5; font-size: .85rem; }
+    main { display: grid; grid-template-columns: minmax(400px, 48%) minmax(460px, 52%); height: calc(100vh - 68px); }
+    .scan-panel, .review-panel { min-height: 0; display: flex; flex-direction: column; }
+    .scan-panel { border-right: 1px solid #ced4d9; }
+    .toolbar { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: white; border-bottom: 1px solid #dce1e5; flex-wrap: wrap; }
+    .toolbar strong { margin-right: auto; font-size: .88rem; }
+    .toolbar button { padding: 5px 10px; border: 1px solid #bdc7d1; border-radius: 6px; background: #fff; color: #1d2935; cursor: pointer; font: inherit; font-size: .85rem; }
+    .toolbar button:hover, .toolbar button:focus-visible { border-color: #245f82; background: #edf6fb; }
+    .toolbar button[aria-pressed="true"] { color: white; border-color: #245f82; background: #245f82; }
+    .zoom-label { min-width: 3.5em; text-align: center; font-size: .85rem; }
+    .scan-scroll, .rows-scroll { overflow: auto; min-height: 0; flex: 1; }
+    .scan-scroll { background: #d9d9d6; }
+    .scan-stage { position: relative; width: 100%; margin: auto; line-height: 0; }
+    .scan-stage img { display: block; width: 100%; height: auto; }
+    .focus-box { position: absolute; border: 3px solid #e8472b; background: #e8472b25; box-shadow: 0 0 0 2px white; pointer-events: none; display: none; }
+    .focus-box.visible { display: block; }
+    .scan-hint { padding: 8px 14px; font-size: .8rem; color: #415362; background: white; border-top: 1px solid #dce1e5; }
+    .rows-scroll { padding: 14px; scroll-behavior: smooth; }
+    .row-card { background: white; border: 1px solid #d7dde2; border-radius: 9px; margin-bottom: 12px; overflow: hidden; box-shadow: 0 1px 2px #1d293510; }
+    .row-card.selected { border-color: #e8472b; box-shadow: 0 0 0 2px #e8472b55; }
+    .row-card.hidden { display: none; }
+    .row-head { width: 100%; border: 0; border-bottom: 1px solid #e4e8ec; background: #f9fafb; color: #24384a; display: flex; align-items: center; gap: 10px; text-align: left; padding: 8px 12px; cursor: pointer; font: inherit; }
+    .row-head:hover { background: #ecf4f8; }
+    .row-head .number { font-weight: 700; min-width: 3em; }
+    .row-head .coord { color: #617180; font-size: .75rem; }
+    .count { margin-left: auto; font-size: .75rem; border-radius: 4px; padding: 2px 6px; background: #e7edf1; white-space: nowrap; }
+    .count.changed { background: #ffeadb; color: #9b3e16; }
+    .ocr-pair { display: grid; grid-template-columns: 1fr 1fr; }
+    .ocr-side { padding: 10px 12px 13px; min-width: 0; }
+    .ocr-side + .ocr-side { border-left: 1px solid #e4e8ec; }
+    .ocr-label { display: block; color: #5a6d7d; font-size: .72rem; font-weight: 700; letter-spacing: .03em; margin-bottom: 5px; }
+    .ocr-text { font-size: 1rem; line-height: 1.8; overflow-wrap: anywhere; white-space: pre-wrap; }
+    mark { background: #ffe08a; color: #172939; padding: 1px 0; border-radius: 2px; }
+    .empty { color: #8b99a5; font-size: .9rem; }
+    .section-title { margin: 22px 2px 10px; font-size: .95rem; }
+    .extra { padding: 10px 12px 13px; font-size: 1rem; }
+    .extra strong { display: inline-block; margin-right: 10px; font-size: .78rem; color: #245f82; }
+    .footnote { margin: 4px 2px 24px; color: #607280; font-size: .78rem; }
+    @media (max-width: 900px) {
+      main { display: block; height: auto; }
+      .scan-panel { height: 54vh; border-right: 0; border-bottom: 1px solid #ced4d9; }
+      .review-panel { height: 75vh; }
+    }
+    @media (max-width: 550px) { .ocr-pair { grid-template-columns: 1fr; } .ocr-side + .ocr-side { border-left: 0; border-top: 1px solid #e4e8ec; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>OCRレビュー · PDF <%= page %>ページ</h1>
+    <p>本文 <%= rows.length %>列 · 不一致 <%= total_edits %>編集 · 別領域 <%= extras.length %>件</p>
+  </header>
+  <main>
+    <section class="scan-panel" aria-label="原本画像">
+      <div class="toolbar">
+        <strong>原本画像</strong>
+        <button type="button" id="zoom-out" aria-label="縮小">−</button>
+        <span class="zoom-label" id="zoom-label">100%</span>
+        <button type="button" id="zoom-in" aria-label="拡大">＋</button>
+        <button type="button" id="zoom-reset">全体表示</button>
+      </div>
+      <div class="scan-scroll" id="scan-scroll">
+        <div class="scan-stage" id="scan-stage">
+          <img src="data:image/jpeg;base64,<%= image_data %>" width="<%= image_width %>" height="<%= image_height %>" alt="PDF <%= page %>ページのスキャン画像">
+          <div class="focus-box" id="focus-box" aria-hidden="true"></div>
+        </div>
+      </div>
+      <div class="scan-hint">右の列を選ぶと、原本内の対応領域を赤枠で示す。画像は拡大できる。</div>
+    </section>
+    <section class="review-panel" aria-label="OCR比較">
+      <div class="toolbar">
+        <strong>列ごとの比較（右から左へ）</strong>
+        <button type="button" id="show-all" aria-pressed="true">すべて</button>
+        <button type="button" id="show-diff" aria-pressed="false">差がある列</button>
+      </div>
+      <div class="rows-scroll" id="rows-scroll">
+        <% rows.each do |row| %>
+        <article class="row-card" data-box="<%= row.fetch(:box).join(',') %>" data-diff="<%= row.fetch(:distance) %>">
+          <button type="button" class="row-head" aria-label="列 <%= row.fetch(:index) %> の原本位置を表示">
+            <span class="number">列 <%= row.fetch(:index) %></span>
+            <span class="coord">x=<%= row.fetch(:box)[0] %></span>
+            <span class="count <%= row.fetch(:distance).positive? ? 'changed' : '' %>"><%= row.fetch(:distance) %> 編集</span>
+          </button>
+          <div class="ocr-pair">
+            <div class="ocr-side"><span class="ocr-label">NDLOCR-Lite</span><div class="ocr-text"><%= row.fetch(:ndl_html) %></div></div>
+            <div class="ocr-side"><span class="ocr-label">PaddleOCR</span><div class="ocr-text"><% if row.fetch(:paddle_missing) %><span class="empty">対応する列なし</span><% else %><%= row.fetch(:paddle_html) %><% end %></div></div>
+          </div>
+        </article>
+        <% end %>
+        <% unless extras.empty? %>
+        <h2 class="section-title">本文とは別の領域</h2>
+        <% extras.each do |item| %>
+        <article class="row-card" data-box="<%= item.fetch(:box).join(',') %>" data-diff="1">
+          <button type="button" class="row-head" aria-label="<%= CGI.escapeHTML(item.fetch(:type)) %> の原本位置を表示">
+            <span class="number"><%= CGI.escapeHTML(item.fetch(:type)) %></span>
+            <span class="coord">x=<%= item.fetch(:box)[0] %>, y=<%= item.fetch(:box)[1] %></span>
+          </button>
+          <div class="extra"><strong>PaddleOCR</strong><%= CGI.escapeHTML(item.fetch(:text)) %></div>
+        </article>
+        <% end %>
+        <% end %>
+        <p class="footnote">黄色は両OCRの不一致。どちらが正しいかは原本で確認する。本文以外の分類はNDLOCR-Liteの領域検出に基づく。</p>
+      </div>
+    </section>
+  </main>
+  <script>
+    const stage = document.getElementById('scan-stage');
+    const scanScroll = document.getElementById('scan-scroll');
+    const focus = document.getElementById('focus-box');
+    const cards = [...document.querySelectorAll('.row-card')];
+    const imageWidth = <%= image_width %>;
+    const imageHeight = <%= image_height %>;
+    let zoom = 1;
+    let selected = null;
+
+    function setZoom(value) {
+      zoom = Math.min(3, Math.max(1, value));
+      stage.style.width = `${zoom * 100}%`;
+      document.getElementById('zoom-label').textContent = `${Math.round(zoom * 100)}%`;
+      if (selected) showBox(selected);
+    }
+
+    function showBox(card) {
+      const [left, top, right, bottom] = card.dataset.box.split(',').map(Number);
+      focus.style.left = `${left / imageWidth * 100}%`;
+      focus.style.top = `${top / imageHeight * 100}%`;
+      focus.style.width = `${(right - left) / imageWidth * 100}%`;
+      focus.style.height = `${(bottom - top) / imageHeight * 100}%`;
+      focus.classList.add('visible');
+      const rect = focus.getBoundingClientRect();
+      const pane = scanScroll.getBoundingClientRect();
+      scanScroll.scrollLeft += (rect.left + rect.right) / 2 - (pane.left + pane.right) / 2;
+      scanScroll.scrollTop += (rect.top + rect.bottom) / 2 - (pane.top + pane.bottom) / 2;
+    }
+
+    cards.forEach(card => card.querySelector('.row-head').addEventListener('click', () => {
+      if (selected) selected.classList.remove('selected');
+      selected = card;
+      card.classList.add('selected');
+      showBox(card);
+    }));
+    document.getElementById('zoom-in').addEventListener('click', () => setZoom(zoom + 0.5));
+    document.getElementById('zoom-out').addEventListener('click', () => setZoom(zoom - 0.5));
+    document.getElementById('zoom-reset').addEventListener('click', () => setZoom(1));
+    document.getElementById('show-all').addEventListener('click', () => {
+      cards.forEach(card => card.classList.remove('hidden'));
+      document.getElementById('show-all').setAttribute('aria-pressed', 'true');
+      document.getElementById('show-diff').setAttribute('aria-pressed', 'false');
+    });
+    document.getElementById('show-diff').addEventListener('click', () => {
+      cards.forEach(card => card.classList.toggle('hidden', Number(card.dataset.diff) === 0));
+      document.getElementById('show-all').setAttribute('aria-pressed', 'false');
+      document.getElementById('show-diff').setAttribute('aria-pressed', 'true');
+    });
+  </script>
+</body>
+</html>
