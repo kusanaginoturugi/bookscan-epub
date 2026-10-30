@@ -1,0 +1,7 @@
+/input/
+/work/
+/vendor/
+/.venv-*/
+/.uv-cache/
+/.paddlex/
+/.cache/
