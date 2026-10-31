@@ -7,8 +7,8 @@ require 'erb'
 require 'json'
 require 'fileutils'
 
-abort "usage: #{$PROGRAM_NAME} IMAGE NDL_JSON PADDLE_JSON OUTPUT_HTML" unless ARGV.length == 4
-image_path, ndl_path, paddle_path, output_path = ARGV
+abort "usage: #{$PROGRAM_NAME} IMAGE NDL_JSON PADDLE_JSON OUTPUT_HTML [RUBY_JSON]" unless (4..5).cover?(ARGV.length)
+image_path, ndl_path, paddle_path, output_path, ruby_path = ARGV
 
 def box_for(line)
   points = line.fetch('boundingBox')
@@ -86,7 +86,7 @@ ndl = ndl_data.fetch('contents').flatten
 paddle_data = JSON.parse(File.read(paddle_path))
 paddle = paddle_data.fetch('rec_texts').each_with_index.map do |text, index|
   { text: text, box: paddle_data.fetch('rec_boxes').fetch(index) }
-end
+end.reject { |line| line.fetch(:text).empty? }
 xml_path = ndl_path.sub(/\.json\z/, '.xml')
 blocks = if File.file?(xml_path)
            File.read(xml_path).scan(/<BLOCK\b([^>]+)\/>/).map do |raw|
@@ -99,6 +99,14 @@ blocks = if File.file?(xml_path)
          else
            []
          end
+ruby_results = ruby_path ? JSON.parse(File.read(ruby_path)).fetch('rubies') : []
+folio_blocks = blocks.select { |block| block.fetch(:type) == 'ノンブル' }
+excluded_folios = []
+paddle.reject! do |line|
+  folio = folio_blocks.any? { |block| overlap_ratio(block.fetch(:box), line.fetch(:box)) >= 0.5 }
+  excluded_folios << line if folio
+  folio
+end
 
 matched = Hash.new { |hash, key| hash[key] = [] }
 unmatched = []
@@ -121,11 +129,17 @@ rows = ndl.each_with_index.map do |line, index|
     ndl_html: ndl_html, paddle_html: paddle_html, paddle_missing: parts.empty? }
 end
 
-extras = unmatched.map do |line|
-  block = blocks.max_by { |candidate| overlap_ratio(candidate.fetch(:box), line.fetch(:box)) }
-  type = block && overlap_ratio(block.fetch(:box), line.fetch(:box)) >= 0.5 ? block.fetch(:type) : '未分類'
-  { type: type, text: line.fetch(:text), box: line.fetch(:box) }
+used = []
+extras = blocks.select { |block| block.fetch(:type) == 'ルビ' }.map do |block|
+  hits = unmatched.select { |line| overlap_ratio(block.fetch(:box), line.fetch(:box)) >= 0.5 }
+  used.concat(hits)
+  result = ruby_results.find { |item| item.fetch('box') == block.fetch(:box) }
+  { type: 'ルビ', text: hits.map { |line| line.fetch(:text) }.join,
+    box: block.fetch(:box), ndl_models: result && result.fetch('text') }
 end
+extras.concat((unmatched - used).map do |line|
+  { type: '未分類', text: line.fetch(:text), box: line.fetch(:box), ndl_models: nil }
+end)
 extras.sort_by! { |item| [item.fetch(:box)[0] * -1, item.fetch(:box)[1]] }
 
 page = File.basename(image_path)[/page-(\d+)/, 1] || '?'
@@ -136,4 +150,4 @@ total_edits = rows.sum { |row| row.fetch(:distance) }
 template = File.read(File.expand_path('../templates/review.html.erb', __dir__))
 FileUtils.mkdir_p(File.dirname(output_path))
 File.write(output_path, ERB.new(template).result(binding))
-puts "wrote #{output_path}: #{rows.length} columns, #{total_edits} OCR differences, #{extras.length} other regions"
+puts "wrote #{output_path}: #{rows.length} columns, #{total_edits} OCR differences, #{extras.length} other regions, #{excluded_folios.length} folios excluded"

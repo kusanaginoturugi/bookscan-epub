@@ -10,7 +10,7 @@ ndl = JSON.parse(File.read(ARGV[0])).fetch('contents').flatten
 paddle_data = JSON.parse(File.read(ARGV[1]))
 paddle = paddle_data.fetch('rec_texts').each_with_index.map do |text, index|
   { 'text' => text, 'box' => paddle_data.fetch('rec_boxes').fetch(index) }
-end
+end.reject { |line| line.fetch('text').empty? }
 ndl_xml = ARGV[0].sub(/\.json\z/, '.xml')
 blocks = if File.file?(ndl_xml)
            File.read(ndl_xml).scan(/<BLOCK\b([^>]+)\/>/).map do |raw|
@@ -99,6 +99,11 @@ def change_spans(operations)
   spans
 end
 
+folios = blocks.select { |block| block.fetch('type') == 'ノンブル' }
+excluded_folios, paddle = paddle.partition do |line|
+  folios.any? { |block| region_overlap(block.fetch('box'), line.fetch('box')) >= 0.5 }
+end
+
 matched = Hash.new { |hash, key| hash[key] = [] }
 unmatched = []
 
@@ -144,6 +149,9 @@ unmatched.each do |line|
   block = blocks.max_by { |candidate| region_overlap(candidate.fetch('box'), line.fetch('box')) }
   region = block && region_overlap(block.fetch('box'), line.fetch('box')) >= 0.5 ? block.fetch('type') : '未分類'
   puts "unmatched Paddle line: region=#{region} x=#{line.fetch('box')[0]} y=#{line.fetch('box')[1]} text=#{line.fetch('text')}"
+end
+excluded_folios.each do |line|
+  puts "excluded folio: x=#{line.fetch('box')[0]} y=#{line.fetch('box')[1]} text=#{line.fetch('text')}"
 end
 puts "total edit distance: #{total_distance} / #{total_chars} NDL characters"
 puts 'This measures OCR disagreement, not accuracy.'
