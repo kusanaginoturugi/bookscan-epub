@@ -55,4 +55,6 @@ NDLOCR-LiteのJSONと同じ場所にXMLがあれば、比較スクリプトは�
 
 追加評価の [PDF 19ページ](review/page-019.html) と [PDF 20ページ](review/page-020.html) もローカルに生成済み。ルビの原本確認にはページを開いてルビの行を選ぶ。未分類のPaddleOCR候補には認識スコアを表示し、低スコアは「未分類・低信頼」と区別する。
 
+原本画像で確認した3か所のルビは `eval/ruby-gold.tsv` に記録した。`ruby bin/score-ruby.rb` で保存済みOCR結果との完全一致を再計算できる。判読がまだ曖昧な箇所は採点対象に入れない。
+
 設計と進捗は [docs/progress.md](docs/progress.md) に記録する。
