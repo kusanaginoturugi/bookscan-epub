@@ -85,7 +85,8 @@ ndl_data = JSON.parse(File.read(ndl_path))
 ndl = ndl_data.fetch('contents').flatten
 paddle_data = JSON.parse(File.read(paddle_path))
 paddle = paddle_data.fetch('rec_texts').each_with_index.map do |text, index|
-  { text: text, box: paddle_data.fetch('rec_boxes').fetch(index) }
+  { text: text, box: paddle_data.fetch('rec_boxes').fetch(index),
+    score: paddle_data.fetch('rec_scores').fetch(index) }
 end.reject { |line| line.fetch(:text).empty? }
 xml_path = ndl_path.sub(/\.json\z/, '.xml')
 blocks = if File.file?(xml_path)
@@ -135,10 +136,11 @@ extras = blocks.select { |block| block.fetch(:type) == 'ルビ' }.map do |block|
   used.concat(hits)
   result = ruby_results.find { |item| item.fetch('box') == block.fetch(:box) }
   { type: 'ルビ', text: hits.map { |line| line.fetch(:text) }.join,
-    box: block.fetch(:box), ndl_models: result && result.fetch('text') }
+    box: block.fetch(:box), ndl_models: result && result.fetch('text'), score: hits.map { |line| line.fetch(:score) }.min }
 end
 extras.concat((unmatched - used).map do |line|
-  { type: '未分類', text: line.fetch(:text), box: line.fetch(:box), ndl_models: nil }
+  { type: line.fetch(:score) < 0.5 ? '未分類・低信頼' : '未分類',
+    text: line.fetch(:text), box: line.fetch(:box), ndl_models: nil, score: line.fetch(:score) }
 end)
 extras.sort_by! { |item| [item.fetch(:box)[0] * -1, item.fetch(:box)[1]] }
 

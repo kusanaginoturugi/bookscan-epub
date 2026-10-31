@@ -47,12 +47,12 @@ ruby bin/build-review.rb \
 firefox-developer-edition review/page-012.html
 ```
 
-PaddleOCR 3.7.0 の PP-OCRv6 では日本語の `--lang` は `ja` ではなく `japan`。各OCRのJSONは別々に保存し、比較時に座標で縦列を対応付ける。比較値は食い違いの量であり、正解率ではない。
+PaddleOCR 3.7.0 の PP-OCRv6 では日本語の `--lang` は `ja` ではなく `japan`。各OCRのJSONは別々に保存し、比較時に座標で縦列を対応付ける。比較値は食い違いの量であり、正解率ではない。現状、PaddleOCRは検証用の参考表示にとどめ、本文の自動採用・多数決には使わない。
 
 NDLOCR-LiteのJSONと同じ場所にXMLがあれば、比較スクリプトは本文に対応しないPaddleOCR領域をルビ・ノンブルとして分類する。ページ12ではルビ「きぜん」とノンブル「10」を分類できた。
 
 レビューHTMLは画像を埋め込んだ単独ファイル。列ごとに差を黄色で示し、列を選ぶと原本の位置を赤枠で表示する。ルビはNDLOCR-Liteの検出枠を切り出して付属の3つの文字認識モデルに読ませ、PaddleOCRと並べる。ノンブルは本文照合前に除外する。生成物は `review/` に置き、Gitには含めない。
 
-追加評価の [PDF 19ページ](review/page-019.html) と [PDF 20ページ](review/page-020.html) もローカルに生成済み。ルビの原本確認にはページを開いてルビの行を選ぶ。
+追加評価の [PDF 19ページ](review/page-019.html) と [PDF 20ページ](review/page-020.html) もローカルに生成済み。ルビの原本確認にはページを開いてルビの行を選ぶ。未分類のPaddleOCR候補には認識スコアを表示し、低スコアは「未分類・低信頼」と区別する。
 
 設計と進捗は [docs/progress.md](docs/progress.md) に記録する。

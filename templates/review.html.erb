@@ -97,16 +97,16 @@
           </button>
           <div class="ocr-pair">
             <div class="ocr-side">
-              <span class="ocr-label">NDL切り出し認識</span>
+              <span class="ocr-label"><%= item.fetch(:type) == 'ルビ' ? 'NDL切り出し認識' : 'NDLの対応領域' %></span>
               <div class="ocr-text ruby-text">
                 <% if item.fetch(:ndl_models) %>
                   <% item.fetch(:ndl_models).each do |model, value| %>
                   <span class="model-line"><span class="model-name"><%= CGI.escapeHTML(model) %>文字モデル</span><%= CGI.escapeHTML(value) %></span>
                   <% end %>
-                <% else %><span class="empty">未実行</span><% end %>
+                <% else %><span class="empty"><%= item.fetch(:type) == 'ルビ' ? '未実行' : 'なし' %></span><% end %>
               </div>
             </div>
-            <div class="ocr-side"><span class="ocr-label">PaddleOCR</span><div class="ocr-text"><% if item.fetch(:text).empty? %><span class="empty">未検出</span><% else %><%= CGI.escapeHTML(item.fetch(:text)) %><% end %></div></div>
+            <div class="ocr-side"><span class="ocr-label">PaddleOCR<% if item.fetch(:score) %> · 認識スコア <%= format('%.2f', item.fetch(:score)) %><% end %></span><div class="ocr-text"><% if item.fetch(:text).empty? %><span class="empty">未検出</span><% else %><%= CGI.escapeHTML(item.fetch(:text)) %><% end %></div></div>
           </div>
         </article>
         <% end %>
@@ -125,7 +125,7 @@
           </div>
         </article>
         <% end %>
-        <p class="footnote">黄色は本文OCRの不一致。ルビはNDLOCR-Liteの検出領域を切り出して認識。ノンブルは本文候補から先に除外した。採否は原本で確認する。</p>
+        <p class="footnote">黄色は本文OCRの不一致。PaddleOCRは検証用で、本文の自動採用には使わない。ルビはNDLOCR-Liteの検出領域を切り出して認識。ノンブルは本文候補から先に除外した。</p>
       </div>
     </section>
   </main>
