@@ -61,7 +61,7 @@
 <body>
   <header>
     <h1>OCRレビュー · PDF <%= page %>ページ</h1>
-    <p>本文 <%= rows.length %>列 · 不一致 <%= total_edits %>編集 · ルビ等 <%= extras.length %>件 · ノンブル除外 <%= excluded_folios.length %>件</p>
+    <p>本文 <%= rows.length %>列 · 不一致 <%= total_edits %>編集 · ルビ等 <%= extras.length %>件 · ノンブル除外 <%= excluded_folios.length %>件<% if ignore_leaders %> · 点線リーダー除外<% end %></p>
   </header>
   <main>
     <section class="scan-panel" aria-label="原本画像">
@@ -125,7 +125,7 @@
           </div>
         </article>
         <% end %>
-        <p class="footnote">黄色は本文OCRの不一致。PaddleOCRは検証用で、本文の自動採用には使わない。ルビはNDLOCR-Liteの検出領域を切り出して認識。ノンブルは本文候補から先に除外した。</p>
+        <p class="footnote">黄色は本文OCRの不一致。<% if ignore_leaders %>繰り返しの点線リーダー（……、...）は比較と表示から除外し、名前の中点「・」や長音「ー」は比較対象に残した。<% end %>PaddleOCRは検証用で、本文の自動採用には使わない。ルビはNDLOCR-Liteの検出領域を切り出して認識。ノンブルは本文候補から先に除外した。</p>
       </div>
     </section>
   </main>

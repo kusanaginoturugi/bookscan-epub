@@ -1,4 +1,5 @@
 /input/
+/output/
 /work/
 /review/
 /vendor/
@@ -6,3 +7,4 @@
 /.uv-cache/
 /.paddlex/
 /.cache/
+__pycache__/

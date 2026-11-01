@@ -4,7 +4,8 @@
 require 'json'
 
 details = ARGV.delete('--details')
-abort "usage: #{$PROGRAM_NAME} [--details] NDL_JSON PADDLE_JSON" unless ARGV.length == 2
+ignore_leaders = ARGV.delete('--ignore-leaders')
+abort "usage: #{$PROGRAM_NAME} [--details] [--ignore-leaders] NDL_JSON PADDLE_JSON" unless ARGV.length == 2
 
 ndl = JSON.parse(File.read(ARGV[0])).fetch('contents').flatten
 paddle_data = JSON.parse(File.read(ARGV[1]))
@@ -80,6 +81,10 @@ def align_text(left, right)
   [matrix[a.length][b.length], operations.reverse]
 end
 
+def comparison_text(text, ignore_leaders)
+  ignore_leaders ? text.gsub(/(?:…{2,}|\.{3,}|⋯+)/, '') : text
+end
+
 def change_spans(operations)
   spans = []
   offset = 0
@@ -132,8 +137,8 @@ ndl.each_with_index do |line, index|
     next
   end
 
-  ndl_text = line.fetch('text')
-  paddle_text = parts.map { |part| part.fetch('text') }.join
+  ndl_text = comparison_text(line.fetch('text'), ignore_leaders)
+  paddle_text = comparison_text(parts.map { |part| part.fetch('text') }.join, ignore_leaders)
   distance, operations = align_text(ndl_text, paddle_text)
   total_distance += distance
   total_chars += ndl_text.scan(/\X/).length
@@ -154,4 +159,5 @@ excluded_folios.each do |line|
   puts "excluded folio: x=#{line.fetch('box')[0]} y=#{line.fetch('box')[1]} text=#{line.fetch('text')}"
 end
 puts "total edit distance: #{total_distance} / #{total_chars} NDL characters"
+puts 'Repeated dot leaders were ignored; ・ and ー remain significant.' if ignore_leaders
 puts 'This measures OCR disagreement, not accuracy.'

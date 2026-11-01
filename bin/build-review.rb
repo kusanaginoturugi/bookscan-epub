@@ -7,7 +7,8 @@ require 'erb'
 require 'json'
 require 'fileutils'
 
-abort "usage: #{$PROGRAM_NAME} IMAGE NDL_JSON PADDLE_JSON OUTPUT_HTML [RUBY_JSON]" unless (4..5).cover?(ARGV.length)
+ignore_leaders = ARGV.delete('--ignore-leaders')
+abort "usage: #{$PROGRAM_NAME} [--ignore-leaders] IMAGE NDL_JSON PADDLE_JSON OUTPUT_HTML [RUBY_JSON]" unless (4..5).cover?(ARGV.length)
 image_path, ndl_path, paddle_path, output_path, ruby_path = ARGV
 
 def box_for(line)
@@ -81,6 +82,10 @@ def highlighted_pair(left, right)
   [matrix[a.length][b.length], *rendered]
 end
 
+def comparison_text(text, ignore_leaders)
+  ignore_leaders ? text.gsub(/(?:…{2,}|\.{3,}|⋯+)/, '') : text
+end
+
 ndl_data = JSON.parse(File.read(ndl_path))
 ndl = ndl_data.fetch('contents').flatten
 paddle_data = JSON.parse(File.read(paddle_path))
@@ -123,8 +128,8 @@ end
 
 rows = ndl.each_with_index.map do |line, index|
   parts = matched[index].sort_by { |part| part.fetch(:box)[1] }
-  ndl_text = line.fetch('text')
-  paddle_text = parts.map { |part| part.fetch(:text) }.join
+  ndl_text = comparison_text(line.fetch('text'), ignore_leaders)
+  paddle_text = comparison_text(parts.map { |part| part.fetch(:text) }.join, ignore_leaders)
   distance, ndl_html, paddle_html = highlighted_pair(ndl_text, paddle_text)
   { index: index + 1, box: box_for(line), distance: distance,
     ndl_html: ndl_html, paddle_html: paddle_html, paddle_missing: parts.empty? }

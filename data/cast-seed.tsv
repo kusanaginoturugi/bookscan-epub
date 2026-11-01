@@ -1,0 +1,18 @@
+entity_id	surface	reading	kind	source_pdf_page	status	ndlocr	paddleocr	note
+person-bernard-fallon	バーナード・ファロン	バーナード・ファロン	person	4	confirmed	バーナード・ファロン	バーナード・フアロン	画像で「ファロン」と確認。別名は次行。
+person-bernard-fallon	コンラッド・ハニガン	コンラッド・ハニガン	alias	4	confirmed	コンラッド・ハニガン	コンラッド・ハニガン	バーナード・ファロンの別名。
+person-julia-clarell	ジュリア・クラレル	ジュリア・クラレル	person	4	confirmed	ジュリア・クラレル	ジュリア・クラレル	
+person-marlowe	マーロウ大佐	マーロウ大佐	person	4	confirmed	マーロウ大佐	マーロウ大佐	
+person-boris-fugelman	ボリス・フューグルマン	ボリス・フューグルマン	person	4	needs_review	ポリス・フューグルマン	ボリス・フューグルマン	ボ／ポがOCR間で不一致。原画像で要確認。
+person-aloysius-morokutsu	アロイシャス・モロクツ	アロイシャス・モロクツ	person	4	needs_review	アロイシャツ・モロクツ	アロイシャツ・モロクツ	「ス／ツ」が不鮮明。原画像で要確認。
+person-nargib-tonbart	ナーギブ・トンバート	ナーギブ・トンバート	person	4	confirmed	ナーギブ・トンバート	ナーギブ・トンバート	
+person-julius-embat	ジュリアス・エンバット	ジュリアス・エンバット	person	4	confirmed	ジュリアス・エンバット	ジュリアス・エンバット	
+person-macon-ngoiba	マコン・ンゴイバ	マコン・ンゴイバ	person	4	needs_review	マコン・ンゴイバ	マコン・ハゴイバ	ン／ハがOCR間で不一致。原画像で要確認。
+person-jovai-balindas	ジョヴァイ・バリンダス	ジョヴァイ・バリンダス	person	4	confirmed	ジョヴァイ・バリンダス	ジョヴイ・バリンダス	ヴァ／ヴイを原画像と照合済み。
+person-hairi-yoratta	ハイリ・ヨラッタ	ハイリ・ヨラッタ	person	4	confirmed	ハイリヨラッタ	ハイリ・ヨラッタ	
+person-marie-guridan	マリー・グリダン	マリー・グリダン	person	4	confirmed	マリー・グリダン	マリー・グリダン	
+person-felix-welker	ドクター・フェリックス・ヴェルカー	ドクター・フェリックス・ヴェルカー	person	4	confirmed	ドクター・フェリックス・ヴェルカー	ドクター・フェリックス・ヴェルカー	
+person-candy	キャンディ	キャンディ	person	4	confirmed	キャンディ	キャンデイ	小書き「ィ」を原画像で確認。別名は次行。
+person-candy	アネット・モスワーノ	アネット・モスワーノ	alias	4	needs_review	アネット・モスワーノ	アネト・モスワノ	キャンディの本名。末尾表記を原画像で再確認。
+person-roger-parnham	ロジャー・パーナム	ロジャー・パーナム	person	4	confirmed	ロジャー・パーナム	ロジヤー・パーナム	小書き「ャ」を原画像で確認。
+person-leroy-wailen	レロイ・ワイレン	レロイ・ワイレン	person	4	confirmed	レロイ・ワイレン	レロイ・ワイレン	
