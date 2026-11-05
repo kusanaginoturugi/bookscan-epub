@@ -7,6 +7,7 @@
 | 種類 | ファイル | 内容 |
 |---|---|---|
 | 完成品 | [検索可能PDF](output/trial/夏への扉%20-%20ロバート・A・ハインライン.pdf) | 356ページ。高さ400px以上の縦書き行は余白30pxの再認識、短い行は保存済みOCR。ダッシュ補正と、辞書による濁点・半濁点の補正（38か所）あり |
+| 注釈試作 | [薄色・右開き・注釈入りPDF](output/trial/夏への扉%20-%20ロバート・A・ハインライン%20注釈試作%20Firefox版%20薄色右開き.pdf) | PDFページ21・23・24に注釈と出典リンク。本文の偶数ページ176枚の端線を修正。Readest用の右開き指定入り。追加の[語句候補](data/summer-door-note-candidates.md) |
 | 再認識 | [余白別認識結果](work/margin/summer-door.tsv)・[実行ログ](work/margin/summer-door.log) | 全6181行。保存済みOCRと余白0・8・14・20・30pxの読み |
 | 正解 | [無作為35行](work/margin/summer-door-gold-random.tsv) | 読みが変わる群15行、同じ群10行、ルビに近い行10行。完成品の編集差2 |
 | 辞書 | [画像確認済み15語](work/eval/summer-door-glossary.tsv)・[頻出語候補332語](work/eval/summer-door-glossary-candidates.tsv) | 確認済みの語だけを `--fix-variants` に使う |

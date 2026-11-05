@@ -1,0 +1,21 @@
+[
+  {
+    "id": "fourth-amendment",
+    "title": "修正第四条",
+    "summary": "米国憲法修正第4条。政府による不合理な捜索・押収から人を守り、令状には相当な理由を求める。",
+    "source": "https://www.archives.gov/founding-docs/bill-of-rights-transcript",
+    "locations": [
+      {"page": 21, "line_id": 16, "term": "修正第四条", "side": "right"},
+      {"page": 23, "line_id": 4, "term": "修正第四条", "side": "right"}
+    ]
+  },
+  {
+    "id": "whistlers-mother",
+    "title": "ホイスラーの『母の肖像』",
+    "summary": "画家ジェームズ・マクニール・ホイッスラーの1871年の絵。椅子に座る母を横顔で描いた。原題は『灰色と黒のアレンジメント 第1番』。",
+    "source": "https://www.musee-orsay.fr/en/artworks/arrangement-en-gris-et-noir-ndeg1-974",
+    "locations": [
+      {"page": 24, "line_id": 17, "term": "ホイスラー", "side": "left"}
+    ]
+  }
+]

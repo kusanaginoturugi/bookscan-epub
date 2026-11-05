@@ -124,6 +124,26 @@ $PY bin/finalize-trial-pdf.py \
 
 OCRは約7分、余白つき再認識は約17分（CPUのみ）。`--min-height` より低い行は `--recognized` の列を使わず保存済みOCRの読みを残す。`--fix-variants` は辞書の確認済みの語について、バ行とパ行の1文字だけが違う読みを辞書の表記に置き換え、置き換えた件数を表示する。長いカタカナ語の一部（ペルシャのペルなど）や、辞書に載っている別の語は置き換えない。行をまたいで分かれた語は対象外。辞書候補は `bin/extract-glossary-candidates.py` で抜き出し、`work/eval/summer-door-glossary-candidates.tsv` に置いた。
 
+### 『夏への扉』の読書用注釈試作
+
+`data/summer-door-reading-notes.json` の2項目を、完成PDFのページ21・23・24にPDF標準のメモ注釈として埋め込んだ。注釈はページ上部の余白に置き、本文画像と文字層は変更しない。完成品は残し、別ファイル `output/trial/夏への扉 - ロバート・A・ハインライン 注釈試作 Firefox版 薄色右開き.pdf`（Git管理外）を作る。Firefoxの黄色い注釈アイコンを隠し、淡い灰色の吹き出しをページに描いた。吹き出しはマウスオーバーで説明を表示し、クリックで固定する。隣の「↗」は出典ページへのリンクで、Firefox内蔵PDFビューアが新しいタブで開く指定を付けた。本文の偶数ページ176枚の左端に残ったスキャン線を、白い細帯で覆った。Readest向けにPDFの `/ViewerPreferences /Direction /R2L` を設定し、見開きを右開きとして自動判定できるようにした。追加候補は [`data/summer-door-note-candidates.md`](data/summer-door-note-candidates.md) に、1956年以前の現実の情報だけを使って選定した。
+
+```sh
+../bookscan/vendor/.venv-ndlocr/bin/python bin/embed-reading-notes.py \
+  'output/trial/夏への扉 - ロバート・A・ハインライン.pdf' \
+  data/summer-door-reading-notes.json work/trial/summer-door-ocr \
+  0101-20150604095752068_check \
+  '/tmp/bookscan-summer-door-pale-notes.pdf'
+../bookscan/vendor/.venv-ndlocr/bin/python bin/mask-scan-edge.py \
+  '/tmp/bookscan-summer-door-pale-notes.pdf' \
+  '/tmp/bookscan-summer-door-pale-edge.pdf' \
+  --even-pages 4-354 --side left --pixels 8
+../bookscan/vendor/.venv-ndlocr/bin/python bin/set-pdf-direction.py \
+  '/tmp/bookscan-summer-door-pale-edge.pdf' \
+  'output/trial/夏への扉 - ロバート・A・ハインライン 注釈試作 Firefox版 薄色右開き.pdf' \
+  --direction rtl
+```
+
 ### 2冊目の試験：『インフィニティ・リミテッド（上）』
 
 完成品は `output/trial/インフィニティ・リミテッド（上） - ジェイムズ・P・ホーガン.pdf`（Git管理外）。388ページの原本を補正前にOCRし、画像を保持したPDFへ透明テキスト層を重ねた。画像で表記を確認した13語は `work/eval/infinity-upper-glossary.tsv`、個別のOCR補正7行は `work/eval/infinity-upper-overrides.tsv` に記録した。全文から抽出した未確認の頻出語候補は `work/eval/infinity-upper-glossary-candidates.tsv` に分け、自動補正には使わない。
