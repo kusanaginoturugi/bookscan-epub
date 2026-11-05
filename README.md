@@ -1,15 +1,15 @@
 # bookscan-epub
 
-画像PDFから、文字サイズを変更できるEPUBを作るための実験用リポジトリ。
+`~/src/bookscan/pdf/` の画像PDFをもとに、サニタイズ済みPDFへ透明テキスト層を重ねる実験用リポジトリ。原本の保管とダウンロードは別プロジェクト `~/src/bookscan/` が担当する。リポジトリ名は旧EPUB方針の名残。
 
 ## 現在の段階
 
-『インフィニティ・リミテッド 上』のページ画像で NDLOCR-Lite と PaddleOCR を比較している。原本・抽出画像・OCR結果は `.gitignore` で管理対象から外す。
+『虎よ、虎よ！』と『インフィニティ・リミテッド（上）』の検索可能PDFを作成した。[成果物の目次](artifacts.html)から完成PDF、辞書、レビューを開ける。目次の原稿は [artifacts.md](artifacts.md)。原本・抽出画像・OCR結果は `.gitignore` で管理対象から外す。
 
-この作業環境には `input/` に原本、`.venv-ndl/` と `.venv-paddle/` にそれぞれのOCR、`vendor/ndlocr-lite/` にNDLOCR-Liteのソースがある。これらはGitには含めない。
+以下は以前のOCR比較で使ったコマンド。このチェックアウトには当時の `.venv-ndl/` と作業データがなく、原本は隣の `bookscan/pdf/` にある。原本と生成物はGitに含めない。
 
 ```sh
-bin/extract-page.sh input/0101-20150604103726242_check.pdf 12
+bin/extract-page.sh ../bookscan/pdf/0101-20150604103726242_check.pdf 12
 
 mkdir -p work/ndl/page-012 work/paddle/page-012
 .venv-ndl/bin/ndlocr-lite \
@@ -73,17 +73,150 @@ ruby bin/build-review.rb --ignore-leaders \
   review/page-004.html
 ```
 
-設計と進捗は [docs/progress.md](docs/progress.md) に記録する。83冊のEPUB化候補は [data/epub-candidates.tsv](data/epub-candidates.tsv) に一次選別した。
+設計と進捗は [docs/progress.md](docs/progress.md) に記録する。[data/epub-candidates.tsv](data/epub-candidates.tsv) は旧EPUB方針での一次選別結果であり、検索可能PDFの対象を絞る根拠には使わない。
 
 ## BOOKSCAN PDF の閲覧用コピー
 
-原本は `input/bookscan-downloads/`、閲覧用コピーは `output/readable-pdf/`。83冊の書誌候補は `data/bookscan-catalog.tsv` に記録し、元のランダム名との対応を残す。書名と著者から `書名 - 著者.pdf` を作る。書誌情報は主に表紙OCRから作った候補なので、必要に応じて原画像で校正する。
+原本は別プロジェクトの `../bookscan/pdf/`、このプロジェクトで作る閲覧用コピーは `output/readable-pdf/`。83冊の書誌候補は `data/bookscan-catalog.tsv` に記録し、元のランダム名との対応を残す。書名と著者から `書名 - 著者.pdf` を作る。書誌情報は主に表紙OCRから作った候補なので、必要に応じて原画像で校正する。
 
 ```sh
 /usr/bin/python bin/prepare-books.py
 ```
 
+`bin/prepare-books.py` は `pikepdf`・`scipy`・`numpy`・`Pillow` を使い、シバンは `/usr/bin/python`。現在の環境では `/usr/bin/python` にも `../bookscan/vendor/.venv-ndlocr` にも `pikepdf` がなく、`/usr/bin/python` には `scipy` もないため、このままでは動かない。`output/readable-pdf/` も現在のチェックアウトにはない。検索可能PDFの試験では、代わりに `bin/prepare-trial-pdf.py`（`pypdf` と `cv2` を使う1冊ずつの版）で `output/trial/*-sanitized.pdf` を作っている。
+
 このスクリプトは画像PDFの本文ページを判別し、紙色が強いページだけ背景を白く補正する。縦組みの列から傾きを確信できたページのみ回転する。ページごとの表示サイズが揺れないよう、余白は切らずに原本のページ枠を保持する。表紙・カラー図版の画像は再圧縮しない。PDFの基本情報には書名と著者を、XMPには翻訳者・文庫名・元ファイル名を記録する。完了冊数と処理数は `output/readable-pdf/conversion.tsv` で確認できる。
 
 処理は途中で再実行できる。既に全ページがある出力PDFは飛ばし、ページ数が不足する試験出力は作り直す。原本はそのまま残す。
 書誌を修正した本だけ作り直す場合は `--only 元ファイル名 --force` を使う。
+
+## 検索可能PDFへの方針変更
+
+このプロジェクトで生成する閲覧用コピーの各ページ画像とページ枠を保持し、NDLOCR-Liteの本文認識結果を透明なテキスト層として重ねる。縦書きは原本の列順（右から左）と列内の行順（上から下）で文字抽出できるようにし、座標とテキストの対応も保持する。傾き補正するページでは補正前の画像もOCRし、補正後の画像へ文字座標を変換する。別プロジェクトの原本PDF、閲覧用PDF、OCR結果は別々に保存する。現在の試験では、閲覧用コピーとして `bin/prepare-trial-pdf.py` で作った `output/trial/*-sanitized.pdf` を使う。傾き補正前のOCR座標を補正後の画像へ移す変換は `bin/deskew-study.py` で6ページだけ試し、1冊分の処理には組み込んでいない。『インフィニティ・リミテッド（上）』は `--no-deskew` で傾き補正せずに作った。
+
+### 2冊目の試験：『インフィニティ・リミテッド（上）』
+
+完成品は `output/trial/インフィニティ・リミテッド（上） - ジェイムズ・P・ホーガン.pdf`（Git管理外）。388ページの原本を補正前にOCRし、画像を保持したPDFへ透明テキスト層を重ねた。画像で表記を確認した13語は `work/eval/infinity-upper-glossary.tsv`、個別のOCR補正7行は `work/eval/infinity-upper-overrides.tsv` に記録した。全文から抽出した未確認の頻出語候補は `work/eval/infinity-upper-glossary-candidates.tsv` に分け、自動補正には使わない。
+
+画像と文字層のレビューは `review/infinity-upper-eval/index.html`、辞書候補上位30語の画像は `review/infinity-upper-glossary/index.html`、ローカルLLMで選んだ20行は `review/infinity-upper-llm/index.html` にある。これらもGit管理外。方法と結果は [docs/progress.md](docs/progress.md) に記録した。
+
+傾き補正候補6ページの前後OCR比較と、補正前OCRの座標を回転して重ねた試験PDFは [比較レビュー](work/deskew-study/index.html) にまとめた。`bin/deskew-study.py --score` で保存済みの正解行を再採点できる。完成品388ページには補正を反映していない。
+
+`bin/ocr-sensitivity.py` は同じ6ページで保存済みの行枠を使い、NDLOCR-Liteの認識モデルだけを再実行する。行枠の幅、画素の揺らし、余白の追加（`--pad-sweep`）で認識結果がどう変わるかを `work/ocr-sensitivity/` に出す。
+
+`bin/margin-recognize.py` は1冊分の保存済みOCRの行枠を使い、縦書きの行画像に余白を足して認識モデルだけを再実行する。`--score` で正解TSVと照合する。
+
+```sh
+PY=../bookscan/vendor/.venv-ndlocr/bin/python
+$PY bin/margin-recognize.py work/margin/infinity-upper.tsv \
+  --pdf ../bookscan/pdf/0101-20150604103726242_check.pdf \
+  --ocr-dir work/trial/infinity-upper-ocr --ocr-stem 0101-20150604103726242_check
+$PY bin/margin-recognize.py work/margin/infinity-upper.tsv \
+  --score work/margin/gold-random.tsv work/margin/gold-existing.tsv
+```
+
+余白30pxの結果で文字層を作り直した版は `output/trial/インフィニティ・リミテッド（上） - ジェイムズ・P・ホーガン v2.pdf`（Git管理外）。従来の完成品と並べて置き、置き換えるかは未決定。`--fix-dashes` は縦書き行で、前後どちらも英数字でない `-` を `―` にする。
+
+```sh
+PY=../bookscan/vendor/.venv-ndlocr/bin/python
+STEM=0101-20150604103726242_check
+$PY bin/rebuild-text-layer.py \
+  output/trial/infinity-upper-sanitized.pdf work/trial/infinity-upper-ocr \
+  output/trial/infinity-upper-text-unfinalized-v2.pdf --ocr-stem "$STEM" \
+  --glossary work/eval/infinity-upper-glossary.tsv \
+  --overrides work/eval/infinity-upper-overrides.tsv \
+  --recognized work/margin/infinity-upper.tsv --column margin30 --fix-dashes
+$PY bin/finalize-trial-pdf.py \
+  output/trial/infinity-upper-sanitized.pdf \
+  output/trial/infinity-upper-text-unfinalized-v2.pdf \
+  'output/trial/インフィニティ・リミテッド（上） - ジェイムズ・P・ホーガン v2.pdf' \
+  --catalog-source "${STEM}.pdf"
+```
+
+```sh
+PY=../bookscan/vendor/.venv-ndlocr/bin/python
+STEM=0101-20150604103726242_check
+$PY bin/prepare-trial-pdf.py "${STEM}.pdf" output/trial/infinity-upper-sanitized.pdf --no-deskew
+$PY ../bookscan/vendor/ndlocr-lite/src/ocr.py \
+  --sourcepdf ../bookscan/pdf/"${STEM}.pdf" \
+  --output work/trial/infinity-upper-ocr \
+  --pdf-output output/trial/infinity-upper-original-ocr.pdf \
+  --pdf-render-dpi 300
+$PY bin/rebuild-text-layer.py \
+  output/trial/infinity-upper-sanitized.pdf work/trial/infinity-upper-ocr \
+  output/trial/infinity-upper-text-unfinalized.pdf --ocr-stem "$STEM" \
+  --glossary work/eval/infinity-upper-glossary.tsv \
+  --overrides work/eval/infinity-upper-overrides.tsv
+$PY bin/finalize-trial-pdf.py \
+  output/trial/infinity-upper-sanitized.pdf \
+  output/trial/infinity-upper-text-unfinalized.pdf \
+  'output/trial/インフィニティ・リミテッド（上） - ジェイムズ・P・ホーガン.pdf' \
+  --catalog-source "${STEM}.pdf"
+```
+
+ルビを本文へ組み込むEPUB特有の処理は不要になる。ルビ画像は残るが、読み上げ時の発音やルビ自体の検索は本文OCRだけでは保証できない。必要になった場合に限り、ルビを別途OCRして扱いを決める。読み上げはPDF閲覧アプリの機能と抽出順に依存するため、実際に使うアプリで確認する。実装と検証手順は [docs/progress.md](docs/progress.md) の最新方針を参照。
+
+### 1冊目の試験：『虎よ、虎よ！』
+
+旧選別で文字配置が重要とした本を364ページ処理した。空白修正版は `output/trial/虎よ、虎よ！ - アルフレッド・ベスター 空白修正.pdf`（Git管理外）。`../bookscan/vendor/.venv-ndlocr/bin/python` とNDLOCR-LiteのPDF文字層機能を使用する。再現手順:
+
+```sh
+PY=../bookscan/vendor/.venv-ndlocr/bin/python
+SOURCE=0101-20150604101257195_check.pdf
+mkdir -p output/trial work/trial/tiger-full
+$PY bin/prepare-trial-pdf.py "$SOURCE" output/trial/tiger-sanitized.pdf
+$PY ../bookscan/vendor/ndlocr-lite/src/ocr.py \
+  --sourcepdf output/trial/tiger-sanitized.pdf \
+  --output work/trial/tiger-full \
+  --pdf-output output/trial/tiger-searchable-unfinalized.pdf \
+  --pdf-render-dpi 300
+$PY bin/finalize-trial-pdf.py \
+  output/trial/tiger-sanitized.pdf \
+  output/trial/tiger-searchable-unfinalized.pdf \
+  'output/trial/虎よ、虎よ！ - アルフレッド・ベスター.pdf'
+$PY bin/rebuild-text-layer.py \
+  output/trial/tiger-sanitized.pdf work/trial/tiger-full \
+  output/trial/tiger-text-normalized.pdf \
+  --overrides work/eval/tiger-overrides.tsv \
+  --glossary work/eval/tiger-glossary.tsv
+$PY bin/finalize-trial-pdf.py \
+  output/trial/tiger-sanitized.pdf output/trial/tiger-text-normalized.pdf \
+  'output/trial/虎よ、虎よ！ - アルフレッド・ベスター 空白修正.pdf'
+```
+
+`prepare-trial-pdf.py`・`rebuild-text-layer.py`・`finalize-trial-pdf.py`・`margin-recognize.py` と、`deskew-study.py` の準備段階は、出力が既にあると止まる。`ocr-sensitivity.py` は `variants.tsv`（`--pad-sweep` では `pad-sweep.tsv`）があると止まる。`evaluate-trial-pdf.py`・`rank-ocr-lines.py`・`build-glossary-review.py`・`extract-glossary-candidates.py` と、`deskew-study.py --score` の `report.json`・`index.html` は既存の出力を上書きする。この本で傾き補正したページは0なので、上の手順では閲覧用PDFを直接OCRした。全364ページのOCR結果は `work/trial/tiger-full/` に残る。検索・画像照合の結果と特殊な組版ページの制約は [docs/progress.md](docs/progress.md) に記録した。読み上げアプリでの実聴は未確認。
+
+### OCR文字層の評価
+
+`bin/evaluate-trial-pdf.py` は通常ページ10件を固定シードで選び、例外ページと抽出が空のページも画像でレビューできるHTMLを作る。画像と照合した正解行を `work/eval/tiger-gold.tsv` に、検索したい語を `work/eval/tiger-queries.tsv` に保存する。これらの本文データはGit管理外。
+
+```sh
+PY=../bookscan/vendor/.venv-ndlocr/bin/python
+$PY bin/evaluate-trial-pdf.py \
+  'output/trial/虎よ、虎よ！ - アルフレッド・ベスター 空白修正.pdf' \
+  work/trial/tiger-full review/tiger-eval \
+  --gold work/eval/tiger-gold.tsv \
+  --queries work/eval/tiger-queries.tsv --normalized-text-layer \
+  --overrides work/eval/tiger-overrides.tsv \
+  --glossary work/eval/tiger-glossary.tsv
+```
+
+結果は `review/tiger-eval/index.html` と `review/tiger-eval/report.json`。通常ページ10行・425文字では編集差0、例外ページ5行・54文字では編集差3。画像で確認した検索語12件のうち5件はPDF文字層に見つからず、いずれも特殊組版ページだった。この小標本を本全体の正解率とみなさない。詳しくは [進捗と設計メモ](docs/progress.md)。
+
+`--ocr-stem` の既定値 `tiger-sanitized` と `--special-pages` の既定値 `155,192,257,311,316,321` は『虎よ、虎よ！』用。上の例はOCRのファイル名が `tiger-sanitized_*.json` なので既定値で動く。『インフィニティ・リミテッド（上）』の `review/infinity-upper-eval/` は次の指定で作った。完成品の文字層は4ページ・行10を直す前の補正で作ったため、直した補正ファイルで再実行すると4ページが不一致として報告される。`--recognized` で作ったv2の文字層は保存済みOCRのJSONと一致しないので、このスクリプトでは評価できない。
+
+```sh
+PY=../bookscan/vendor/.venv-ndlocr/bin/python
+STEM=0101-20150604103726242_check
+$PY bin/evaluate-trial-pdf.py \
+  'output/trial/インフィニティ・リミテッド（上） - ジェイムズ・P・ホーガン.pdf' \
+  work/trial/infinity-upper-ocr review/infinity-upper-eval --ocr-stem "$STEM" \
+  --queries work/eval/infinity-upper-queries.tsv --normalized-text-layer \
+  --overrides work/eval/infinity-upper-overrides.tsv \
+  --glossary work/eval/infinity-upper-glossary.tsv \
+  --special-pages 4,12,19,20,49,100,113,285,311,367,376
+```
+
+`bin/extract-glossary-candidates.py` はPDF全文から繰り返し現れるカタカナ語を集める。今回の候補100件は `work/eval/tiger-glossary-candidates.tsv`（Git管理外）に保存した。原本画像で確認した語だけを `work/eval/tiger-glossary.tsv` の `verified=yes` として使う。語中の空白だけをつなぎ、話者名とセリフの区切りなどは残す。
+
+ルビ近傍の空白などを優先してローカルLLMに文章の違和感を採点させる場合は、OpenAI互換のローカルサーバーを起動してから `bin/rank-ocr-lines.py` を使う。`--url` でサーバーを、`--glossary` で確認済み辞書を指定できる。今回の20行の結果は `review/tiger-llm/index.html` と `ranked.tsv`（Git管理外）。レビューには元OCRと修正版PDFの文字層を両方表示する。高スコアにも詩や意図的な反復が混じるため、原本画像で確認してから修正する。画像で確認した個別補正は `work/eval/tiger-overrides.tsv`（Git管理外）に記録する。

@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="ja" xml:lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc 3.11" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>検索可能PDFとレビューの目次</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      white-space: pre-wrap;
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: 1.5em;}
+    div.column{flex: auto;}
+    @media screen {
+    div.columns{gap: min(4vw, 1.5em);}
+    div.column{overflow-x: auto;}
+    }
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">検索可能PDFとレビューの目次</h1>
+</header>
+<nav id="TOC" role="doc-toc">
+<ul>
+<li><a href="#検索可能pdfとレビューの目次"
+id="toc-検索可能pdfとレビューの目次">検索可能PDFとレビューの目次</a>
+<ul>
+<li><a href="#インフィニティリミテッド上"
+id="toc-インフィニティリミテッド上">インフィニティ・リミテッド（上）</a>
+<ul>
+<li><a href="#行画像の余白と再認識"
+id="toc-行画像の余白と再認識">行画像の余白と再認識</a></li>
+<li><a href="#傾き補正の比較"
+id="toc-傾き補正の比較">傾き補正の比較</a></li>
+</ul></li>
+<li><a href="#虎よ虎よ" id="toc-虎よ虎よ">虎よ、虎よ！</a></li>
+<li><a href="#プロジェクト資料"
+id="toc-プロジェクト資料">プロジェクト資料</a></li>
+</ul></li>
+</ul>
+</nav>
+<h1 id="検索可能pdfとレビューの目次">検索可能PDFとレビューの目次</h1>
+<p>このページは、このリポジトリで作った2冊の成果物への入口。PDF、OCR結果、レビューの一部はGit管理外のローカルファイルなので、同じ作業ディレクトリで開く。完成品と試験版のPDFは、ページ単位の奇数ページ見開き（<code>/PageLayout /TwoPageLeft</code>）で、1ページ目をページ全体に合わせて開く（<code>/OpenAction</code>
+の <code>/Fit</code>）設定を持つ。Firefoxでの効き方は<a
+href="docs/progress.md">作業記録</a>のPDFの初期表示設定を参照。</p>
+<h2
+id="インフィニティリミテッド上">インフィニティ・リミテッド（上）</h2>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>種類</th>
+<th>ファイル</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>完成品</td>
+<td><a
+href="output/trial/インフィニティ・リミテッド（上）%20-%20ジェイムズ・P・ホーガン.pdf">検索可能PDF</a></td>
+<td>388ページ、透明テキスト層付き</td>
+</tr>
+<tr>
+<td>試験版</td>
+<td><a
+href="output/trial/インフィニティ・リミテッド（上）%20-%20ジェイムズ・P・ホーガン%20v2.pdf">余白30pxの文字層
+v2</a></td>
+<td>認識モデルを余白30pxで再実行し、ダッシュを補正。無作為23行の編集差58→7。置き換えは未決定</td>
+</tr>
+<tr>
+<td>評価（完成品）</td>
+<td><a
+href="review/infinity-upper-eval/index.html">ページ画像と文字層のレビュー</a></td>
+<td>通常10ページ、例外ページ、空白ページの画像。v2は対象外</td>
+</tr>
+<tr>
+<td>評価（完成品）</td>
+<td><a href="review/infinity-upper-eval/report.json">集計JSON</a>・<a
+href="review/infinity-upper-eval/sample.tsv">標本TSV</a></td>
+<td>文字層一致、検索語13件、標本一覧。4ページ・行10の補正を直した後に再実行すると、4ページが不一致になる（完成品は直す前の補正のまま）</td>
+</tr>
+<tr>
+<td>辞書</td>
+<td><a
+href="work/eval/infinity-upper-glossary.tsv">画像確認済み13語</a></td>
+<td>補正に使う表記</td>
+</tr>
+<tr>
+<td>辞書</td>
+<td><a
+href="work/eval/infinity-upper-glossary-candidates.tsv">頻出語候補517語</a>・<a
+href="review/infinity-upper-glossary/index.html">上位30語の画像</a></td>
+<td>未確認候補は自動補正に使わない</td>
+</tr>
+<tr>
+<td>補正</td>
+<td><a
+href="work/eval/infinity-upper-overrides.tsv">画像確認済みの7行</a>（4ページ・行10はv2用に修正済み）・<a
+href="work/eval/infinity-upper-queries.tsv">検索語13件</a></td>
+<td>元OCRを残して文字層だけ補正</td>
+</tr>
+<tr>
+<td>文章レビュー</td>
+<td><a
+href="review/infinity-upper-llm/index.html">画像付きレビュー</a>・<a
+href="review/infinity-upper-llm/ranked.tsv">採点TSV</a></td>
+<td>ローカルLLMで選んだ20行。スコアは正誤判定ではない</td>
+</tr>
+<tr>
+<td>中間PDF</td>
+<td><a
+href="output/trial/infinity-upper-sanitized.pdf">画像保持版</a>・<a
+href="output/trial/infinity-upper-original-ocr.pdf">原本OCR版</a>・<a
+href="output/trial/infinity-upper-text-unfinalized.pdf">文字層版</a>・<a
+href="output/trial/infinity-upper-text-unfinalized-v2.pdf">v2文字層版</a></td>
+<td>作業確認用。閲覧には完成品を使う</td>
+</tr>
+</tbody>
+</table>
+<p>OCRのページ別JSON・TXT・XMLは
+<code>work/trial/infinity-upper-ocr/</code>
+に保存してある。評価結果と手順は<a
+href="docs/progress.md">作業記録</a>を参照。</p>
+<h3 id="行画像の余白と再認識">行画像の余白と再認識</h3>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>種類</th>
+<th>ファイル</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>再認識</td>
+<td><a
+href="work/margin/infinity-upper.tsv">全ページの余白別認識結果</a></td>
+<td>全6621行。保存済みOCRと余白0・8・14・20・30pxの読み。v2の文字層の元</td>
+</tr>
+<tr>
+<td>正解</td>
+<td><a href="work/margin/gold-random.tsv">無作為23行</a>・<a
+href="work/margin/gold-existing.tsv">既存の20行</a></td>
+<td>原本画像から転記。<code>bin/margin-recognize.py --score</code>
+で採点</td>
+</tr>
+<tr>
+<td>感度実験</td>
+<td><a href="work/ocr-sensitivity/variants.tsv">条件別の認識結果</a>・<a
+href="work/ocr-sensitivity/pad-sweep.tsv">余白の比較</a>・<a
+href="work/ocr-sensitivity/summary.json">集計JSON</a>・<a
+href="work/ocr-sensitivity/gold-lines.tsv">正解行</a></td>
+<td>傾き補正比較の6ページで、枠の幅・揺らし・JPEG品質・余白を変えて認識モデルだけ再実行</td>
+</tr>
+</tbody>
+</table>
+<h3 id="傾き補正の比較">傾き補正の比較</h3>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>種類</th>
+<th>ファイル</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>OCR比較</td>
+<td><a
+href="work/deskew-study/index.html">画像と正解テキストのレビュー</a>・<a
+href="work/deskew-study/report.json">集計JSON</a>・<a
+href="work/deskew-study/gold.tsv">正解TSV</a></td>
+<td>6ページ、13行、488文字の原本・再保存・傾き補正後比較</td>
+</tr>
+<tr>
+<td>座標検証</td>
+<td><a
+href="work/deskew-study/transformed-ocr.pdf">補正後画像＋補正前OCRの文字層</a>・<a
+href="work/deskew-study/transformed-visible.pdf">青字での位置確認用PDF</a>・<a
+href="work/deskew-study/search-hit-35.jpg">検索位置の画像</a></td>
+<td>文字層を画像と同じ角度だけ回転</td>
+</tr>
+<tr>
+<td>中間データ</td>
+<td><a href="work/deskew-study/original.pdf">原本ページ抜粋</a>・<a
+href="work/deskew-study/reencoded.pdf">再保存のみ</a>・<a
+href="work/deskew-study/rotated.pdf">補正後ページ抜粋</a>・<a
+href="work/deskew-study/pages.tsv">対応表</a></td>
+<td>35、160、179、192、209、210ページ</td>
+</tr>
+</tbody>
+</table>
+<p>比較の再実行には
+<code>../bookscan/vendor/.venv-ndlocr/bin/python bin/deskew-study.py --score</code>
+を使う。</p>
+<h2 id="虎よ虎よ">虎よ、虎よ！</h2>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>種類</th>
+<th>ファイル</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>完成品</td>
+<td><a
+href="output/trial/虎よ、虎よ！%20-%20アルフレッド・ベスター%20空白修正.pdf">検索可能PDF（空白修正）</a></td>
+<td>364ページ、透明テキスト層付き</td>
+</tr>
+<tr>
+<td>試験版</td>
+<td><a
+href="output/trial/虎よ、虎よ！%20-%20アルフレッド・ベスター%20空白修正%20v2.pdf">空白修正
+v2</a>・<a href="review/tiger-eval-v2/index.html">評価</a></td>
+<td>15ページ・行9、254ページ・行4の個別補正を追加。正解15行の編集差3、検索語7/12は完成品と同じ。置き換えは未決定</td>
+</tr>
+<tr>
+<td>評価</td>
+<td><a
+href="review/tiger-eval/index.html">ページ画像と文字層のレビュー</a>・<a
+href="review/tiger-eval/report.json">集計JSON</a></td>
+<td>通常・例外ページ、検索語の照合</td>
+</tr>
+<tr>
+<td>辞書</td>
+<td><a href="work/eval/tiger-glossary.tsv">確認済み語</a>・<a
+href="work/eval/tiger-glossary-candidates.tsv">頻出語候補</a></td>
+<td>候補は未確認</td>
+</tr>
+<tr>
+<td>補正</td>
+<td><a href="work/eval/tiger-overrides.tsv">個別補正</a>・<a
+href="work/eval/tiger-gold.tsv">画像照合した正解行</a>・<a
+href="work/eval/tiger-queries.tsv">検索語</a></td>
+<td>原本画像で確認した内容</td>
+</tr>
+<tr>
+<td>文章レビュー</td>
+<td><a href="review/tiger-llm/index.html">画像付きレビュー</a>・<a
+href="review/tiger-llm/ranked.tsv">採点TSV</a></td>
+<td>ローカルLLMによる優先順位</td>
+</tr>
+</tbody>
+</table>
+<h2 id="プロジェクト資料">プロジェクト資料</h2>
+<ul>
+<li><a
+href="README.md">README</a>：方針、再現手順、各スクリプトの説明</li>
+<li><a
+href="docs/progress.md">作業記録</a>：評価結果、制約、次の作業</li>
+<li><a
+href="data/bookscan-catalog.tsv">書誌カタログ</a>：元PDF名と書名の対応</li>
+</ul>
+<p>HTMLは
+<code>pandoc --standalone --toc -M lang=ja -M title=検索可能PDFとレビューの目次 -o artifacts.html artifacts.md</code>
+で再生成できる。</p>
+</body>
+</html>
