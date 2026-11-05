@@ -117,6 +117,15 @@ def main():
                 note_origins[term] = '既存の出典付き説明'
                 references[term] = note['source']
 
+    for correction in csv.DictReader((root / 'data/summer-door-glossary-corrections.tsv').open(), delimiter='\t'):
+        term = correction['term']
+        if term not in notes:
+            raise ValueError(f'correction term missing from glossary: {term}')
+        notes[term] = correction['note']
+        note_origins[term] = '本文・資料で補正'
+        if correction['reference_url']:
+            references[term] = correction['reference_url']
+
     output = root / 'data/summer-door-reading-glossary.tsv'
     with output.open('w', newline='') as stream:
         writer = csv.writer(stream, delimiter='\t', lineterminator='\n')
