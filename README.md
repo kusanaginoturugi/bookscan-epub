@@ -4,7 +4,7 @@
 
 ## 現在の段階
 
-『虎よ、虎よ！』と『インフィニティ・リミテッド（上）』の検索可能PDFを作成した。[成果物の目次](artifacts.html)から完成PDF、辞書、レビューを開ける。目次の原稿は [artifacts.md](artifacts.md)。原本・抽出画像・OCR結果は `.gitignore` で管理対象から外す。
+『虎よ、虎よ！』『インフィニティ・リミテッド（上）』『夏への扉』の検索可能PDFを作成した。[成果物の目次](artifacts.html)から完成PDF、辞書、レビューを開ける。目次の原稿は [artifacts.md](artifacts.md)。原本・抽出画像・OCR結果は `.gitignore` で管理対象から外す。
 
 以下は以前のOCR比較で使ったコマンド。このチェックアウトには当時の `.venv-ndl/` と作業データがなく、原本は隣の `bookscan/pdf/` にある。原本と生成物はGitに含めない。
 
@@ -94,6 +94,36 @@ ruby bin/build-review.rb --ignore-leaders \
 
 このプロジェクトで生成する閲覧用コピーの各ページ画像とページ枠を保持し、NDLOCR-Liteの本文認識結果を透明なテキスト層として重ねる。縦書きは原本の列順（右から左）と列内の行順（上から下）で文字抽出できるようにし、座標とテキストの対応も保持する。傾き補正するページでは補正前の画像もOCRし、補正後の画像へ文字座標を変換する。別プロジェクトの原本PDF、閲覧用PDF、OCR結果は別々に保存する。現在の試験では、閲覧用コピーとして `bin/prepare-trial-pdf.py` で作った `output/trial/*-sanitized.pdf` を使う。傾き補正前のOCR座標を補正後の画像へ移す変換は `bin/deskew-study.py` で6ページだけ試し、1冊分の処理には組み込んでいない。『インフィニティ・リミテッド（上）』は `--no-deskew` で傾き補正せずに作った。
 
+### 3冊目：『夏への扉』（余白つき再認識を最初から使う手順）
+
+完成品は `output/trial/夏への扉 - ロバート・A・ハインライン.pdf`（Git管理外）。356ページ。保存済みOCRのない本に、上巻で決めた規則を最初から当てた。原本をOCRして行枠を得たあと、`bin/margin-recognize.py` で認識モデルだけを余白つきで再実行する。高さ400px以上の縦書き行は余白30pxの読み、それより低い行（短い会話行・ノンブル・奥付など）は保存済みOCRの読みを使い、`--fix-dashes` を当てる。さらに、画像で確認した15語の辞書 `work/eval/summer-door-glossary.tsv` と `--fix-variants` で、濁点と半濁点の取り違え（ビート→ピート、ポストン→ボストンなど）を直す。個別補正はまだない。
+
+```sh
+PY=../bookscan/vendor/.venv-ndlocr/bin/python
+STEM=0101-20150604095752068_check
+$PY bin/prepare-trial-pdf.py "${STEM}.pdf" output/trial/summer-door-sanitized.pdf --no-deskew
+$PY ../bookscan/vendor/ndlocr-lite/src/ocr.py \
+  --sourcepdf ../bookscan/pdf/"${STEM}.pdf" \
+  --output work/trial/summer-door-ocr \
+  --pdf-output output/trial/summer-door-original-ocr.pdf \
+  --pdf-render-dpi 300
+$PY bin/margin-recognize.py work/margin/summer-door.tsv \
+  --pdf ../bookscan/pdf/"${STEM}.pdf" \
+  --ocr-dir work/trial/summer-door-ocr --ocr-stem "$STEM"
+$PY bin/rebuild-text-layer.py \
+  output/trial/summer-door-sanitized.pdf work/trial/summer-door-ocr \
+  output/trial/summer-door-text-unfinalized-v2.pdf --ocr-stem "$STEM" \
+  --recognized work/margin/summer-door.tsv --column margin30 --min-height 400 --fix-dashes \
+  --glossary work/eval/summer-door-glossary.tsv --fix-variants
+$PY bin/finalize-trial-pdf.py \
+  output/trial/summer-door-sanitized.pdf \
+  output/trial/summer-door-text-unfinalized-v2.pdf \
+  'output/trial/夏への扉 - ロバート・A・ハインライン.pdf' \
+  --catalog-source "${STEM}.pdf"
+```
+
+OCRは約7分、余白つき再認識は約17分（CPUのみ）。`--min-height` より低い行は `--recognized` の列を使わず保存済みOCRの読みを残す。`--fix-variants` は辞書の確認済みの語について、バ行とパ行の1文字だけが違う読みを辞書の表記に置き換え、置き換えた件数を表示する。長いカタカナ語の一部（ペルシャのペルなど）や、辞書に載っている別の語は置き換えない。行をまたいで分かれた語は対象外。辞書候補は `bin/extract-glossary-candidates.py` で抜き出し、`work/eval/summer-door-glossary-candidates.tsv` に置いた。
+
 ### 2冊目の試験：『インフィニティ・リミテッド（上）』
 
 完成品は `output/trial/インフィニティ・リミテッド（上） - ジェイムズ・P・ホーガン.pdf`（Git管理外）。388ページの原本を補正前にOCRし、画像を保持したPDFへ透明テキスト層を重ねた。画像で表記を確認した13語は `work/eval/infinity-upper-glossary.tsv`、個別のOCR補正7行は `work/eval/infinity-upper-overrides.tsv` に記録した。全文から抽出した未確認の頻出語候補は `work/eval/infinity-upper-glossary-candidates.tsv` に分け、自動補正には使わない。
@@ -115,7 +145,7 @@ $PY bin/margin-recognize.py work/margin/infinity-upper.tsv \
   --score work/margin/gold-random.tsv work/margin/gold-existing.tsv
 ```
 
-余白30pxの結果で文字層を作り直した版は `output/trial/インフィニティ・リミテッド（上） - ジェイムズ・P・ホーガン v2.pdf`（Git管理外）。従来の完成品と並べて置き、置き換えるかは未決定。`--fix-dashes` は縦書き行で、前後どちらも英数字でない `-` を `―` にする。
+余白30pxの結果で文字層を作り直した版は `output/trial/インフィニティ・リミテッド（上） - ジェイムズ・P・ホーガン v2.pdf`（Git管理外）。従来の完成品と並べて置き、置き換えるかは未決定。v2は `--min-height` を付けずに作ったため、短い行の閉じかぎ括弧の脱落などを含む（[docs/progress.md](docs/progress.md)）。`--fix-dashes` は縦書き行で、前後どちらも英数字でない `-` を `―` にする。
 
 ```sh
 PY=../bookscan/vendor/.venv-ndlocr/bin/python

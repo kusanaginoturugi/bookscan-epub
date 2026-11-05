@@ -5,11 +5,12 @@ import argparse
 import csv
 import json
 import sys
+from collections import Counter
 from pathlib import Path
 
 from pypdf import PdfReader
 
-from text_layer_utils import clean_text, fix_dashes, load_glossary
+from text_layer_utils import clean_text, fix_dashes, fix_variants, load_glossary
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -24,8 +25,12 @@ def main():
     parser.add_argument('--recognized', type=Path,
                         help='TSV from bin/margin-recognize.py to use instead of saved OCR text')
     parser.add_argument('--column', default='margin30', help='column of --recognized to use')
+    parser.add_argument('--min-height', type=int, default=0,
+                        help='keep saved OCR text for --recognized lines shorter than this many pixels')
     parser.add_argument('--fix-dashes', action='store_true',
                         help='turn hyphens outside Latin words into two-em dashes in vertical lines')
+    parser.add_argument('--fix-variants', action='store_true',
+                        help='replace dakuten/handakuten misreadings of --glossary terms')
     parser.add_argument('--ndl-src', type=Path,
                         default=Path('../bookscan/vendor/ndlocr-lite/src'))
     args = parser.parse_args()
@@ -34,6 +39,9 @@ def main():
     sys.path.insert(0, str(args.ndl_src.resolve()))
     from ocr import embed_text_layer_pdf
     glossary = load_glossary(args.glossary) if args.glossary else []
+    if args.fix_variants and not glossary:
+        parser.error('--fix-variants needs --glossary')
+    variants = Counter()
 
     overrides = {}
     if args.overrides:
@@ -68,7 +76,8 @@ def main():
                 row = recognized.pop(key, None)
                 if row is None or row['saved'] != original:
                     raise ValueError(f'recognized TSV does not match OCR: {key}')
-                text = row[args.column]
+                if int(row['height']) >= args.min_height:
+                    text = row[args.column]
             if key in overrides:
                 override = overrides.pop(key)
                 if override['ocr_text'] != original:
@@ -78,6 +87,8 @@ def main():
                 if args.fix_dashes and vertical:
                     text = fix_dashes(text)
                 text = clean_text(text, vertical, glossary)
+                if args.fix_variants:
+                    text = fix_variants(text, glossary, variants)
             if text != original:
                 changed_lines += 1
                 removed_spaces += (original.count(' ') + original.count('　') -
@@ -94,6 +105,8 @@ def main():
     embed_text_layer_pdf(str(args.sanitized_pdf), str(args.output_pdf), page_results)
     print(f'{args.output_pdf}: {count} pages, {changed_lines} lines normalized, '
           f'{removed_spaces} spaces removed')
+    for (variant, term), count in sorted(variants.items(), key=lambda item: -item[1]):
+        print(f'{variant} -> {term}: {count}')
 
 
 if __name__ == '__main__':

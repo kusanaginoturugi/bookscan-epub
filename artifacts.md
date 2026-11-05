@@ -1,13 +1,25 @@
 # 検索可能PDFとレビューの目次
 
-このページは、このリポジトリで作った2冊の成果物への入口。PDF、OCR結果、レビューの一部はGit管理外のローカルファイルなので、同じ作業ディレクトリで開く。完成品と試験版のPDFは、ページ単位の奇数ページ見開き（`/PageLayout /TwoPageLeft`）で、1ページ目をページ全体に合わせて開く（`/OpenAction` の `/Fit`）設定を持つ。Firefoxでの効き方は[作業記録](docs/progress.md)のPDFの初期表示設定を参照。
+このページは、このリポジトリで作った3冊の成果物への入口。PDF、OCR結果、レビューの一部はGit管理外のローカルファイルなので、同じ作業ディレクトリで開く。完成品と試験版のPDFは、ページ単位の奇数ページ見開き（`/PageLayout /TwoPageLeft`）で、1ページ目をページ全体に合わせて開く（`/OpenAction` の `/Fit`）設定を持つ。Firefoxでの効き方は[作業記録](docs/progress.md)のPDFの初期表示設定を参照。
+
+## 夏への扉
+
+| 種類 | ファイル | 内容 |
+|---|---|---|
+| 完成品 | [検索可能PDF](output/trial/夏への扉%20-%20ロバート・A・ハインライン.pdf) | 356ページ。高さ400px以上の縦書き行は余白30pxの再認識、短い行は保存済みOCR。ダッシュ補正と、辞書による濁点・半濁点の補正（38か所）あり |
+| 再認識 | [余白別認識結果](work/margin/summer-door.tsv)・[実行ログ](work/margin/summer-door.log) | 全6181行。保存済みOCRと余白0・8・14・20・30pxの読み |
+| 正解 | [無作為35行](work/margin/summer-door-gold-random.tsv) | 読みが変わる群15行、同じ群10行、ルビに近い行10行。完成品の編集差2 |
+| 辞書 | [画像確認済み15語](work/eval/summer-door-glossary.tsv)・[頻出語候補332語](work/eval/summer-door-glossary-candidates.tsv) | 確認済みの語だけを `--fix-variants` に使う |
+| 中間PDF | [画像保持版](output/trial/summer-door-sanitized.pdf)・[原本OCR版](output/trial/summer-door-original-ocr.pdf)・[文字層版（辞書補正前）](output/trial/summer-door-text-unfinalized.pdf)・[文字層版](output/trial/summer-door-text-unfinalized-v2.pdf) | 作業確認用。閲覧には完成品を使う |
+
+OCRのページ別JSON・TXT・XMLは `work/trial/summer-door-ocr/` に保存してある。
 
 ## インフィニティ・リミテッド（上）
 
 | 種類 | ファイル | 内容 |
 |---|---|---|
 | 完成品 | [検索可能PDF](output/trial/インフィニティ・リミテッド（上）%20-%20ジェイムズ・P・ホーガン.pdf) | 388ページ、透明テキスト層付き |
-| 試験版 | [余白30pxの文字層 v2](output/trial/インフィニティ・リミテッド（上）%20-%20ジェイムズ・P・ホーガン%20v2.pdf) | 認識モデルを余白30pxで再実行し、ダッシュを補正。無作為23行の編集差58→7。置き換えは未決定 |
+| 試験版 | [余白30pxの文字層 v2](output/trial/インフィニティ・リミテッド（上）%20-%20ジェイムズ・P・ホーガン%20v2.pdf) | 認識モデルを余白30pxで再実行し、ダッシュを補正。無作為23行の編集差58→7。短い行の閉じかぎ括弧が33行で落ちる（`--min-height` 導入前）。置き換えは未決定 |
 | 評価（完成品） | [ページ画像と文字層のレビュー](review/infinity-upper-eval/index.html) | 通常10ページ、例外ページ、空白ページの画像。v2は対象外 |
 | 評価（完成品） | [集計JSON](review/infinity-upper-eval/report.json)・[標本TSV](review/infinity-upper-eval/sample.tsv) | 文字層一致、検索語13件、標本一覧。4ページ・行10の補正を直した後に再実行すると、4ページが不一致になる（完成品は直す前の補正のまま） |
 | 辞書 | [画像確認済み13語](work/eval/infinity-upper-glossary.tsv) | 補正に使う表記 |

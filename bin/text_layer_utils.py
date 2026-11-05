@@ -26,3 +26,23 @@ def fix_dashes(text):
     # NDLOCR-Lite often reads a vertical two-em dash as ASCII hyphens; keep
     # hyphens next to Latin letters or digits such as M-47.
     return re.sub(r'(?<![0-9A-Za-z])-+(?![0-9A-Za-z])', '―', text)
+
+
+VOICING = str.maketrans('バビブベボパピプペポ', 'パピプペポバビブベボ')
+
+
+def fix_variants(text, glossary, counts=None):
+    # OCR confuses dakuten and handakuten (ビ/ピ). Replace a reading that
+    # differs from a verified term by one such kana, unless it is part of a
+    # longer katakana word or is itself a verified term.
+    for term in glossary:
+        for index, char in enumerate(term):
+            swapped = char.translate(VOICING)
+            variant = term[:index] + swapped + term[index + 1:]
+            if swapped == char or variant in glossary:
+                continue
+            pattern = rf'(?<![ァ-ヴー]){re.escape(variant)}(?![ァ-ヴー])'
+            text, found = re.subn(pattern, term, text)
+            if found and counts is not None:
+                counts[(variant, term)] += found
+    return text

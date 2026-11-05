@@ -182,6 +182,7 @@
 <li><a href="#検索可能pdfとレビューの目次"
 id="toc-検索可能pdfとレビューの目次">検索可能PDFとレビューの目次</a>
 <ul>
+<li><a href="#夏への扉" id="toc-夏への扉">夏への扉</a></li>
 <li><a href="#インフィニティリミテッド上"
 id="toc-インフィニティリミテッド上">インフィニティ・リミテッド（上）</a>
 <ul>
@@ -197,9 +198,61 @@ id="toc-プロジェクト資料">プロジェクト資料</a></li>
 </ul>
 </nav>
 <h1 id="検索可能pdfとレビューの目次">検索可能PDFとレビューの目次</h1>
-<p>このページは、このリポジトリで作った2冊の成果物への入口。PDF、OCR結果、レビューの一部はGit管理外のローカルファイルなので、同じ作業ディレクトリで開く。完成品と試験版のPDFは、ページ単位の奇数ページ見開き（<code>/PageLayout /TwoPageLeft</code>）で、1ページ目をページ全体に合わせて開く（<code>/OpenAction</code>
+<p>このページは、このリポジトリで作った3冊の成果物への入口。PDF、OCR結果、レビューの一部はGit管理外のローカルファイルなので、同じ作業ディレクトリで開く。完成品と試験版のPDFは、ページ単位の奇数ページ見開き（<code>/PageLayout /TwoPageLeft</code>）で、1ページ目をページ全体に合わせて開く（<code>/OpenAction</code>
 の <code>/Fit</code>）設定を持つ。Firefoxでの効き方は<a
 href="docs/progress.md">作業記録</a>のPDFの初期表示設定を参照。</p>
+<h2 id="夏への扉">夏への扉</h2>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>種類</th>
+<th>ファイル</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>完成品</td>
+<td><a
+href="output/trial/夏への扉%20-%20ロバート・A・ハインライン.pdf">検索可能PDF</a></td>
+<td>356ページ。高さ400px以上の縦書き行は余白30pxの再認識、短い行は保存済みOCR。ダッシュ補正と、辞書による濁点・半濁点の補正（38か所）あり</td>
+</tr>
+<tr>
+<td>再認識</td>
+<td><a href="work/margin/summer-door.tsv">余白別認識結果</a>・<a
+href="work/margin/summer-door.log">実行ログ</a></td>
+<td>全6181行。保存済みOCRと余白0・8・14・20・30pxの読み</td>
+</tr>
+<tr>
+<td>正解</td>
+<td><a
+href="work/margin/summer-door-gold-random.tsv">無作為35行</a></td>
+<td>読みが変わる群15行、同じ群10行、ルビに近い行10行。完成品の編集差2</td>
+</tr>
+<tr>
+<td>辞書</td>
+<td><a
+href="work/eval/summer-door-glossary.tsv">画像確認済み15語</a>・<a
+href="work/eval/summer-door-glossary-candidates.tsv">頻出語候補332語</a></td>
+<td>確認済みの語だけを <code>--fix-variants</code> に使う</td>
+</tr>
+<tr>
+<td>中間PDF</td>
+<td><a href="output/trial/summer-door-sanitized.pdf">画像保持版</a>・<a
+href="output/trial/summer-door-original-ocr.pdf">原本OCR版</a>・<a
+href="output/trial/summer-door-text-unfinalized.pdf">文字層版（辞書補正前）</a>・<a
+href="output/trial/summer-door-text-unfinalized-v2.pdf">文字層版</a></td>
+<td>作業確認用。閲覧には完成品を使う</td>
+</tr>
+</tbody>
+</table>
+<p>OCRのページ別JSON・TXT・XMLは
+<code>work/trial/summer-door-ocr/</code> に保存してある。</p>
 <h2
 id="インフィニティリミテッド上">インフィニティ・リミテッド（上）</h2>
 <table>
@@ -227,7 +280,8 @@ href="output/trial/インフィニティ・リミテッド（上）%20-%20ジェ
 <td><a
 href="output/trial/インフィニティ・リミテッド（上）%20-%20ジェイムズ・P・ホーガン%20v2.pdf">余白30pxの文字層
 v2</a></td>
-<td>認識モデルを余白30pxで再実行し、ダッシュを補正。無作為23行の編集差58→7。置き換えは未決定</td>
+<td>認識モデルを余白30pxで再実行し、ダッシュを補正。無作為23行の編集差58→7。短い行の閉じかぎ括弧が33行で落ちる（<code>--min-height</code>
+導入前）。置き換えは未決定</td>
 </tr>
 <tr>
 <td>評価（完成品）</td>
