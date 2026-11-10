@@ -18,7 +18,7 @@ GLOSSARY=${3:-}
 PY=$DATA_ROOT/.venv-ndl/bin/python
 export BOOKSCAN_PDF_DIR=${BOOKSCAN_PDF_DIR:-$DATA_ROOT/input/bookscan-downloads}
 export NDLOCR_SRC=${NDLOCR_SRC:-$DATA_ROOT/vendor/ndlocr-lite/src}
-WORK=$DATA_ROOT/work/searchable/$SLUG
+WORK=$DATA_ROOT/work/searchable/$SLUG${MAX_PAGES:+-first$MAX_PAGES}
 OUT=$DATA_ROOT/output/searchable
 mkdir -p "$WORK" "$OUT"
 

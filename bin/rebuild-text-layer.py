@@ -5,6 +5,7 @@ import argparse
 import csv
 import os
 import json
+import math
 import sys
 from collections import Counter
 from pathlib import Path
@@ -35,34 +36,18 @@ def main():
     parser.add_argument('--ndl-src', type=Path,
                         default=Path(os.environ.get('NDLOCR_SRC', Path(__file__).resolve().parents[1] / 'vendor/ndlocr-lite/src')))
     parser.add_argument('--angles', type=Path,
-                        help='TSV from prepare-trial-pdf.py --angles; rotate OCR from the '
-                             'unrotated original with the deskewed page image')
+                        help='TSV from prepare-trial-pdf.py --angles; move OCR boxes from the '
+                             'unrotated original with each deskewed page image')
     args = parser.parse_args()
     if args.output_pdf.exists() or args.output_pdf.resolve() == args.sanitized_pdf.resolve():
         parser.error('output PDF must be new and separate from the input')
     sys.path.insert(0, str(args.ndl_src.resolve()))
-    import ocr
+    from ocr import embed_text_layer_pdf
     angles = {}
     if args.angles:
         with args.angles.open(newline='') as handle:
             angles = {int(row['page']): float(row['angle_deg'])
                       for row in csv.DictReader(handle, delimiter='\t')}
-        draw_line = ocr._draw_text_layer_line
-
-        def draw_rotated(canvas_obj, line, page_width, page_height, **kwargs):
-            # Rotate about the page centre, as the image was rotated about its centre
-            # (checked against post-deskew OCR in bin/deskew-study.py).
-            angle = line.get('angle', 0.0)
-            if angle:
-                canvas_obj.saveState()
-                canvas_obj.translate(page_width / 2, page_height / 2)
-                canvas_obj.rotate(angle)
-                canvas_obj.translate(-page_width / 2, -page_height / 2)
-            draw_line(canvas_obj=canvas_obj, line=line, page_width=page_width,
-                      page_height=page_height, **kwargs)
-            if angle:
-                canvas_obj.restoreState()
-        ocr._draw_text_layer_line = draw_rotated
     glossary = load_glossary(args.glossary) if args.glossary else []
     if args.fix_variants and not glossary:
         parser.error('--fix-variants needs --glossary')
@@ -120,17 +105,27 @@ def main():
                 changed_lines += 1
                 removed_spaces += (original.count(' ') + original.count('　') -
                                    text.count(' ') - text.count('　'))
+            info = data['imginfo']
+            if angles.get(page):
+                # The text is drawn straight along the box centre line, which already
+                # matches the deskewed column, so only move the box centre with the
+                # image rotation about its centre (formula from bin/deskew-study.py).
+                # Rotating the drawn text as well tilts it against the image.
+                angle = math.radians(angles[page])
+                cx, cy = info['img_width'] / 2, info['img_height'] / 2
+                ox, oy = (x0 + x1) / 2 - cx, (y0 + y1) / 2 - cy
+                dx = math.cos(angle) * ox + math.sin(angle) * oy - ox
+                dy = -math.sin(angle) * ox + math.cos(angle) * oy - oy
+                x0, x1, y0, y1 = x0 + dx, x1 + dx, y0 + dy, y1 + dy
             lines.append({'x': x0, 'y': y0, 'width': x1 - x0, 'height': y1 - y0,
-                          'text': text, 'is_vertical': vertical,
-                          'angle': angles.get(page, 0.0)})
-        info = data['imginfo']
+                          'text': text, 'is_vertical': vertical})
         page_results.append({'text_layer_lines': lines, 'img_width': info['img_width'],
                              'img_height': info['img_height']})
     if overrides:
         raise ValueError(f'overrides not found in OCR: {list(overrides)}')
     if recognized:
         raise ValueError(f'recognized lines not found in OCR: {list(recognized)[:5]}')
-    ocr.embed_text_layer_pdf(str(args.sanitized_pdf), str(args.output_pdf), page_results)
+    embed_text_layer_pdf(str(args.sanitized_pdf), str(args.output_pdf), page_results)
     print(f'{args.output_pdf}: {count} pages, {changed_lines} lines normalized, '
           f'{removed_spaces} spaces removed')
     for (variant, term), count in sorted(variants.items(), key=lambda item: -item[1]):

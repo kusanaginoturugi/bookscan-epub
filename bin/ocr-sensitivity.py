@@ -77,7 +77,9 @@ def load_lines(path):
     for item in ET.parse(path).iter('LINE'):
         lines.append({'x': int(item.get('X')), 'y': int(item.get('Y')),
                       'w': int(item.get('WIDTH')), 'h': int(item.get('HEIGHT')),
-                      'count': float(item.get('PRED_CHAR_CNT')), 'text': item.get('STRING')})
+                      # ocr.py uses 100 when the detector gave no count (small lines).
+                      'count': float(item.get('PRED_CHAR_CNT') or 100),
+                      'text': item.get('STRING')})
     return lines
 
 
