@@ -51,8 +51,8 @@ def main():
 
     grouped = defaultdict(list)
     rows = list(csv.DictReader(args.glossary.open(), delimiter='\t'))
-    if len(rows) != 234:
-        raise ValueError(f'expected 234 terms, got {len(rows)}')
+    if not rows or len({row['term'] for row in rows}) != len(rows):
+        raise ValueError('glossary is empty or has duplicate terms')
     for row in rows:
         number = int(row['first_pdf_page'])
         term = row['term']

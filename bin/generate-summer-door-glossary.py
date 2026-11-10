@@ -126,15 +126,25 @@ def main():
         if correction['reference_url']:
             references[term] = correction['reference_url']
 
+    drops = {row['term'] for row in csv.DictReader((root / 'data/summer-door-glossary-drops.tsv').open(), delimiter='\t')}
+    unknown = drops - {row['term'] for row in rows}
+    if unknown:
+        raise ValueError(f'drop terms missing from candidates: {sorted(unknown)}')
+    entries = [[row['first_pdf_page'], row['term'], notes[row['term']], note_origins[row['term']],
+                references.get(row['term'], ''), row['review_status']]
+               for row in rows if row['term'] not in drops]
+    for addition in csv.DictReader((root / 'data/summer-door-glossary-additions.tsv').open(), delimiter='\t'):
+        snippet(pages[int(addition['first_pdf_page']) - 1], addition['term'])
+        entries.append([addition['first_pdf_page'], addition['term'], addition['note'],
+                        addition['origin'], addition['reference_url'], '未検証'])
+    entries.sort(key=lambda entry: int(entry[0]))
+
     output = root / 'data/summer-door-reading-glossary.tsv'
     with output.open('w', newline='') as stream:
         writer = csv.writer(stream, delimiter='\t', lineterminator='\n')
         writer.writerow(['first_pdf_page', 'term', 'note', 'note_source', 'reference_url', 'review_status'])
-        for row in rows:
-            term = row['term']
-            writer.writerow([row['first_pdf_page'], term, notes[term], note_origins[term],
-                             references.get(term, ''), row['review_status']])
-    print(f'{len(notes)} notes -> {output}')
+        writer.writerows(entries)
+    print(f'{len(entries)} notes ({len(drops)} dropped) -> {output}')
 
 
 if __name__ == '__main__':
