@@ -4,7 +4,28 @@
 
 ## 現在の段階
 
-『虎よ、虎よ！』『インフィニティ・リミテッド（上）』『夏への扉』の検索可能PDFを作成した。[成果物の目次](artifacts.html)から完成PDF、辞書、レビューを開ける。目次の原稿は [artifacts.md](artifacts.md)。原本・抽出画像・OCR結果は `.gitignore` で管理対象から外す。
+『虎よ、虎よ！』『インフィニティ・リミテッド（上）』『夏への扉』の検索可能PDFを作成した。続けて傾き補正込みの手順で『時間泥棒』『暗黒星雲突破！』『天の光はすべて星』『インフィニティ・リミテッド（下）』を作り、ローカルLLMで作った濁点・半濁点の辞書で補正した版も作った。[成果物の目次](artifacts.html)から完成PDF、辞書、レビューを開ける。目次の原稿は [artifacts.md](artifacts.md)。原本・抽出画像・OCR結果は `.gitignore` で管理対象から外す。
+
+### 現在の1冊分の手順（傾き補正込み）
+
+原本は `input/bookscan-downloads/`、Pythonは `.venv-ndl`、NDLOCR-Liteは `vendor/ndlocr-lite/src`。作業は `work/searchable/作業名/`、完成品は `output/searchable/書名 - 著者.pdf`。各段は出力があれば飛ばすので、途中から再実行できる。`MAX_PAGES=8` を付けると先頭8ページだけの試運転（作業ディレクトリは別名）になる。
+
+```sh
+SOURCE=0101-20150604105123153_check.pdf   # data/bookscan-catalog.tsv の source
+bin/build-searchable-book.sh "$SOURCE" jikan-dorobou
+
+# ローカルLLM（llama-server 127.0.0.1:8080、gemma-4-12B）で濁点・半濁点の辞書を作り、補正版を作る
+.venv-ndl/bin/python bin/auto-variant-glossary.py \
+  work/searchable/jikan-dorobou/text-unfinalized.pdf \
+  work/searchable/jikan-dorobou/variant-glossary.tsv
+bin/build-searchable-book.sh "$SOURCE" jikan-dorobou work/searchable/jikan-dorobou/variant-glossary.tsv
+
+# 傾き補正したページの文字層の位置を確認（列の縦ずれの傾きが0付近ならよい）
+.venv-ndl/bin/python bin/check-deskew-text.py \
+  work/searchable/jikan-dorobou/angles.tsv work/searchable/jikan-dorobou/text-unfinalized.pdf
+```
+
+OCRは1ページ約1.2秒、余白つき再認識は約3秒（CPUのみ）。辞書の判定は1組数秒。考え方と検証結果は [docs/progress.md](docs/progress.md) の「傾き補正込みで4冊を作成」。
 
 以下は以前のOCR比較で使ったコマンド。このチェックアウトには当時の `.venv-ndl/` と作業データがなく、原本は隣の `bookscan/pdf/` にある。原本と生成物はGitに含めない。
 

@@ -1,6 +1,17 @@
 # 検索可能PDFとレビューの目次
 
-このページは、このリポジトリで作った3冊の成果物への入口。PDF、OCR結果、レビューの一部はGit管理外のローカルファイルなので、同じ作業ディレクトリで開く。完成品と試験版のPDFは、ページ単位の奇数ページ見開き（`/PageLayout /TwoPageLeft`）で、1ページ目をページ全体に合わせて開く（`/OpenAction` の `/Fit`）設定を持つ。Firefoxでの効き方は[作業記録](docs/progress.md)のPDFの初期表示設定を参照。
+このページは、このリポジトリで作った成果物への入口。PDF、OCR結果、レビューの一部はGit管理外のローカルファイルなので、同じ作業ディレクトリで開く。完成品と試験版のPDFは、ページ単位の奇数ページ見開き（`/PageLayout /TwoPageLeft`）で、1ページ目をページ全体に合わせて開く（`/OpenAction` の `/Fit`）設定を持つ。Firefoxでの効き方は[作業記録](docs/progress.md)のPDFの初期表示設定を参照。
+
+## 傾き補正込みの4冊（2026-11-10）
+
+`bin/build-searchable-book.sh` で作成。各冊とも、辞書補正なしの完成品と、ローカルLLMで作った濁点・半濁点の辞書で補正した版がある。辞書の判定と見送り理由は `work/searchable/作業名/variant-glossary.tsv`。
+
+| 書名 | ページ | 傾き補正 | 完成品 | 辞書補正版 | 辞書 |
+|---|---|---|---|---|---|
+| 時間泥棒 | 196 | 0 | [PDF](output/searchable/時間泥棒%20-%20ジェイムズ・P・ホーガン.pdf) | [PDF](output/searchable/時間泥棒%20-%20ジェイムズ・P・ホーガン%20辞書補正.pdf) | [8語10か所](work/searchable/jikan-dorobou/variant-glossary.tsv) |
+| 暗黒星雲突破！ | 216 | 0 | [PDF](output/searchable/暗黒星雲突破！%20-%20A・B・チャンドラー.pdf) | [PDF](output/searchable/暗黒星雲突破！%20-%20A・B・チャンドラー%20辞書補正.pdf) | [5語11か所](work/searchable/ankoku-seiun-toppa/variant-glossary.tsv) |
+| 天の光はすべて星 | 284 | 1 | [PDF](output/searchable/天の光はすべて星%20-%20フレドリック・ブラウン.pdf) | [PDF](output/searchable/天の光はすべて星%20-%20フレドリック・ブラウン%20辞書補正.pdf) | [5語7か所](work/searchable/ten-no-hikari/variant-glossary.tsv) |
+| インフィニティ・リミテッド（下） | 388 | 3 | [PDF](output/searchable/インフィニティ・リミテッド（下）%20-%20ジェイムズ・P・ホーガン.pdf) | [PDF](output/searchable/インフィニティ・リミテッド（下）%20-%20ジェイムズ・P・ホーガン%20辞書補正.pdf) | [20語61か所](work/searchable/infinity-lower/variant-glossary.tsv) |
 
 ## 夏への扉
 

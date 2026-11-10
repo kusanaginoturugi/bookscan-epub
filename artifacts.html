@@ -182,6 +182,8 @@
 <li><a href="#検索可能pdfとレビューの目次"
 id="toc-検索可能pdfとレビューの目次">検索可能PDFとレビューの目次</a>
 <ul>
+<li><a href="#傾き補正込みの4冊2026-11-10"
+id="toc-傾き補正込みの4冊2026-11-10">傾き補正込みの4冊（2026-11-10）</a></li>
 <li><a href="#夏への扉" id="toc-夏への扉">夏への扉</a></li>
 <li><a href="#インフィニティリミテッド上"
 id="toc-インフィニティリミテッド上">インフィニティ・リミテッド（上）</a>
@@ -198,9 +200,80 @@ id="toc-プロジェクト資料">プロジェクト資料</a></li>
 </ul>
 </nav>
 <h1 id="検索可能pdfとレビューの目次">検索可能PDFとレビューの目次</h1>
-<p>このページは、このリポジトリで作った3冊の成果物への入口。PDF、OCR結果、レビューの一部はGit管理外のローカルファイルなので、同じ作業ディレクトリで開く。完成品と試験版のPDFは、ページ単位の奇数ページ見開き（<code>/PageLayout /TwoPageLeft</code>）で、1ページ目をページ全体に合わせて開く（<code>/OpenAction</code>
+<p>このページは、このリポジトリで作った成果物への入口。PDF、OCR結果、レビューの一部はGit管理外のローカルファイルなので、同じ作業ディレクトリで開く。完成品と試験版のPDFは、ページ単位の奇数ページ見開き（<code>/PageLayout /TwoPageLeft</code>）で、1ページ目をページ全体に合わせて開く（<code>/OpenAction</code>
 の <code>/Fit</code>）設定を持つ。Firefoxでの効き方は<a
 href="docs/progress.md">作業記録</a>のPDFの初期表示設定を参照。</p>
+<h2
+id="傾き補正込みの4冊2026-11-10">傾き補正込みの4冊（2026-11-10）</h2>
+<p><code>bin/build-searchable-book.sh</code>
+で作成。各冊とも、辞書補正なしの完成品と、ローカルLLMで作った濁点・半濁点の辞書で補正した版がある。辞書の判定と見送り理由は
+<code>work/searchable/作業名/variant-glossary.tsv</code>。</p>
+<table style="width:100%;">
+<colgroup>
+<col style="width: 16%" />
+<col style="width: 16%" />
+<col style="width: 16%" />
+<col style="width: 16%" />
+<col style="width: 16%" />
+<col style="width: 16%" />
+</colgroup>
+<thead>
+<tr>
+<th>書名</th>
+<th>ページ</th>
+<th>傾き補正</th>
+<th>完成品</th>
+<th>辞書補正版</th>
+<th>辞書</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>時間泥棒</td>
+<td>196</td>
+<td>0</td>
+<td><a
+href="output/searchable/時間泥棒%20-%20ジェイムズ・P・ホーガン.pdf">PDF</a></td>
+<td><a
+href="output/searchable/時間泥棒%20-%20ジェイムズ・P・ホーガン%20辞書補正.pdf">PDF</a></td>
+<td><a
+href="work/searchable/jikan-dorobou/variant-glossary.tsv">8語10か所</a></td>
+</tr>
+<tr>
+<td>暗黒星雲突破！</td>
+<td>216</td>
+<td>0</td>
+<td><a
+href="output/searchable/暗黒星雲突破！%20-%20A・B・チャンドラー.pdf">PDF</a></td>
+<td><a
+href="output/searchable/暗黒星雲突破！%20-%20A・B・チャンドラー%20辞書補正.pdf">PDF</a></td>
+<td><a
+href="work/searchable/ankoku-seiun-toppa/variant-glossary.tsv">5語11か所</a></td>
+</tr>
+<tr>
+<td>天の光はすべて星</td>
+<td>284</td>
+<td>1</td>
+<td><a
+href="output/searchable/天の光はすべて星%20-%20フレドリック・ブラウン.pdf">PDF</a></td>
+<td><a
+href="output/searchable/天の光はすべて星%20-%20フレドリック・ブラウン%20辞書補正.pdf">PDF</a></td>
+<td><a
+href="work/searchable/ten-no-hikari/variant-glossary.tsv">5語7か所</a></td>
+</tr>
+<tr>
+<td>インフィニティ・リミテッド（下）</td>
+<td>388</td>
+<td>3</td>
+<td><a
+href="output/searchable/インフィニティ・リミテッド（下）%20-%20ジェイムズ・P・ホーガン.pdf">PDF</a></td>
+<td><a
+href="output/searchable/インフィニティ・リミテッド（下）%20-%20ジェイムズ・P・ホーガン%20辞書補正.pdf">PDF</a></td>
+<td><a
+href="work/searchable/infinity-lower/variant-glossary.tsv">20語61か所</a></td>
+</tr>
+</tbody>
+</table>
 <h2 id="夏への扉">夏への扉</h2>
 <table>
 <colgroup>
