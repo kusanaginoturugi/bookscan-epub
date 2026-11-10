@@ -3,6 +3,7 @@
 
 import argparse
 import csv
+import os
 import json
 import sys
 from collections import Counter
@@ -32,12 +33,36 @@ def main():
     parser.add_argument('--fix-variants', action='store_true',
                         help='replace dakuten/handakuten misreadings of --glossary terms')
     parser.add_argument('--ndl-src', type=Path,
-                        default=Path('../bookscan/vendor/ndlocr-lite/src'))
+                        default=Path(os.environ.get('NDLOCR_SRC', Path(__file__).resolve().parents[1] / 'vendor/ndlocr-lite/src')))
+    parser.add_argument('--angles', type=Path,
+                        help='TSV from prepare-trial-pdf.py --angles; rotate OCR from the '
+                             'unrotated original with the deskewed page image')
     args = parser.parse_args()
     if args.output_pdf.exists() or args.output_pdf.resolve() == args.sanitized_pdf.resolve():
         parser.error('output PDF must be new and separate from the input')
     sys.path.insert(0, str(args.ndl_src.resolve()))
-    from ocr import embed_text_layer_pdf
+    import ocr
+    angles = {}
+    if args.angles:
+        with args.angles.open(newline='') as handle:
+            angles = {int(row['page']): float(row['angle_deg'])
+                      for row in csv.DictReader(handle, delimiter='\t')}
+        draw_line = ocr._draw_text_layer_line
+
+        def draw_rotated(canvas_obj, line, page_width, page_height, **kwargs):
+            # Rotate about the page centre, as the image was rotated about its centre
+            # (checked against post-deskew OCR in bin/deskew-study.py).
+            angle = line.get('angle', 0.0)
+            if angle:
+                canvas_obj.saveState()
+                canvas_obj.translate(page_width / 2, page_height / 2)
+                canvas_obj.rotate(angle)
+                canvas_obj.translate(-page_width / 2, -page_height / 2)
+            draw_line(canvas_obj=canvas_obj, line=line, page_width=page_width,
+                      page_height=page_height, **kwargs)
+            if angle:
+                canvas_obj.restoreState()
+        ocr._draw_text_layer_line = draw_rotated
     glossary = load_glossary(args.glossary) if args.glossary else []
     if args.fix_variants and not glossary:
         parser.error('--fix-variants needs --glossary')
@@ -58,6 +83,8 @@ def main():
                 recognized[(int(row['page']), int(row['line_id']))] = row
 
     count = len(PdfReader(args.sanitized_pdf).pages)
+    if any(page > count for page in angles):
+        raise ValueError('angles TSV has pages beyond the PDF')
     page_results = []
     changed_lines = removed_spaces = 0
     for page in range(1, count + 1):
@@ -94,7 +121,8 @@ def main():
                 removed_spaces += (original.count(' ') + original.count('　') -
                                    text.count(' ') - text.count('　'))
             lines.append({'x': x0, 'y': y0, 'width': x1 - x0, 'height': y1 - y0,
-                          'text': text, 'is_vertical': vertical})
+                          'text': text, 'is_vertical': vertical,
+                          'angle': angles.get(page, 0.0)})
         info = data['imginfo']
         page_results.append({'text_layer_lines': lines, 'img_width': info['img_width'],
                              'img_height': info['img_height']})
@@ -102,7 +130,7 @@ def main():
         raise ValueError(f'overrides not found in OCR: {list(overrides)}')
     if recognized:
         raise ValueError(f'recognized lines not found in OCR: {list(recognized)[:5]}')
-    embed_text_layer_pdf(str(args.sanitized_pdf), str(args.output_pdf), page_results)
+    ocr.embed_text_layer_pdf(str(args.sanitized_pdf), str(args.output_pdf), page_results)
     print(f'{args.output_pdf}: {count} pages, {changed_lines} lines normalized, '
           f'{removed_spaces} spaces removed')
     for (variant, term), count in sorted(variants.items(), key=lambda item: -item[1]):

@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """Prepare one image PDF with the existing paper cleanup for a searchable-PDF trial.
 
-Run with the Python environment in ../bookscan/vendor/.venv-ndlocr. This uses
+Run with the Python environment in .venv-ndl. This uses
 pypdf because pikepdf is not available in that environment.
 """
 
 import argparse
 import csv
+import os
 import io
 from pathlib import Path
 
@@ -18,7 +19,7 @@ from pypdf import PdfReader, PdfWriter
 
 ROOT = Path(__file__).resolve().parent.parent
 CATALOG = ROOT / 'data/bookscan-catalog.tsv'
-SOURCE = ROOT.parent / 'bookscan/pdf'
+SOURCE = Path(os.environ.get('BOOKSCAN_PDF_DIR', ROOT / 'input/bookscan-downloads'))
 
 
 def classify(image):
@@ -84,6 +85,8 @@ def main():
     parser.add_argument('--max-pages', type=int, help='Trial with the first N pages')
     parser.add_argument('--no-deskew', action='store_true',
                         help='keep image geometry unchanged so OCR can run on the original first')
+    parser.add_argument('--angles', type=Path,
+                        help='write page and rotation angle (degrees, counterclockwise) of deskewed pages')
     args = parser.parse_args()
     if args.max_pages is not None and args.max_pages < 1:
         parser.error('--max-pages must be positive')
@@ -102,6 +105,7 @@ def main():
     writer.add_metadata({'/Title': book['title'], '/Author': book['author'],
                          '/Translator': book['translator'], '/Series': book['series'],
                          '/SourceFilename': args.source})
+    angles = []
     counts = {'cleaned': 0, 'deskewed': 0, 'deskew_candidates': 0, 'preserved': 0}
     for index, page in enumerate(writer.pages):
         images = page.images
@@ -125,6 +129,8 @@ def main():
         images[0].replace(updated, quality=90, subsampling=0)
         counts['cleaned'] += bool(needs_cleaning)
         counts['deskewed'] += bool(angle)
+        if angle:
+            angles.append((index + 1, angle))
         if (index + 1) % 25 == 0:
             print(f'processed {index + 1}/{len(writer.pages)} pages', flush=True)
     args.output.parent.mkdir(parents=True, exist_ok=True)
@@ -133,6 +139,11 @@ def main():
         writer.write(handle)
     if len(PdfReader(partial).pages) != len(writer.pages):
         raise RuntimeError('page count changed')
+    if args.angles:
+        with args.angles.open('w', newline='') as handle:
+            out = csv.writer(handle, delimiter='\t', lineterminator='\n')
+            out.writerow(['page', 'angle_deg'])
+            out.writerows(angles)
     partial.replace(args.output)
     print(f'{args.output}: {len(writer.pages)} pages, {counts}', flush=True)
 

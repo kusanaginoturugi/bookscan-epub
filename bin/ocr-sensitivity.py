@@ -22,13 +22,15 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
+import os
+
 import pypdfium2
 from PIL import Image
 
 
 ROOT = Path(__file__).resolve().parent.parent
 STUDY = ROOT / 'work/deskew-study'
-NDL_SRC = ROOT.parent / 'bookscan/vendor/ndlocr-lite/src'
+NDL_SRC = Path(os.environ.get('NDLOCR_SRC', ROOT / 'vendor/ndlocr-lite/src'))
 RENDER_DPI = 300
 CONDITIONS = {
     'original': ('original.pdf', 'original-ocr-control', 'original'),

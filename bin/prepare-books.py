@@ -3,6 +3,7 @@
 
 import argparse
 import csv
+import os
 import io
 import re
 import time
@@ -15,7 +16,7 @@ from scipy.ndimage import rotate as rotate_array
 
 
 ROOT = Path(__file__).resolve().parent.parent
-SOURCE = ROOT.parent / 'bookscan/pdf'
+SOURCE = Path(os.environ.get('BOOKSCAN_PDF_DIR', ROOT / 'input/bookscan-downloads'))
 DEST = ROOT / 'output/readable-pdf'
 CATALOG = ROOT / 'data/bookscan-catalog.tsv'
 NAMESPACE = 'https://local.bookscan-epub.example/metadata/1.0/'
