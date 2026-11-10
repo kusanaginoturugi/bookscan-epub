@@ -1,17 +1,22 @@
 #!/usr/bin/env python3
 """Check text-layer placement on deskewed pages against OCR of the deskewed image.
 
-For each page in the angles TSV, the page image of the PDF is rendered at 300 dpi
-and OCRed again with NDLOCR-Lite. Each text-layer character (PDFium char box)
-counts as placed when its centre falls inside a line box from that fresh OCR,
-widened by --slack points. Several PDFs can be compared, for example the text
-layer rotated with --angles and one built without it. Run with .venv-ndl.
+For each page in the angles TSV, the page image is rendered at 300 dpi and
+OCRed again with NDLOCR-Lite. For every tall vertical line of that fresh OCR,
+the text-layer characters (PDFium char boxes) on its centre line are collected
+and the offset of their vertical midpoint from the line box midpoint is taken.
+If the OCR boxes were not moved with the page rotation, this offset grows
+linearly across the page: the slope dy/dx is about sin(angle). A correct
+placement gives a slope near 0. Several PDFs with the same page images can be
+compared. Run with .venv-ndl.
 """
 
 import argparse
 import csv
 import json
+import math
 import os
+import statistics
 import subprocess
 import sys
 import tempfile
@@ -45,25 +50,33 @@ def fresh_ocr(pdf, pages, ndl_src):
     return boxes
 
 
-def placed(pdf, page, boxes, slack):
+def slope(pdf, page, boxes, min_height=100, near=5):
     textpage = pypdfium2.PdfDocument(str(pdf))[page - 1].get_textpage()
-    inside = total = 0
+    chars = []
     for index in range(textpage.count_chars()):
         if textpage.get_text_range(index, 1).isspace():
             continue
         left, bottom, right, top = textpage.get_charbox(index)
-        x, y = (left + right) / 2, (bottom + top) / 2
-        total += 1
-        inside += any(x0 - slack <= x <= x1 + slack and y0 - slack <= y <= y1 + slack
-                      for x0, y0, x1, y1 in boxes)
-    return inside, total
+        chars.append(((left + right) / 2, (bottom + top) / 2))
+    points = []
+    for x0, y0, x1, y1 in boxes:
+        if y1 - y0 < min_height:
+            continue
+        centre = (x0 + x1) / 2
+        ys = [y for x, y in chars if abs(x - centre) < near and y0 - 15 <= y <= y1 + 15]
+        if len(ys) >= 10:
+            points.append((centre, (max(ys) + min(ys)) / 2 - (y0 + y1) / 2))
+    if len(points) < 3:
+        return None, len(points)
+    mean_x = statistics.mean(x for x, _ in points)
+    spread = sum((x - mean_x) ** 2 for x, _ in points)
+    return sum((x - mean_x) * d for x, d in points) / spread, len(points)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('angles', type=Path)
     parser.add_argument('pdfs', type=Path, nargs='+', help='first PDF supplies the page images')
-    parser.add_argument('--slack', type=float, default=1.0, help='points added around OCR line boxes')
     parser.add_argument('--ndl-src', type=Path, default=Path(os.environ.get(
         'NDLOCR_SRC', Path(__file__).resolve().parents[1] / 'vendor/ndlocr-lite/src')))
     args = parser.parse_args()
@@ -74,17 +87,15 @@ def main():
         print('no deskewed pages')
         return
     boxes = fresh_ocr(args.pdfs[0], sorted(angles), args.ndl_src)
-    totals = {pdf: [0, 0] for pdf in args.pdfs}
-    for page in sorted(angles):
+    for page, angle in sorted(angles.items()):
         cells = []
         for pdf in args.pdfs:
-            inside, total = placed(pdf, page, boxes[page], args.slack)
-            totals[pdf][0] += inside
-            totals[pdf][1] += total
-            cells.append(f'{inside}/{total}')
-        print(f'page {page} ({angles[page]:+.2f}°): ' + '  '.join(cells))
-    for pdf, (inside, total) in totals.items():
-        print(f'{pdf.name}: {inside}/{total} = {inside / max(total, 1):.1%} inside fresh OCR lines')
+            value, columns = slope(pdf, page, boxes[page])
+            cells.append(f'{pdf.name}: ' + ('n/a' if value is None else f'{value:+.4f}')
+                         + f' ({columns} columns)')
+        unrotated = math.sin(math.radians(abs(angle)))
+        print(f'page {page} ({angle:+.2f}°, unmoved boxes give about ±{unrotated:.4f}): '
+              + '; '.join(cells))
 
 
 if __name__ == '__main__':
