@@ -441,9 +441,11 @@ https://kusanaginoturugi.github.io/rclone/ に置いてある。別のマシン�
 <div class="sourceCode" id="cb7"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co"># このマシンからDriveへ（既存のファイルは消さない）</span></span>
 <span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="ex">rclone</span> copy output gdrive:bookscan-epub/output</span>
 <span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="ex">rclone</span> copy work/searchable gdrive:bookscan-epub/work/searchable <span class="at">--include</span> <span class="st">&#39;*.tsv&#39;</span></span>
-<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="co"># 別のマシンでDriveから戻す（artifacts.html のリンクがそのまま開ける）</span></span>
-<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="ex">rclone</span> copy gdrive:bookscan-epub/output output</span>
-<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="ex">rclone</span> copy gdrive:bookscan-epub/work/searchable work/searchable</span></code></pre></div>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="ex">rclone</span> copy work/eval gdrive:bookscan-epub/work/eval <span class="at">--include</span> <span class="st">&#39;*.tsv&#39;</span>   <span class="co"># 人が確定した辞書・正解</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="co"># 別のマシンでDriveから戻す（artifacts.html のリンクがそのまま開ける）</span></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="ex">rclone</span> copy gdrive:bookscan-epub/output output</span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a><span class="ex">rclone</span> copy gdrive:bookscan-epub/work/searchable work/searchable</span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a><span class="ex">rclone</span> copy gdrive:bookscan-epub/work/eval work/eval</span></code></pre></div>
 <p><code>rclone sync</code>
 は送り先にしかないファイルを消すので使わない。中身は買った本のスキャンなので、共有リンク（<code>rclone link</code>
 やブラウザの「リンクを知っている全員」）は作らない。</p>

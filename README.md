@@ -144,9 +144,11 @@ ruby bin/build-review.rb --ignore-leaders \
 # このマシンからDriveへ（既存のファイルは消さない）
 rclone copy output gdrive:bookscan-epub/output
 rclone copy work/searchable gdrive:bookscan-epub/work/searchable --include '*.tsv'
+rclone copy work/eval gdrive:bookscan-epub/work/eval --include '*.tsv'   # 人が確定した辞書・正解
 # 別のマシンでDriveから戻す（artifacts.html のリンクがそのまま開ける）
 rclone copy gdrive:bookscan-epub/output output
 rclone copy gdrive:bookscan-epub/work/searchable work/searchable
+rclone copy gdrive:bookscan-epub/work/eval work/eval
 ```
 
 `rclone sync` は送り先にしかないファイルを消すので使わない。中身は買った本のスキャンなので、共有リンク（`rclone link` やブラウザの「リンクを知っている全員」）は作らない。
