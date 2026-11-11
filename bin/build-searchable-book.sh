@@ -2,7 +2,8 @@
 # Build one searchable PDF with the Summer Door rules plus deskew:
 # prepare (background cleanup + deskew, angles saved) -> NDLOCR-Lite on the
 # unrotated original -> margin re-recognition -> text layer rotated with each
-# deskewed page (margin30, --min-height 400, --fix-dashes, optional glossary)
+# deskewed page (margin30, --min-height 400, --fix-dashes, --fix-brackets,
+# optional glossary)
 # -> finalize. Each step is skipped when its output already exists.
 #
 # usage: bin/build-searchable-book.sh SOURCE.pdf SLUG [GLOSSARY.tsv]
@@ -98,7 +99,7 @@ echo "[$(date +%T)] text layer"
 if [ ! -e "$TEXT" ]; then
   "$PY" "$BIN/rebuild-text-layer.py" "$SANITIZED" "$WORK/ocr" "$TEXT" \
     --ocr-stem "$OCR_STEM" --recognized "$WORK/margin.tsv" --column margin30 \
-    --min-height 400 --fix-dashes --angles "$WORK/angles.tsv" "$@" > "$LOG"
+    --min-height 400 --fix-dashes --fix-brackets --angles "$WORK/angles.tsv" "$@" > "$LOG"
   cat "$LOG"
 fi
 

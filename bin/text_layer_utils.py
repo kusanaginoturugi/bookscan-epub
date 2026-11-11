@@ -28,6 +28,40 @@ def fix_dashes(text):
     return re.sub(r'(?<![0-9A-Za-z])-+(?![0-9A-Za-z])', '―', text)
 
 
+BRACKETS = str.maketrans({'<': '〈', '＜': '〈', '>': '〉', '＞': '〉'})
+
+
+def fix_brackets(text):
+    # NDLOCR-Lite reads vertical 〈〉 as ASCII or full-width angle brackets.
+    return text.translate(BRACKETS)
+
+
+def fix_quotes(texts):
+    """Turn ASCII double quotes in one page's vertical lines into 〝〟.
+
+    texts are in reading order. Quote marks, including 〝〟 that OCR already got
+    right, must alternate open/close; a page whose marks do not pair up (odd
+    count, or a 〝 or 〟 out of turn) is returned unchanged. Returns the texts and
+    the number of quotes replaced (None when the page was left alone).
+    """
+    marks = [ch for text in texts for ch in text if ch in '"〝〟']
+    if '"' not in marks:
+        return texts, 0
+    if len(marks) % 2 or any(ch != '"' and ch != '〝〟'[i % 2] for i, ch in enumerate(marks)):
+        return texts, None
+    index = 0
+    result = []
+    for text in texts:
+        chars = []
+        for ch in text:
+            if ch in '"〝〟':
+                ch = '〝〟'[index % 2]
+                index += 1
+            chars.append(ch)
+        result.append(''.join(chars))
+    return result, marks.count('"')
+
+
 VOICING = str.maketrans('バビブベボパピプペポ', 'パピプペポバビブベボ')
 
 

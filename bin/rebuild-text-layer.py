@@ -12,7 +12,8 @@ from pathlib import Path
 
 from pypdf import PdfReader
 
-from text_layer_utils import clean_text, fix_dashes, fix_variants, load_glossary
+from text_layer_utils import (clean_text, fix_brackets, fix_dashes, fix_quotes, fix_variants,
+                              load_glossary)
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -31,6 +32,9 @@ def main():
                         help='keep saved OCR text for --recognized lines shorter than this many pixels')
     parser.add_argument('--fix-dashes', action='store_true',
                         help='turn hyphens outside Latin words into two-em dashes in vertical lines')
+    parser.add_argument('--fix-brackets', action='store_true',
+                        help='in vertical lines turn <> into 〈〉 and pair ASCII double quotes '
+                             'into 〝〟 per page (pages whose quotes do not pair up are kept)')
     parser.add_argument('--fix-variants', action='store_true',
                         help='replace dakuten/handakuten misreadings of --glossary terms')
     parser.add_argument('--ndl-src', type=Path,
@@ -71,7 +75,8 @@ def main():
     if any(page > count for page in angles):
         raise ValueError('angles TSV has pages beyond the PDF')
     page_results = []
-    changed_lines = removed_spaces = 0
+    changed_lines = removed_spaces = quotes = 0
+    unpaired_pages = []
     for page in range(1, count + 1):
         path = args.ocr_dir / f'{args.ocr_stem}_{page:05}.json'
         data = json.loads(path.read_text())
@@ -98,13 +103,13 @@ def main():
             else:
                 if args.fix_dashes and vertical:
                     text = fix_dashes(text)
+                if args.fix_brackets and vertical:
+                    text = fix_brackets(text)
                 text = clean_text(text, vertical, glossary)
                 if args.fix_variants:
                     text = fix_variants(text, glossary, variants)
-            if text != original:
-                changed_lines += 1
-                removed_spaces += (original.count(' ') + original.count('　') -
-                                   text.count(' ') - text.count('　'))
+            removed_spaces += (original.count(' ') + original.count('　') -
+                               text.count(' ') - text.count('　'))
             info = data['imginfo']
             if angles.get(page):
                 # The text is drawn straight along the box centre line, which already
@@ -118,7 +123,18 @@ def main():
                 dy = -math.sin(angle) * ox + math.cos(angle) * oy - oy
                 x0, x1, y0, y1 = x0 + dx, x1 + dx, y0 + dy, y1 + dy
             lines.append({'x': x0, 'y': y0, 'width': x1 - x0, 'height': y1 - y0,
-                          'text': text, 'is_vertical': vertical})
+                          'text': text, 'is_vertical': vertical, 'original': original})
+        if args.fix_brackets:
+            vertical_lines = [line for line in lines if line['is_vertical']]
+            texts, replaced = fix_quotes([line['text'] for line in vertical_lines])
+            if replaced is None:
+                unpaired_pages.append(page)
+            else:
+                quotes += replaced
+                for line, text in zip(vertical_lines, texts):
+                    line['text'] = text
+        for line in lines:
+            changed_lines += line.pop('original') != line['text']
         page_results.append({'text_layer_lines': lines, 'img_width': info['img_width'],
                              'img_height': info['img_height']})
     if overrides:
@@ -128,6 +144,9 @@ def main():
     embed_text_layer_pdf(str(args.sanitized_pdf), str(args.output_pdf), page_results)
     print(f'{args.output_pdf}: {count} pages, {changed_lines} lines normalized, '
           f'{removed_spaces} spaces removed')
+    if args.fix_brackets:
+        print(f'{quotes} double quotes paired into 〝〟; quotes left unpaired on pages '
+              f'{",".join(map(str, unpaired_pages)) or "none"}')
     for (variant, term), count in sorted(variants.items(), key=lambda item: -item[1]):
         print(f'{variant} -> {term}: {count}')
 

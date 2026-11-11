@@ -210,7 +210,7 @@ $PY bin/margin-recognize.py work/margin/infinity-upper.tsv \
   --score work/margin/gold-random.tsv work/margin/gold-existing.tsv
 ```
 
-余白30pxの結果で文字層を作り直した版は `output/trial/インフィニティ・リミテッド（上） - ジェイムズ・P・ホーガン v2.pdf`（Git管理外）。従来の完成品と並べて置き、置き換えるかは未決定。v2は `--min-height` を付けずに作ったため、短い行の閉じかぎ括弧の脱落などを含む（[docs/progress.md](docs/progress.md)）。`--fix-dashes` は縦書き行で、前後どちらも英数字でない `-` を `―` にする。
+余白30pxの結果で文字層を作り直した版は `output/trial/インフィニティ・リミテッド（上） - ジェイムズ・P・ホーガン v2.pdf`（Git管理外）。従来の完成品と並べて置き、置き換えるかは未決定。v2は `--min-height` を付けずに作ったため、短い行の閉じかぎ括弧の脱落などを含む（[docs/progress.md](docs/progress.md)）。`--fix-dashes` は縦書き行で、前後どちらも英数字でない `-` を `―` にする。`--fix-brackets` は縦書き行で `<>` `＜＞` を〈〉にし、`"` をページ内の読み順で〝〟の開き・閉じが交互になるよう戻す。数が合わないページは `"` のまま残し、ページ番号を表示する。`bin/build-searchable-book.sh` は常にこのオプションを付けるが、作成済みの本の文字層には入っていない。
 
 ```sh
 PY=../bookscan/vendor/.venv-ndlocr/bin/python

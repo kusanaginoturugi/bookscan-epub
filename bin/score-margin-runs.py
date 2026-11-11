@@ -3,7 +3,8 @@
 
 Run with .venv-ndl/bin/python. Each run is DIR/BOOK/margin-RUN.tsv. Lines get the
 text bin/build-searchable-book.sh would place: margin30 for lines at least 400px
-high, the saved OCR otherwise, then --fix-dashes on vertical lines. Gold lines
+high, the saved OCR otherwise, then --fix-dashes and --fix-brackets on vertical
+lines (double quotes paired over the page's vertical lines). Gold lines
 are scored against the best-matching line on their page, whitespace removed.
 
 usage: bin/score-margin-runs.py work/ocr-engine-check ocrcpu-reccpu ocrcuda-reccuda
@@ -15,7 +16,7 @@ import json
 import re
 from pathlib import Path
 
-from text_layer_utils import fix_dashes
+from text_layer_utils import fix_brackets, fix_dashes, fix_quotes
 
 WS = re.compile(r'\s+')
 
@@ -33,13 +34,20 @@ def lev(a, b):
 
 
 def production(path):
-    pages = {}
+    rows = {}
     with path.open(newline='') as handle:
         for row in csv.DictReader(handle, delimiter='\t'):
             text = row['margin30'] if int(row['height']) >= 400 else row['saved']
-            if row['vertical'] == '1':
-                text = fix_dashes(text)
-            pages.setdefault(int(row['page']), []).append(WS.sub('', text))
+            vertical = row['vertical'] == '1'
+            if vertical:
+                text = fix_brackets(fix_dashes(text))
+            rows.setdefault(int(row['page']), []).append([text, vertical])
+    pages = {}
+    for page, lines in rows.items():
+        vertical = [line for line in lines if line[1]]
+        for line, text in zip(vertical, fix_quotes([line[0] for line in vertical])[0]):
+            line[0] = text
+        pages[page] = [WS.sub('', text) for text, _ in lines]
     return pages
 
 

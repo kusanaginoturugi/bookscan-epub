@@ -4,7 +4,8 @@
 Run with .venv-ndl/bin/python. Engines are KIND:RUN under each book directory:
   ndl:RUN       ocr.py JSON in BOOK/RUN/subset_NNNNN.json (lines in file order)
   margin:RUN    BOOK/margin-RUN.tsv, the text bin/build-searchable-book.sh places
-                (margin30 for lines >= 400px, saved OCR otherwise, --fix-dashes)
+                (margin30 for lines >= 400px, saved OCR otherwise, --fix-dashes,
+                --fix-brackets; double quotes paired over the page's vertical lines)
   yomitoku:RUN  yomitoku -f json in BOOK/RUN/BOOK_subset_pN.json (paragraph order)
 Text is NFKC-normalized, dashes are unified and whitespace is removed for every
 engine and the gold alike. Each gold line is scored by the edit distance to its
@@ -26,7 +27,7 @@ import unicodedata
 from collections import defaultdict
 from pathlib import Path
 
-from text_layer_utils import fix_dashes
+from text_layer_utils import fix_brackets, fix_dashes, fix_quotes
 
 DASHES = re.compile('[―—–─‐-]+')
 WS = re.compile(r'\s+')
@@ -88,10 +89,19 @@ def page_lines(root, name, book, engine):
         else:
             pages[i] = []
     if kind == 'margin':
+        rows = {i: [] for i in pages}
         with (root / name / f'margin-{run}.tsv').open(newline='') as handle:
             for row in csv.DictReader(handle, delimiter='\t'):
                 text = row['margin30'] if int(row['height']) >= 400 else row['saved']
-                pages[int(row['page'])].append(fix_dashes(text) if row['vertical'] == '1' else text)
+                vertical = row['vertical'] == '1'
+                if vertical:
+                    text = fix_brackets(fix_dashes(text))
+                rows[int(row['page'])].append([text, vertical])
+        for i, lines in rows.items():
+            vertical = [line for line in lines if line[1]]
+            for line, text in zip(vertical, fix_quotes([line[0] for line in vertical])[0]):
+                line[0] = text
+            pages[i] = [text for text, _ in lines]
     return {i: [norm(t) for t in lines] for i, lines in pages.items()}
 
 
