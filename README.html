@@ -353,7 +353,8 @@ href="docs/progress.html">docs/progress.md</a>
 に追記され、同じ差分は聞き直さない。レビュー画面では、反映した差分を先頭に並べる。画面で選んだ結果をTSVで保存して
 <code>--human</code> に渡すと、人の判定が常に優先される。差分は
 <code>rebuild-text-layer.py --corrections</code>
-が、ほかの補正のあと、引用符を組み直す前に当てる。前後4文字が一致しないと、適用せずに止まる。</p>
+が、ほかの補正のあと、引用符を組み直す前に当てる。前後4文字が一致しないと、適用せずに止まる。NDLの字が新字体で、YomiTokuの字がその旧字体（掴／摑、顛／顚など）の差分は、聞かずにYomiTokuを採る。規則で聞かなかった差分も、人の判定があればそれを使う。線や記号（一・―・ー・「」など）の差分は、レビュー画面で6倍に拡大して印を付ける。本全体で原本と違う字を使い分けている場合（この本はすべて摑なのに、OCRは掴と読む箇所が残るなど）は、<code>rebuild-text-layer.py --char-map 対応表TSV</code>（列は
+<code>from</code>・<code>to</code>）で、差分を当てたあとに1文字ずつ置き換える。</p>
 <div class="sourceCode" id="cb4"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="ex">.venv-ndl/bin/python</span> bin/judge-ocr-disagreements.py input/bookscan-downloads/<span class="va">$SOURCE</span> <span class="va">$WORK</span>/ocr <span class="dt">\</span></span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  work/voicing/<span class="va">$SLUG</span>/yomitoku work/judge/<span class="va">$SLUG</span> review/<span class="va">$SLUG</span>-judge <span class="at">--ocr-stem</span> <span class="st">&quot;</span><span class="va">$STEM</span><span class="st">&quot;</span> <span class="dt">\</span></span>
 <span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">--recognized</span> <span class="va">$WORK</span>/margin.tsv <span class="at">--glossary</span> <span class="va">$WORK</span>/voicing-glossary.tsv <span class="dt">\</span></span>

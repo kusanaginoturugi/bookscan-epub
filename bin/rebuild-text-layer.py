@@ -38,6 +38,9 @@ def main():
     parser.add_argument('--corrections', type=Path,
                         help='TSV from judge-ocr-disagreements.py (page, line_id, left, from, to, right); '
                              'applied after the other fixes, before quote pairing')
+    parser.add_argument('--char-map', type=Path,
+                        help='TSV (from, to) of characters this book prints differently from OCR, '
+                             'e.g. 掴 -> 摑; applied after --corrections')
     parser.add_argument('--fix-variants', action='store_true',
                         help='replace dakuten/handakuten misreadings of --glossary terms')
     parser.add_argument('--ndl-src', type=Path,
@@ -66,6 +69,14 @@ def main():
             for row in csv.DictReader(handle, delimiter='\t'):
                 corrections.setdefault((int(row['page']), int(row['line_id'])), []).append(row)
     applied = 0
+    char_map = {}
+    if args.char_map:
+        with args.char_map.open(newline='') as handle:
+            char_map = {row['from']: row['to'] for row in csv.DictReader(handle, delimiter='\t')}
+        if any(len(k) != 1 or len(v) != 1 for k, v in char_map.items()):
+            raise ValueError('--char-map maps single characters')
+    char_map = str.maketrans(char_map)
+    mapped = 0
     overrides = {}
     if args.overrides:
         with args.overrides.open(newline='') as handle:
@@ -125,6 +136,10 @@ def main():
                         raise ValueError(f'correction does not match line {key}: {row["id"]}')
                     text = text.replace(old, row['left'] + row['to'] + row['right'])
                     applied += 1
+                if char_map:
+                    before = text
+                    text = text.translate(char_map)
+                    mapped += sum(a != b for a, b in zip(before, text))
             removed_spaces += (original.count(' ') + original.count('　') -
                                text.count(' ') - text.count('　'))
             info = data['imginfo']
@@ -165,6 +180,8 @@ def main():
           f'{removed_spaces} spaces removed')
     if args.corrections:
         print(f'{applied} corrections applied from {args.corrections}')
+    if args.char_map:
+        print(f'{mapped} characters mapped by {args.char_map}')
     if args.fix_brackets:
         print(f'{quotes} double quotes paired into 〝〟; quotes left unpaired on pages '
               f'{",".join(map(str, unpaired_pages)) or "none"}')

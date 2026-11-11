@@ -9,7 +9,8 @@ are split into hunks. Hunks that other steps or rules settle are not asked:
 バ/パ swaps (voicing review), brackets, ASCII quotes (paired later), dashes, dakuten added or
 dropped and small kana (NDL was right on every such case in
 work/ocr-engine-check/disagreements-gold.tsv), and text only one engine has.
-Lines with many hunks count as misaligned and are skipped. The rest are
+A simplified kanji (掴) against YomiToku's traditional form of it (摑) takes
+YomiToku's by rule. Lines with many hunks count as misaligned and are skipped. The rest are
 asked in both orders as two versions of the line; YomiToku's reading is
 applied only when both answers pick it.
 
@@ -49,7 +50,13 @@ A: {a}
 
 B: {b}"""
 VOICING = str.maketrans('バビブベボパピプペポ', 'パピプペポバビブベボ')
-SMALL = str.maketrans('ァィゥェォッャュョヮヵヶ', 'アイウエオツヤユヨワカケ')
+SMALL = str.maketrans('ァィゥェォッャュョヮヵヶぁぃぅぇぉっゃゅょゎ', 'アイウエオツヤユヨワカケあいうえおつやゆよわ')
+# NDLOCR-Lite answers in the simplified form (掴) even where the page prints
+# the traditional one (摑), and lacks some of these in its character list
+# (頰, 噓, 鷗, 啞, 𠮟, 瘦); YomiToku reads them as printed.
+OLD_FORMS = dict(zip('掴噛頬嘘剥填鴎掻屏祷蝋唖叱痩撹麹鹸繍蒋醤蝉槙溌涜騨顛',
+                     '摑嚙頰噓剝塡鷗搔屛禱蠟啞𠮟瘦攪麴鹼繡蔣醬蟬槇潑瀆驒顚'))
+LINE_SHAPED = set('一「」『』[]\\|―ー-−—')
 STYLE = {'·': '・', '“': '〝', '”': '〟'}
 DASHES = set('―—–─‐-')
 CONTEXT = 4
@@ -75,6 +82,8 @@ def norm_char(ch):
 def kind(x, y):
     if '"' in x:
         return 'quote'  # paired into 〝〟 per page after corrections
+    if x != y and len(x) == len(y) and all(OLD_FORMS.get(a, a) == b for a, b in zip(x, y)):
+        return 'old-form'
     if len(x) == len(y) == 1 and x.translate(VOICING) == y:
         return 'voicing'
     if set(x + y) <= set('<>〈〉"〝〟＜＞'):
@@ -179,6 +188,10 @@ def resolve(verdict, item, text):
         if (left and to.startswith(left)) or (right and to.endswith(right)):
             return (to,) + wide
     return to, start, end
+
+
+def line_shaped(item):
+    return bool(set(item['ndl']) <= LINE_SHAPED and item['ndl']) or bool(set(item['yomitoku']) <= LINE_SHAPED and item['yomitoku'])
 
 
 def read_tsv(path):
@@ -313,11 +326,23 @@ def main():
             continue
         for start, end, frm, to, category in found:
             counts[category] += 1
-            if category != 'judge':
-                continue
             text = line['text']
             left, right = text[max(0, start - CONTEXT):start], text[end:end + CONTEXT]
             hunk_id = f'{line["page"]}:{line["line_id"]}:{left}[{frm}→{to}]{right}'
+            if category not in ('judge', 'old-form'):
+                # Rules keep NDL here, but a human verdict on the hunk still wins.
+                if hunk_id in human:
+                    items.append(dict(id=hunk_id, page=line['page'], line_id=line['line_id'], left=left,
+                                      ndl=frm, yomitoku=to, right=right, line=text, first='skip',
+                                      second='skip', decision='ndl', model=f'rule:{category}', prompt='',
+                                      date=today, index=index, start=start, end=end))
+                continue
+            if category == 'old-form':
+                items.append(dict(id=hunk_id, page=line['page'], line_id=line['line_id'], left=left, ndl=frm,
+                                  yomitoku=to, right=right, line=text, first='rule', second='rule',
+                                  decision='yomitoku', model='rule:old-form', prompt='', date=today,
+                                  index=index, start=start, end=end))
+                continue
             record = done.get((hunk_id, args.model, PROMPT_VERSION))
             if record is None:
                 alt = text[:start] + to + text[end:]
@@ -350,7 +375,7 @@ def main():
             if to != text[start:end]:
                 corrections.append((dict(item, start=start, end=end), to, 'human'))
         elif item['decision'] == 'yomitoku':
-            corrections.append((item, item['yomitoku'], 'llm'))
+            corrections.append((item, item['yomitoku'], 'rule' if item['first'] == 'rule' else 'llm'))
     # Hunks closer than their context would overlap when applied; merge them.
     merged = []
     for item, to, source in sorted(corrections, key=lambda c: (c[0]['index'], c[0]['start'])):
@@ -383,6 +408,8 @@ def main():
         for n, item in entries:
             for name, picture in zip(('thumb', 'line', 'zoom'),
                                      crops(image, lines[item['index']], item['start'], max(item['end'], item['start'] + 1))):
+                if name == 'zoom' and line_shaped(item):
+                    picture = picture.resize((picture.width * 2, picture.height * 2))  # 6x for thin marks
                 picture.save(images / f'{n}-{name}.jpg', quality=85)
     document.close()
 
@@ -402,8 +429,14 @@ def main():
         reading = {'NDL': item['ndl'], 'YomiToku': item['yomitoku']}
         llm = (f'1回目: {esc(reading.get(first, ""))}（{first}）／'
                f'2回目（順序を入れ替え）: {esc(reading.get(second, ""))}（{second}）')
+        if item['first'] == 'rule':
+            llm = '聞いていない（旧字体はYomiTokuを採る規則）'
+        elif item['first'] == 'skip':
+            llm = f'聞いていない（規則でNDLのまま: {esc(item["model"][5:])}）'
         if verdict:
             now, why = verdict['to'], '人の判定'
+        elif item['first'] == 'rule':
+            now, why = item['yomitoku'], 'YomiTokuの読み。旧字体の規則'
         elif item['decision'] == 'yomitoku':
             now, why = item['yomitoku'], 'YomiTokuの読み。LLMが2回とも選んだ'
         elif item['decision'] == 'split':
@@ -418,7 +451,8 @@ def main():
                                            ('ok', '今の読みでよい'), ('custom', '自分で書く'),
                                            ('undecided', '未確認')))
         sections.append(
-            f'<section id="s{n}" class="{"human" if verdict else labels[item["decision"]]}"><h2>#{n + 1} {item["page"]}ページ・行{item["line_id"]}</h2>'
+            f'<section id="s{n}" class="{"human" if verdict else labels[item["decision"]]}"><h2>#{n + 1} {item["page"]}ページ・行{item["line_id"]}'
+            f'{"【線・記号：6倍で表示】" if line_shaped(item) else ""}</h2>'
             f'<table><tr class="now"><td>文字層の今の読み</td><td>{esc(item["left"])}{esc(now)}{esc(item["right"])}（{why}）</td></tr>'
             f'<tr><td>NDL</td><td>{esc(item["left"])}<b>{esc(item["ndl"])}</b>{esc(item["right"])}</td></tr>'
             f'<tr><td>YomiToku</td><td>{esc(item["left"])}<b>{esc(item["yomitoku"])}</b>{esc(item["right"])}</td></tr>'
