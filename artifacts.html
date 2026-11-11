@@ -184,6 +184,10 @@ id="toc-検索可能pdfとレビューの目次">検索可能PDFとレビュー�
 <ul>
 <li><a href="#傾き補正込みの4冊2026-11-10"
 id="toc-傾き補正込みの4冊2026-11-10">傾き補正込みの4冊（2026-11-10）</a></li>
+<li><a href="#濁点半濁点のレビュー2026-11-11"
+id="toc-濁点半濁点のレビュー2026-11-11">濁点・半濁点のレビュー（2026-11-11）</a></li>
+<li><a href="#ocrのcpuとgpuの比較2026-11-11"
+id="toc-ocrのcpuとgpuの比較2026-11-11">OCRのCPUとGPUの比較（2026-11-11）</a></li>
 <li><a href="#夏への扉" id="toc-夏への扉">夏への扉</a></li>
 <li><a href="#インフィニティリミテッド上"
 id="toc-インフィニティリミテッド上">インフィニティ・リミテッド（上）</a>
@@ -200,9 +204,14 @@ id="toc-プロジェクト資料">プロジェクト資料</a></li>
 </ul>
 </nav>
 <h1 id="検索可能pdfとレビューの目次">検索可能PDFとレビューの目次</h1>
-<p>このページは、このリポジトリで作った成果物への入口。PDF、OCR結果、レビューの一部はGit管理外のローカルファイルなので、同じ作業ディレクトリで開く。完成品と試験版のPDFは、ページ単位の奇数ページ見開き（<code>/PageLayout /TwoPageLeft</code>）で、1ページ目をページ全体に合わせて開く（<code>/OpenAction</code>
+<p>このページは、このリポジトリで作った成果物への入口。PDF、OCR結果、レビューの一部はGit管理外のローカルファイルなので、同じ作業ディレクトリで開く。<code>output/</code>
+のPDFはGoogle Driveの <code>bookscan-epub/output/</code>
+にも置いてある。リンクが切れていたら、<a
+href="README.html">README</a>の「成果物の保管」の手順で
+<code>rclone copy</code>
+して戻す。完成品と試験版のPDFは、ページ単位の奇数ページ見開き（<code>/PageLayout /TwoPageLeft</code>）で、1ページ目をページ全体に合わせて開く（<code>/OpenAction</code>
 の <code>/Fit</code>）設定を持つ。Firefoxでの効き方は<a
-href="docs/progress.md">作業記録</a>のPDFの初期表示設定を参照。</p>
+href="docs/progress.html">作業記録</a>のPDFの初期表示設定を参照。</p>
 <h2
 id="傾き補正込みの4冊2026-11-10">傾き補正込みの4冊（2026-11-10）</h2>
 <p><code>bin/build-searchable-book.sh</code>
@@ -274,6 +283,64 @@ href="work/searchable/infinity-lower/variant-glossary.tsv">20語61か所</a></td
 </tr>
 </tbody>
 </table>
+<h2
+id="濁点半濁点のレビュー2026-11-11">濁点・半濁点のレビュー（2026-11-11）</h2>
+<p>『夏への扉』の <a
+href="review/summer-door-voicing/index.html">濁点・半濁点レビュー</a>。濁点・半濁点1字だけが違うカタカナ語52組を、原本の縮小画像・行・3倍拡大で確かめて選ぶ。選んだ結果は画面の下のTSVにまとまり、<code>--fix-variants</code>
+の辞書になる。YomiTokuの全ページの結果は
+<code>work/voicing/summer-door/yomitoku/</code>。</p>
+<h2
+id="ocrのcpuとgpuの比較2026-11-11">OCRのCPUとGPUの比較（2026-11-11）</h2>
+<p>虎よ・インフィニティ上巻・夏への扉から141ページを抜き出し、NDLOCR-LiteをCPUとCUDAで比べた。精度は同等で、速さは約3倍。詳細は<a
+href="docs/progress.html">作業記録</a>の「GPU（CUDA）でのOCRと余白つき再認識」。</p>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>種類</th>
+<th>ファイル</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>標本</td>
+<td><a href="work/ocr-engine-check/manifest.json">manifest.json</a></td>
+<td>冊ごとの <code>subset.pdf</code> のページと、正解行93行</td>
+</tr>
+<tr>
+<td><code>ocr.py</code> の比較</td>
+<td><a
+href="work/ocr-engine-check/report-ocr.txt">report-ocr.txt</a></td>
+<td>保存分・CPU・CUDA 2回。食い違い43行の一覧つき</td>
+</tr>
+<tr>
+<td>本番の文字列の比較</td>
+<td><a
+href="work/ocr-engine-check/report-margin.txt">report-margin.txt</a></td>
+<td>余白つき再認識を含む。正解行の誤り CPU 14/3300、CUDA
+13/3300（括弧の補正前は20、19）</td>
+</tr>
+<tr>
+<td>YomiTokuとの比較</td>
+<td><a
+href="work/ocr-engine-check/report-engines.txt">report-engines.txt</a></td>
+<td>正規化と部分文字列で採点。正解行の誤り 本番NDL 14〜15/3374、YomiToku
+94/3374。無作為ページの食い違い130か所の一覧つき（画像確認ではNDLが正しい90、YomiTokuが正しい28、両方誤り12）</td>
+</tr>
+<tr>
+<td>括弧の補正後</td>
+<td><a
+href="work/ocr-engine-check/report-engines-brackets.txt">report-engines-brackets.txt</a></td>
+<td><code>--fix-brackets</code> を当てた本番NDL。正解行の誤り CPU
+9、CUDA 8/3374。YomiTokuとの食い違い124行</td>
+</tr>
+</tbody>
+</table>
 <h2 id="夏への扉">夏への扉</h2>
 <table>
 <colgroup>
@@ -300,7 +367,7 @@ href="output/trial/夏への扉%20-%20ロバート・A・ハインライン.pdf"
 <td><a
 href="output/trial/夏への扉%20-%20ロバート・A・ハインライン%20注釈試作%20Firefox版%20薄色右開き.pdf">薄色・右開き・注釈入りPDF</a></td>
 <td>PDFページ21・23・24に注釈と出典リンク。本文の偶数ページ176枚の端線を修正。Readest用の右開き指定入り。追加の<a
-href="data/summer-door-note-candidates.md">語句候補</a></td>
+href="data/summer-door-note-candidates.html">語句候補</a></td>
 </tr>
 <tr>
 <td>再認識</td>
@@ -416,7 +483,7 @@ href="output/trial/infinity-upper-text-unfinalized-v2.pdf">v2文字層版</a></t
 <p>OCRのページ別JSON・TXT・XMLは
 <code>work/trial/infinity-upper-ocr/</code>
 に保存してある。評価結果と手順は<a
-href="docs/progress.md">作業記録</a>を参照。</p>
+href="docs/progress.html">作業記録</a>を参照。</p>
 <h3 id="行画像の余白と再認識">行画像の余白と再認識</h3>
 <table>
 <colgroup>
@@ -558,9 +625,9 @@ href="review/tiger-llm/ranked.tsv">採点TSV</a></td>
 <h2 id="プロジェクト資料">プロジェクト資料</h2>
 <ul>
 <li><a
-href="README.md">README</a>：方針、再現手順、各スクリプトの説明</li>
+href="README.html">README</a>：方針、再現手順、各スクリプトの説明</li>
 <li><a
-href="docs/progress.md">作業記録</a>：評価結果、制約、次の作業</li>
+href="docs/progress.html">作業記録</a>：評価結果、制約、次の作業</li>
 <li><a
 href="data/bookscan-catalog.tsv">書誌カタログ</a>：元PDF名と書名の対応</li>
 </ul>

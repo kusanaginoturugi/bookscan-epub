@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="ja" xml:lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc 3.11" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>bookscan-epub</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      white-space: pre-wrap;
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: 1.5em;}
+    div.column{flex: auto;}
+    @media screen {
+    div.columns{gap: min(4vw, 1.5em);}
+    div.column{overflow-x: auto;}
+    }
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    /* CSS for syntax highlighting */
+    html { -webkit-text-size-adjust: 100%; }
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {   }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #7d9029; } /* Attribute */
+    code span.bn { color: #40a070; } /* BaseN */
+    code span.bu { color: #008000; } /* BuiltIn */
+    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4070a0; } /* Char */
+    code span.cn { color: #880000; } /* Constant */
+    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code span.dt { color: #902000; } /* DataType */
+    code span.dv { color: #40a070; } /* DecVal */
+    code span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #40a070; } /* Float */
+    code span.fu { color: #06287e; } /* Function */
+    code span.im { color: #008000; font-weight: bold; } /* Import */
+    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code span.op { color: #666666; } /* Operator */
+    code span.ot { color: #007020; } /* Other */
+    code span.pp { color: #bc7a00; } /* Preprocessor */
+    code span.sc { color: #4070a0; } /* SpecialChar */
+    code span.ss { color: #bb6688; } /* SpecialString */
+    code span.st { color: #4070a0; } /* String */
+    code span.va { color: #19177c; } /* Variable */
+    code span.vs { color: #4070a0; } /* VerbatimString */
+    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+  </style>
+</head>
+<body>
+<nav id="TOC" role="doc-toc">
+<ul>
+<li><a href="#bookscan-epub" id="toc-bookscan-epub">bookscan-epub</a>
+<ul>
+<li><a href="#現在の段階" id="toc-現在の段階">現在の段階</a>
+<ul>
+<li><a href="#現在の1冊分の手順傾き補正込み"
+id="toc-現在の1冊分の手順傾き補正込み">現在の1冊分の手順（傾き補正込み）</a></li>
+</ul></li>
+<li><a href="#成果物の保管google-drive"
+id="toc-成果物の保管google-drive">成果物の保管（Google Drive）</a></li>
+<li><a href="#bookscan-pdf-の閲覧用コピー"
+id="toc-bookscan-pdf-の閲覧用コピー">BOOKSCAN PDF
+の閲覧用コピー</a></li>
+<li><a href="#検索可能pdfへの方針変更"
+id="toc-検索可能pdfへの方針変更">検索可能PDFへの方針変更</a>
+<ul>
+<li><a href="#冊目夏への扉余白つき再認識を最初から使う手順"
+id="toc-冊目夏への扉余白つき再認識を最初から使う手順">3冊目：『夏への扉』（余白つき再認識を最初から使う手順）</a></li>
+<li><a href="#夏への扉の読書用注釈試作"
+id="toc-夏への扉の読書用注釈試作">『夏への扉』の読書用注釈試作</a></li>
+<li><a href="#冊目の試験インフィニティリミテッド上"
+id="toc-冊目の試験インフィニティリミテッド上">2冊目の試験：『インフィニティ・リミテッド（上）』</a></li>
+<li><a href="#冊目の試験虎よ虎よ"
+id="toc-冊目の試験虎よ虎よ">1冊目の試験：『虎よ、虎よ！』</a></li>
+<li><a href="#ocr文字層の評価"
+id="toc-ocr文字層の評価">OCR文字層の評価</a></li>
+</ul></li>
+</ul></li>
+</ul>
+</nav>
+<h1 id="bookscan-epub">bookscan-epub</h1>
+<p><code>~/src/bookscan/pdf/</code>
+の画像PDFをもとに、サニタイズ済みPDFへ透明テキスト層を重ねる実験用リポジトリ。原本の保管とダウンロードは別プロジェクト
+<code>~/src/bookscan/</code>
+が担当する。リポジトリ名は旧EPUB方針の名残。</p>
+<h2 id="現在の段階">現在の段階</h2>
+<p>『虎よ、虎よ！』『インフィニティ・リミテッド（上）』『夏への扉』の検索可能PDFを作成した。続けて傾き補正込みの手順で『時間泥棒』『暗黒星雲突破！』『天の光はすべて星』『インフィニティ・リミテッド（下）』を作り、ローカルLLMで作った濁点・半濁点の辞書で補正した版も作った。<a
+href="artifacts.html">成果物の目次</a>から完成PDF、辞書、レビューを開ける。目次の原稿は
+<code>artifacts.md</code> で、<code>bin/build-docs-html.sh</code>
+がこのREADMEや作業記録と一緒にHTMLにする（mdへのリンクはhtmlへのリンクになる）。原本・抽出画像・OCR結果は
+<code>.gitignore</code> で管理対象から外す。</p>
+<h3
+id="現在の1冊分の手順傾き補正込み">現在の1冊分の手順（傾き補正込み）</h3>
+<p>原本は <code>input/bookscan-downloads/</code>、Pythonは
+<code>.venv-ndl</code>、NDLOCR-Liteは
+<code>vendor/ndlocr-lite/src</code>。作業は
+<code>work/searchable/作業名/</code>、完成品は
+<code>output/searchable/書名 - 著者.pdf</code>。各段は出力があれば飛ばすので、途中から再実行できる。<code>MAX_PAGES=8</code>
+を付けると先頭8ページだけの試運転（作業ディレクトリは別名）になる。</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="va">SOURCE</span><span class="op">=</span>0101-20150604105123153_check.pdf   <span class="co"># data/bookscan-catalog.tsv の source</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="ex">bin/build-searchable-book.sh</span> <span class="st">&quot;</span><span class="va">$SOURCE</span><span class="st">&quot;</span> jikan-dorobou</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="co"># ローカルLLM（llama-server 127.0.0.1:8080、gemma-4-12B）で濁点・半濁点の辞書を作り、補正版を作る</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="ex">.venv-ndl/bin/python</span> bin/auto-variant-glossary.py <span class="dt">\</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>  work/searchable/jikan-dorobou/text-unfinalized.pdf <span class="dt">\</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>  work/searchable/jikan-dorobou/variant-glossary.tsv</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="ex">bin/build-searchable-book.sh</span> <span class="st">&quot;</span><span class="va">$SOURCE</span><span class="st">&quot;</span> jikan-dorobou work/searchable/jikan-dorobou/variant-glossary.tsv</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="co"># 傾き補正したページの文字層の位置を確認（列の縦ずれの傾きが0付近ならよい）</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="ex">.venv-ndl/bin/python</span> bin/check-deskew-text.py <span class="dt">\</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>  work/searchable/jikan-dorobou/angles.tsv work/searchable/jikan-dorobou/text-unfinalized.pdf</span></code></pre></div>
+<p>OCRは1ページ約1.2秒、余白つき再認識は約3秒（CPU）。辞書の判定は1組数秒。考え方と検証結果は
+<a href="docs/progress.html">docs/progress.md</a>
+の「傾き補正込みで4冊を作成」。</p>
+<p>GPUを使う場合は、<code>.venv-ndl</code> の <code>onnxruntime</code>
+を <code>onnxruntime-gpu[cuda,cudnn]</code>
+に入れ替え、<code>NDLOCR_DEVICE=cuda</code>
+を付ける。OCRは約0.45秒、余白つき再認識は約0.75秒になる（RTX
+3060）。CPUとGPUは約2%の行で読みが変わるが、精度は同等。そのため1冊は同じデバイスで通す。作業ディレクトリの
+<code>device</code>
+に最初のデバイスを記録し、違うデバイスでの再開は止まる。GPUが使えずCPUに切り替わった場合も止まる。入れ替え後も
+<code>NDLOCR_DEVICE=cpu</code>（既定）なら、結果は
+<code>onnxruntime</code> と同じ。検証は <a
+href="docs/progress.html">docs/progress.md</a>
+の「GPU（CUDA）でのOCRと余白つき再認識」。</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">.venv-ndl/bin/pip</span> uninstall <span class="at">-y</span> onnxruntime</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="ex">.venv-ndl/bin/pip</span> install <span class="st">&#39;onnxruntime-gpu[cuda,cudnn]==1.31.1&#39;</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="va">NDLOCR_DEVICE</span><span class="op">=</span>cuda <span class="ex">bin/build-searchable-book.sh</span> <span class="st">&quot;</span><span class="va">$SOURCE</span><span class="st">&quot;</span> jikan-dorobou</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="co"># OCRの比較用標本（3冊141ページ）と、実行結果の比較</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="ex">.venv-ndl/bin/python</span> bin/ocr-sample-pages.py work/ocr-engine-check</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="ex">.venv-ndl/bin/python</span> bin/compare-ocr-runs.py work/ocr-engine-check cpu saved cuda</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="ex">.venv-ndl/bin/python</span> bin/score-margin-runs.py work/ocr-engine-check ocrcpu-reccpu ocrcuda-reccuda</span></code></pre></div>
+<p><code>compare-ocr-runs.py</code> は
+<code>work/ocr-engine-check/書籍/実行名/</code> にある
+<code>ocr.py --output</code> の結果を読む（<code>saved</code>
+は全冊OCRの保存分）。<code>score-margin-runs.py</code> は
+<code>書籍/margin-実行名.tsv</code>（<code>margin-recognize.py</code>
+の出力）を読む。</p>
+<p>濁点・半濁点（バ／パ）の取り違えは、<code>bin/build-voicing-review.py</code>
+が作るレビュー画面で人が確定して辞書にする。候補は、本の中で両方の表記が出る組と、YomiTokuが別の表記に読んだ組。組ごとに、ページの縮小画像・行・3倍拡大を並べる。選んだ結果は画面の下にTSVでまとまるので、「TSVをコピー」で保存して辞書として渡す。</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="va">SLUG</span><span class="op">=</span>jikan-dorobou<span class="kw">;</span> <span class="va">STEM</span><span class="op">=</span><span class="va">${SOURCE</span><span class="op">%</span>.pdf<span class="va">}</span><span class="kw">;</span> <span class="va">WORK</span><span class="op">=</span>work/searchable/<span class="va">$SLUG</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="ex">../bookscan/vendor/.venv-yomitoku/bin/yomitoku</span> input/bookscan-downloads/<span class="va">$SOURCE</span> <span class="dt">\</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">-f</span> json <span class="at">-o</span> work/voicing/<span class="va">$SLUG</span>/yomitoku <span class="at">-d</span> cuda <span class="at">--dpi</span> 300 <span class="at">--ignore_ruby</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="ex">.venv-ndl/bin/python</span> bin/build-voicing-review.py input/bookscan-downloads/<span class="va">$SOURCE</span> <span class="dt">\</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>  <span class="va">$WORK</span>/ocr review/<span class="va">$SLUG</span>-voicing <span class="at">--ocr-stem</span> <span class="st">&quot;</span><span class="va">$STEM</span><span class="st">&quot;</span> <span class="at">--recognized</span> <span class="va">$WORK</span>/margin.tsv <span class="dt">\</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">--yomitoku-dir</span> work/voicing/<span class="va">$SLUG</span>/yomitoku <span class="at">--title</span> <span class="st">&quot;</span><span class="va">$SLUG</span><span class="st"> 濁点・半濁点レビュー&quot;</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a><span class="ex">firefox-developer-edition</span> review/<span class="va">$SLUG</span>-voicing/index.html</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="co"># 画面でコピーしたTSVを $WORK/voicing-glossary.tsv に保存してから</span></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a><span class="ex">bin/build-searchable-book.sh</span> <span class="st">&quot;</span><span class="va">$SOURCE</span><span class="st">&quot;</span> <span class="va">$SLUG</span> <span class="va">$WORK</span>/voicing-glossary.tsv</span></code></pre></div>
+<p><code>--yomitoku-dir</code>
+は省略できる（本の中で両方の表記が出る組だけになる）。<code>build-searchable-book.sh</code>
+が受け取る辞書は1つなので、LLMで作った <code>variant-glossary.tsv</code>
+とは別の版になる。</p>
+<p>ほかのOCRとは <code>bin/score-ocr-engines.py</code>
+で比べる。エンジンは
+<code>ndl:実行名</code>・<code>margin:実行名</code>・<code>yomitoku:実行名</code>
+で指定する。行の区切りや記号の表記に左右されない採点で、<code>--diff A B</code>
+を付けると、無作為ページでAとBが食い違った行を出す。YomiTokuは別の環境で動かす。</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="ex">../bookscan/vendor/.venv-yomitoku/bin/yomitoku</span> work/ocr-engine-check/tiger/subset.pdf <span class="dt">\</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">-f</span> json <span class="at">-o</span> work/ocr-engine-check/tiger/yomitoku <span class="at">-d</span> cuda <span class="at">--dpi</span> 300 <span class="at">--ignore_ruby</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="ex">.venv-ndl/bin/python</span> bin/score-ocr-engines.py work/ocr-engine-check <span class="dt">\</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>  ndl:cpu margin:ocrcpu-reccpu yomitoku:yomitoku <span class="at">--diff</span> margin:ocrcpu-reccpu yomitoku:yomitoku</span></code></pre></div>
+<p>以下は以前のOCR比較で使ったコマンド。このチェックアウトには当時の
+<code>.venv-ndl/</code> と作業データがなく、原本は隣の
+<code>bookscan/pdf/</code> にある。原本と生成物はGitに含めない。</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="ex">bin/extract-page.sh</span> ../bookscan/pdf/0101-20150604103726242_check.pdf 12</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="fu">mkdir</span> <span class="at">-p</span> work/ndl/page-012 work/paddle/page-012</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="ex">.venv-ndl/bin/ndlocr-lite</span> <span class="dt">\</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">--sourceimg</span> work/sample/page-012-000.jpg <span class="dt">\</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">--output</span> work/ndl/page-012 <span class="at">--viz</span> True</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a><span class="va">PADDLE_PDX_CACHE_HOME</span><span class="op">=</span><span class="st">&quot;</span><span class="va">$PWD</span><span class="st">/.paddlex&quot;</span> <span class="ex">.venv-paddle/bin/paddleocr</span> ocr <span class="dt">\</span></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>  <span class="at">-i</span> work/sample/page-012-000.jpg <span class="at">--device</span> cpu <span class="dt">\</span></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>  <span class="at">--lang</span> japan <span class="at">--ocr_version</span> PP-OCRv6 <span class="dt">\</span></span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>  <span class="at">--use_doc_orientation_classify</span> False <span class="dt">\</span></span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>  <span class="at">--use_doc_unwarping</span> False <span class="dt">\</span></span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>  <span class="at">--use_textline_orientation</span> False <span class="dt">\</span></span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>  <span class="at">--save_path</span> work/paddle/page-012</span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a><span class="ex">ruby</span> bin/compare-ocr.rb <span class="dt">\</span></span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a>  work/ndl/page-012/page-012-000.json <span class="dt">\</span></span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a>  work/paddle/page-012/page-012-000_res.json</span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a><span class="co"># 差がある文字位置も表示</span></span>
+<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a><span class="ex">ruby</span> bin/compare-ocr.rb <span class="at">--details</span> <span class="dt">\</span></span>
+<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a>  work/ndl/page-012/page-012-000.json <span class="dt">\</span></span>
+<span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a>  work/paddle/page-012/page-012-000_res.json</span>
+<span id="cb5-24"><a href="#cb5-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-25"><a href="#cb5-25" aria-hidden="true" tabindex="-1"></a><span class="co"># 原本画像と2つのOCRを1画面でレビュー（Firefoxで直接開ける）</span></span>
+<span id="cb5-26"><a href="#cb5-26" aria-hidden="true" tabindex="-1"></a><span class="ex">.venv-ndl/bin/python</span> bin/recognize-ruby.py <span class="dt">\</span></span>
+<span id="cb5-27"><a href="#cb5-27" aria-hidden="true" tabindex="-1"></a>  work/sample/page-012-000.jpg <span class="dt">\</span></span>
+<span id="cb5-28"><a href="#cb5-28" aria-hidden="true" tabindex="-1"></a>  work/ndl/page-012/page-012-000.xml <span class="dt">\</span></span>
+<span id="cb5-29"><a href="#cb5-29" aria-hidden="true" tabindex="-1"></a>  work/ruby/page-012.json</span>
+<span id="cb5-30"><a href="#cb5-30" aria-hidden="true" tabindex="-1"></a><span class="ex">ruby</span> bin/build-review.rb <span class="dt">\</span></span>
+<span id="cb5-31"><a href="#cb5-31" aria-hidden="true" tabindex="-1"></a>  work/sample/page-012-000.jpg <span class="dt">\</span></span>
+<span id="cb5-32"><a href="#cb5-32" aria-hidden="true" tabindex="-1"></a>  work/ndl/page-012/page-012-000.json <span class="dt">\</span></span>
+<span id="cb5-33"><a href="#cb5-33" aria-hidden="true" tabindex="-1"></a>  work/paddle/page-012/page-012-000_res.json <span class="dt">\</span></span>
+<span id="cb5-34"><a href="#cb5-34" aria-hidden="true" tabindex="-1"></a>  review/page-012.html <span class="dt">\</span></span>
+<span id="cb5-35"><a href="#cb5-35" aria-hidden="true" tabindex="-1"></a>  work/ruby/page-012.json</span>
+<span id="cb5-36"><a href="#cb5-36" aria-hidden="true" tabindex="-1"></a><span class="ex">firefox-developer-edition</span> review/page-012.html</span></code></pre></div>
+<p>PaddleOCR 3.7.0 の PP-OCRv6 では日本語の <code>--lang</code> は
+<code>ja</code> ではなく
+<code>japan</code>。各OCRのJSONは別々に保存し、比較時に座標で縦列を対応付ける。比較値は食い違いの量であり、正解率ではない。現状、PaddleOCRは検証用の参考表示にとどめ、本文の自動採用・多数決には使わない。</p>
+<p>NDLOCR-LiteのJSONと同じ場所にXMLがあれば、比較スクリプトは本文に対応しないPaddleOCR領域をルビ・ノンブルとして分類する。ページ12ではルビ「きぜん」とノンブル「10」を分類できた。</p>
+<p>レビューHTMLは画像を埋め込んだ単独ファイル。列ごとに差を黄色で示し、列を選ぶと原本の位置を赤枠で表示する。ルビはNDLOCR-Liteの検出枠を切り出して付属の3つの文字認識モデルに読ませ、PaddleOCRと並べる。ノンブルは本文照合前に除外する。生成物は
+<code>review/</code> に置き、Gitには含めない。</p>
+<p>追加評価の <a href="review/page-004.html">PDF 4ページ</a>、<a
+href="review/page-019.html">PDF 19ページ</a>、<a
+href="review/page-020.html">PDF 20ページ</a>
+もローカルに生成済み。ルビの原本確認にはページを開いてルビの行を選ぶ。未分類のPaddleOCR候補には認識スコアを表示し、低スコアは「未分類・低信頼」と区別する。</p>
+<p>原本画像で確認した3か所のルビは <code>eval/ruby-gold.tsv</code>
+に記録した。<code>ruby bin/score-ruby.rb</code>
+で保存済みOCR結果との完全一致を再計算できる。判読がまだ曖昧な箇所は採点対象に入れない。</p>
+<p>PDF 4ページの登場人物一覧から作った辞書候補は
+<code>data/cast-seed.tsv</code>。<code>confirmed</code>
+は画像で表記を確認済み、<code>needs_review</code>
+はOCR間の不一致などが残っている。未確認候補は本文の自動修正に使わない。</p>
+<p>登場人物一覧のように点線リーダーがあるページは、比較時に
+<code>--ignore-leaders</code> を付けると繰り返しの <code>……</code> /
+<code>...</code> だけ無視できる。名前中の <code>・</code> と
+<code>ー</code> は差分として残す。例えば:</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="ex">ruby</span> bin/compare-ocr.rb <span class="at">--details</span> <span class="at">--ignore-leaders</span> <span class="dt">\</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  work/ndl/page-004/page-004-000.json <span class="dt">\</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  work/paddle/page-004/page-004-000_res.json</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a><span class="ex">ruby</span> bin/build-review.rb <span class="at">--ignore-leaders</span> <span class="dt">\</span></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>  work/sample/page-004-000.jpg <span class="dt">\</span></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>  work/ndl/page-004/page-004-000.json <span class="dt">\</span></span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>  work/paddle/page-004/page-004-000_res.json <span class="dt">\</span></span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>  review/page-004.html</span></code></pre></div>
+<p>設計と進捗は <a href="docs/progress.html">docs/progress.md</a>
+に記録する。<a
+href="data/epub-candidates.tsv">data/epub-candidates.tsv</a>
+は旧EPUB方針での一次選別結果であり、検索可能PDFの対象を絞る根拠には使わない。</p>
+<h2 id="成果物の保管google-drive">成果物の保管（Google Drive）</h2>
+<p><code>output/</code> と <code>work/</code>
+はGitに入らない。そのため、完成品はGoogle Driveの
+<code>bookscan-epub/</code>
+に、このリポジトリと同じフォルダ構成で置く。Driveには
+<code>rclone</code> のリモート <code>gdrive:</code>
+で接続する。リモートは自分で作ったOAuthクライアントIDを使い、scope は
+<code>drive.file</code>（rcloneが置いたファイルとフォルダにだけ触れる）。ブラウザから入れたファイルは、rcloneからは見えない。OAuthアプリは本番に公開してあるので、許可は期限切れにならない。ホームページとプライバシーポリシーは
+https://kusanaginoturugi.github.io/rclone/ に置いてある。別のマシンでは
+<code>~/.config/rclone/rclone.conf</code> の <code>[gdrive]</code>
+をコピーするか、同じクライアントIDで <code>rclone config</code>
+する。</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co"># このマシンからDriveへ（既存のファイルは消さない）</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="ex">rclone</span> copy output gdrive:bookscan-epub/output</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="ex">rclone</span> copy work/searchable gdrive:bookscan-epub/work/searchable <span class="at">--include</span> <span class="st">&#39;*.tsv&#39;</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="co"># 別のマシンでDriveから戻す（artifacts.html のリンクがそのまま開ける）</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="ex">rclone</span> copy gdrive:bookscan-epub/output output</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="ex">rclone</span> copy gdrive:bookscan-epub/work/searchable work/searchable</span></code></pre></div>
+<p><code>rclone sync</code>
+は送り先にしかないファイルを消すので使わない。中身は買った本のスキャンなので、共有リンク（<code>rclone link</code>
+やブラウザの「リンクを知っている全員」）は作らない。</p>
+<h2 id="bookscan-pdf-の閲覧用コピー">BOOKSCAN PDF の閲覧用コピー</h2>
+<p>原本は別プロジェクトの
+<code>../bookscan/pdf/</code>、このプロジェクトで作る閲覧用コピーは
+<code>output/readable-pdf/</code>。83冊の書誌候補は
+<code>data/bookscan-catalog.tsv</code>
+に記録し、元のランダム名との対応を残す。書名と著者から
+<code>書名 - 著者.pdf</code>
+を作る。書誌情報は主に表紙OCRから作った候補なので、必要に応じて原画像で校正する。</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="ex">/usr/bin/python</span> bin/prepare-books.py</span></code></pre></div>
+<p><code>bin/prepare-books.py</code> は
+<code>pikepdf</code>・<code>scipy</code>・<code>numpy</code>・<code>Pillow</code>
+を使い、シバンは <code>/usr/bin/python</code>。現在の環境では
+<code>/usr/bin/python</code> にも
+<code>../bookscan/vendor/.venv-ndlocr</code> にも <code>pikepdf</code>
+がなく、<code>/usr/bin/python</code> には <code>scipy</code>
+もないため、このままでは動かない。<code>output/readable-pdf/</code>
+も現在のチェックアウトにはない。検索可能PDFの試験では、代わりに
+<code>bin/prepare-trial-pdf.py</code>（<code>pypdf</code> と
+<code>cv2</code> を使う1冊ずつの版）で
+<code>output/trial/*-sanitized.pdf</code> を作っている。</p>
+<p>このスクリプトは画像PDFの本文ページを判別し、紙色が強いページだけ背景を白く補正する。縦組みの列から傾きを確信できたページのみ回転する。ページごとの表示サイズが揺れないよう、余白は切らずに原本のページ枠を保持する。表紙・カラー図版の画像は再圧縮しない。PDFの基本情報には書名と著者を、XMPには翻訳者・文庫名・元ファイル名を記録する。完了冊数と処理数は
+<code>output/readable-pdf/conversion.tsv</code> で確認できる。</p>
+<p>処理は途中で再実行できる。既に全ページがある出力PDFは飛ばし、ページ数が不足する試験出力は作り直す。原本はそのまま残す。
+書誌を修正した本だけ作り直す場合は
+<code>--only 元ファイル名 --force</code> を使う。</p>
+<h2 id="検索可能pdfへの方針変更">検索可能PDFへの方針変更</h2>
+<p>このプロジェクトで生成する閲覧用コピーの各ページ画像とページ枠を保持し、NDLOCR-Liteの本文認識結果を透明なテキスト層として重ねる。縦書きは原本の列順（右から左）と列内の行順（上から下）で文字抽出できるようにし、座標とテキストの対応も保持する。傾き補正するページでは補正前の画像もOCRし、補正後の画像へ文字座標を変換する。別プロジェクトの原本PDF、閲覧用PDF、OCR結果は別々に保存する。現在の試験では、閲覧用コピーとして
+<code>bin/prepare-trial-pdf.py</code> で作った
+<code>output/trial/*-sanitized.pdf</code>
+を使う。傾き補正前のOCR座標を補正後の画像へ移す変換は
+<code>bin/deskew-study.py</code>
+で6ページだけ試し、1冊分の処理には組み込んでいない。『インフィニティ・リミテッド（上）』は
+<code>--no-deskew</code> で傾き補正せずに作った。</p>
+<h3
+id="冊目夏への扉余白つき再認識を最初から使う手順">3冊目：『夏への扉』（余白つき再認識を最初から使う手順）</h3>
+<p>完成品は
+<code>output/trial/夏への扉 - ロバート・A・ハインライン.pdf</code>（Git管理外）。356ページ。保存済みOCRのない本に、上巻で決めた規則を最初から当てた。原本をOCRして行枠を得たあと、<code>bin/margin-recognize.py</code>
+で認識モデルだけを余白つきで再実行する。高さ400px以上の縦書き行は余白30pxの読み、それより低い行（短い会話行・ノンブル・奥付など）は保存済みOCRの読みを使い、<code>--fix-dashes</code>
+を当てる。さらに、画像で確認した15語の辞書
+<code>work/eval/summer-door-glossary.tsv</code> と
+<code>--fix-variants</code>
+で、濁点と半濁点の取り違え（ビート→ピート、ポストン→ボストンなど）を直す。個別補正はまだない。</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="va">PY</span><span class="op">=</span>../bookscan/vendor/.venv-ndlocr/bin/python</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="va">STEM</span><span class="op">=</span>0101-20150604095752068_check</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="va">$PY</span> bin/prepare-trial-pdf.py <span class="st">&quot;</span><span class="va">${STEM}</span><span class="st">.pdf&quot;</span> output/trial/summer-door-sanitized.pdf <span class="at">--no-deskew</span></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="va">$PY</span> ../bookscan/vendor/ndlocr-lite/src/ocr.py <span class="dt">\</span></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">--sourcepdf</span> ../bookscan/pdf/<span class="st">&quot;</span><span class="va">${STEM}</span><span class="st">.pdf&quot;</span> <span class="dt">\</span></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">--output</span> work/trial/summer-door-ocr <span class="dt">\</span></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">--pdf-output</span> output/trial/summer-door-original-ocr.pdf <span class="dt">\</span></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>  <span class="at">--pdf-render-dpi</span> 300</span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a><span class="va">$PY</span> bin/margin-recognize.py work/margin/summer-door.tsv <span class="dt">\</span></span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>  <span class="at">--pdf</span> ../bookscan/pdf/<span class="st">&quot;</span><span class="va">${STEM}</span><span class="st">.pdf&quot;</span> <span class="dt">\</span></span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>  <span class="at">--ocr-dir</span> work/trial/summer-door-ocr <span class="at">--ocr-stem</span> <span class="st">&quot;</span><span class="va">$STEM</span><span class="st">&quot;</span></span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a><span class="va">$PY</span> bin/rebuild-text-layer.py <span class="dt">\</span></span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>  output/trial/summer-door-sanitized.pdf work/trial/summer-door-ocr <span class="dt">\</span></span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a>  output/trial/summer-door-text-unfinalized-v2.pdf <span class="at">--ocr-stem</span> <span class="st">&quot;</span><span class="va">$STEM</span><span class="st">&quot;</span> <span class="dt">\</span></span>
+<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a>  <span class="at">--recognized</span> work/margin/summer-door.tsv <span class="at">--column</span> margin30 <span class="at">--min-height</span> 400 <span class="at">--fix-dashes</span> <span class="dt">\</span></span>
+<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a>  <span class="at">--glossary</span> work/eval/summer-door-glossary.tsv <span class="at">--fix-variants</span></span>
+<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a><span class="va">$PY</span> bin/finalize-trial-pdf.py <span class="dt">\</span></span>
+<span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a>  output/trial/summer-door-sanitized.pdf <span class="dt">\</span></span>
+<span id="cb9-19"><a href="#cb9-19" aria-hidden="true" tabindex="-1"></a>  output/trial/summer-door-text-unfinalized-v2.pdf <span class="dt">\</span></span>
+<span id="cb9-20"><a href="#cb9-20" aria-hidden="true" tabindex="-1"></a>  <span class="st">&#39;output/trial/夏への扉 - ロバート・A・ハインライン.pdf&#39;</span> <span class="dt">\</span></span>
+<span id="cb9-21"><a href="#cb9-21" aria-hidden="true" tabindex="-1"></a>  <span class="at">--catalog-source</span> <span class="st">&quot;</span><span class="va">${STEM}</span><span class="st">.pdf&quot;</span></span></code></pre></div>
+<p>OCRは約7分、余白つき再認識は約17分（CPUのみ）。<code>--min-height</code>
+より低い行は <code>--recognized</code>
+の列を使わず保存済みOCRの読みを残す。<code>--fix-variants</code>
+は辞書の確認済みの語について、バ行とパ行の1文字だけが違う読みを辞書の表記に置き換え、置き換えた件数を表示する。長いカタカナ語の一部（ペルシャのペルなど）や、辞書に載っている別の語は置き換えない。行をまたいで分かれた語は対象外。辞書候補は
+<code>bin/extract-glossary-candidates.py</code>
+で抜き出し、<code>work/eval/summer-door-glossary-candidates.tsv</code>
+に置いた。</p>
+<h3 id="夏への扉の読書用注釈試作">『夏への扉』の読書用注釈試作</h3>
+<p><code>data/summer-door-reading-notes.json</code>
+の2項目を、完成PDFのページ21・23・24にPDF標準のメモ注釈として埋め込んだ。注釈はページ上部の余白に置き、本文画像と文字層は変更しない。完成品は残し、別ファイル
+<code>output/trial/夏への扉 - ロバート・A・ハインライン 注釈試作 Firefox版 薄色右開き.pdf</code>（Git管理外）を作る。Firefoxの黄色い注釈アイコンを隠し、淡い灰色の吹き出しをページに描いた。吹き出しはマウスオーバーで説明を表示し、クリックで固定する。隣の「↗」は出典ページへのリンクで、Firefox内蔵PDFビューアが新しいタブで開く指定を付けた。本文の偶数ページ176枚の左端に残ったスキャン線を、白い細帯で覆った。Readest向けにPDFの
+<code>/ViewerPreferences /Direction /R2L</code>
+を設定し、見開きを右開きとして自動判定できるようにした。追加候補は <a
+href="data/summer-door-note-candidates.html"><code>data/summer-door-note-candidates.md</code></a>
+に、1956年以前の現実の情報だけを使って選定した。</p>
+<div class="sourceCode" id="cb10"><pre
+class="sourceCode sh"><code class="sourceCode bash"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="ex">../bookscan/vendor/.venv-ndlocr/bin/python</span> bin/embed-reading-notes.py <span class="dt">\</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>  <span class="st">&#39;output/trial/夏への扉 - ロバート・A・ハインライン.pdf&#39;</span> <span class="dt">\</span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>  data/summer-door-reading-notes.json work/trial/summer-door-ocr <span class="dt">\</span></span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>  0101-20150604095752068_check <span class="dt">\</span></span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>  <span class="st">&#39;/tmp/bookscan-summer-door-pale-notes.pdf&#39;</span></span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a><span class="ex">../bookscan/vendor/.venv-ndlocr/bin/python</span> bin/mask-scan-edge.py <span class="dt">\</span></span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>  <span class="st">&#39;/tmp/bookscan-summer-door-pale-notes.pdf&#39;</span> <span class="dt">\</span></span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>  <span class="st">&#39;/tmp/bookscan-summer-door-pale-edge.pdf&#39;</span> <span class="dt">\</span></span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>  <span class="at">--even-pages</span> 4-354 <span class="at">--side</span> left <span class="at">--pixels</span> 8</span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a><span class="ex">../bookscan/vendor/.venv-ndlocr/bin/python</span> bin/set-pdf-direction.py <span class="dt">\</span></span>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>  <span class="st">&#39;/tmp/bookscan-summer-door-pale-edge.pdf&#39;</span> <span class="dt">\</span></span>
+<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a>  <span class="st">&#39;output/trial/夏への扉 - ロバート・A・ハインライン 注釈試作 Firefox版 薄色右開き.pdf&#39;</span> <span class="dt">\</span></span>
+<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a>  <span class="at">--direction</span> rtl</span></code></pre></div>
+<h3
+id="冊目の試験インフィニティリミテッド上">2冊目の試験：『インフィニティ・リミテッド（上）』</h3>
+<p>完成品は
+<code>output/trial/インフィニティ・リミテッド（上） - ジェイムズ・P・ホーガン.pdf</code>（Git管理外）。388ページの原本を補正前にOCRし、画像を保持したPDFへ透明テキスト層を重ねた。画像で表記を確認した13語は
+<code>work/eval/infinity-upper-glossary.tsv</code>、個別のOCR補正7行は
+<code>work/eval/infinity-upper-overrides.tsv</code>
+に記録した。全文から抽出した未確認の頻出語候補は
+<code>work/eval/infinity-upper-glossary-candidates.tsv</code>
+に分け、自動補正には使わない。</p>
+<p>画像と文字層のレビューは
+<code>review/infinity-upper-eval/index.html</code>、辞書候補上位30語の画像は
+<code>review/infinity-upper-glossary/index.html</code>、ローカルLLMで選んだ20行は
+<code>review/infinity-upper-llm/index.html</code>
+にある。これらもGit管理外。方法と結果は <a
+href="docs/progress.html">docs/progress.md</a> に記録した。</p>
+<p>傾き補正候補6ページの前後OCR比較と、補正前OCRの座標を回転して重ねた試験PDFは
+<a href="work/deskew-study/index.html">比較レビュー</a>
+にまとめた。<code>bin/deskew-study.py --score</code>
+で保存済みの正解行を再採点できる。完成品388ページには補正を反映していない。</p>
+<p><code>bin/ocr-sensitivity.py</code>
+は同じ6ページで保存済みの行枠を使い、NDLOCR-Liteの認識モデルだけを再実行する。行枠の幅、画素の揺らし、余白の追加（<code>--pad-sweep</code>）で認識結果がどう変わるかを
+<code>work/ocr-sensitivity/</code> に出す。</p>
+<p><code>bin/margin-recognize.py</code>
+は1冊分の保存済みOCRの行枠を使い、縦書きの行画像に余白を足して認識モデルだけを再実行する。<code>--score</code>
+で正解TSVと照合する。</p>
+<div class="sourceCode" id="cb11"><pre
+class="sourceCode sh"><code class="sourceCode bash"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="va">PY</span><span class="op">=</span>../bookscan/vendor/.venv-ndlocr/bin/python</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="va">$PY</span> bin/margin-recognize.py work/margin/infinity-upper.tsv <span class="dt">\</span></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">--pdf</span> ../bookscan/pdf/0101-20150604103726242_check.pdf <span class="dt">\</span></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">--ocr-dir</span> work/trial/infinity-upper-ocr <span class="at">--ocr-stem</span> 0101-20150604103726242_check</span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a><span class="va">$PY</span> bin/margin-recognize.py work/margin/infinity-upper.tsv <span class="dt">\</span></span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">--score</span> work/margin/gold-random.tsv work/margin/gold-existing.tsv</span></code></pre></div>
+<p>余白30pxの結果で文字層を作り直した版は
+<code>output/trial/インフィニティ・リミテッド（上） - ジェイムズ・P・ホーガン v2.pdf</code>（Git管理外）。従来の完成品と並べて置き、置き換えるかは未決定。v2は
+<code>--min-height</code>
+を付けずに作ったため、短い行の閉じかぎ括弧の脱落などを含む（<a
+href="docs/progress.html">docs/progress.md</a>）。<code>--fix-dashes</code>
+は縦書き行で、前後どちらも英数字でない <code>-</code> を <code>―</code>
+にする。<code>--fix-brackets</code> は縦書き行で <code>&lt;&gt;</code>
+<code>＜＞</code> を〈〉にし、<code>"</code>
+をページ内の読み順で〝〟の開き・閉じが交互になるよう戻す。数が合わないページは
+<code>"</code>
+のまま残し、ページ番号を表示する。<code>bin/build-searchable-book.sh</code>
+は常にこのオプションを付けるが、作成済みの本の文字層には入っていない。</p>
+<div class="sourceCode" id="cb12"><pre
+class="sourceCode sh"><code class="sourceCode bash"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="va">PY</span><span class="op">=</span>../bookscan/vendor/.venv-ndlocr/bin/python</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a><span class="va">STEM</span><span class="op">=</span>0101-20150604103726242_check</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a><span class="va">$PY</span> bin/rebuild-text-layer.py <span class="dt">\</span></span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>  output/trial/infinity-upper-sanitized.pdf work/trial/infinity-upper-ocr <span class="dt">\</span></span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>  output/trial/infinity-upper-text-unfinalized-v2.pdf <span class="at">--ocr-stem</span> <span class="st">&quot;</span><span class="va">$STEM</span><span class="st">&quot;</span> <span class="dt">\</span></span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">--glossary</span> work/eval/infinity-upper-glossary.tsv <span class="dt">\</span></span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">--overrides</span> work/eval/infinity-upper-overrides.tsv <span class="dt">\</span></span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>  <span class="at">--recognized</span> work/margin/infinity-upper.tsv <span class="at">--column</span> margin30 <span class="at">--fix-dashes</span></span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a><span class="va">$PY</span> bin/finalize-trial-pdf.py <span class="dt">\</span></span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a>  output/trial/infinity-upper-sanitized.pdf <span class="dt">\</span></span>
+<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a>  output/trial/infinity-upper-text-unfinalized-v2.pdf <span class="dt">\</span></span>
+<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a>  <span class="st">&#39;output/trial/インフィニティ・リミテッド（上） - ジェイムズ・P・ホーガン v2.pdf&#39;</span> <span class="dt">\</span></span>
+<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a>  <span class="at">--catalog-source</span> <span class="st">&quot;</span><span class="va">${STEM}</span><span class="st">.pdf&quot;</span></span></code></pre></div>
+<div class="sourceCode" id="cb13"><pre
+class="sourceCode sh"><code class="sourceCode bash"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="va">PY</span><span class="op">=</span>../bookscan/vendor/.venv-ndlocr/bin/python</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a><span class="va">STEM</span><span class="op">=</span>0101-20150604103726242_check</span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a><span class="va">$PY</span> bin/prepare-trial-pdf.py <span class="st">&quot;</span><span class="va">${STEM}</span><span class="st">.pdf&quot;</span> output/trial/infinity-upper-sanitized.pdf <span class="at">--no-deskew</span></span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a><span class="va">$PY</span> ../bookscan/vendor/ndlocr-lite/src/ocr.py <span class="dt">\</span></span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">--sourcepdf</span> ../bookscan/pdf/<span class="st">&quot;</span><span class="va">${STEM}</span><span class="st">.pdf&quot;</span> <span class="dt">\</span></span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">--output</span> work/trial/infinity-upper-ocr <span class="dt">\</span></span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">--pdf-output</span> output/trial/infinity-upper-original-ocr.pdf <span class="dt">\</span></span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a>  <span class="at">--pdf-render-dpi</span> 300</span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a><span class="va">$PY</span> bin/rebuild-text-layer.py <span class="dt">\</span></span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a>  output/trial/infinity-upper-sanitized.pdf work/trial/infinity-upper-ocr <span class="dt">\</span></span>
+<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a>  output/trial/infinity-upper-text-unfinalized.pdf <span class="at">--ocr-stem</span> <span class="st">&quot;</span><span class="va">$STEM</span><span class="st">&quot;</span> <span class="dt">\</span></span>
+<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a>  <span class="at">--glossary</span> work/eval/infinity-upper-glossary.tsv <span class="dt">\</span></span>
+<span id="cb13-13"><a href="#cb13-13" aria-hidden="true" tabindex="-1"></a>  <span class="at">--overrides</span> work/eval/infinity-upper-overrides.tsv</span>
+<span id="cb13-14"><a href="#cb13-14" aria-hidden="true" tabindex="-1"></a><span class="va">$PY</span> bin/finalize-trial-pdf.py <span class="dt">\</span></span>
+<span id="cb13-15"><a href="#cb13-15" aria-hidden="true" tabindex="-1"></a>  output/trial/infinity-upper-sanitized.pdf <span class="dt">\</span></span>
+<span id="cb13-16"><a href="#cb13-16" aria-hidden="true" tabindex="-1"></a>  output/trial/infinity-upper-text-unfinalized.pdf <span class="dt">\</span></span>
+<span id="cb13-17"><a href="#cb13-17" aria-hidden="true" tabindex="-1"></a>  <span class="st">&#39;output/trial/インフィニティ・リミテッド（上） - ジェイムズ・P・ホーガン.pdf&#39;</span> <span class="dt">\</span></span>
+<span id="cb13-18"><a href="#cb13-18" aria-hidden="true" tabindex="-1"></a>  <span class="at">--catalog-source</span> <span class="st">&quot;</span><span class="va">${STEM}</span><span class="st">.pdf&quot;</span></span></code></pre></div>
+<p>ルビを本文へ組み込むEPUB特有の処理は不要になる。ルビ画像は残るが、読み上げ時の発音やルビ自体の検索は本文OCRだけでは保証できない。必要になった場合に限り、ルビを別途OCRして扱いを決める。読み上げはPDF閲覧アプリの機能と抽出順に依存するため、実際に使うアプリで確認する。実装と検証手順は
+<a href="docs/progress.html">docs/progress.md</a> の最新方針を参照。</p>
+<h3 id="冊目の試験虎よ虎よ">1冊目の試験：『虎よ、虎よ！』</h3>
+<p>旧選別で文字配置が重要とした本を364ページ処理した。空白修正版は
+<code>output/trial/虎よ、虎よ！ - アルフレッド・ベスター 空白修正.pdf</code>（Git管理外）。<code>../bookscan/vendor/.venv-ndlocr/bin/python</code>
+とNDLOCR-LiteのPDF文字層機能を使用する。再現手順:</p>
+<div class="sourceCode" id="cb14"><pre
+class="sourceCode sh"><code class="sourceCode bash"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="va">PY</span><span class="op">=</span>../bookscan/vendor/.venv-ndlocr/bin/python</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a><span class="va">SOURCE</span><span class="op">=</span>0101-20150604101257195_check.pdf</span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a><span class="fu">mkdir</span> <span class="at">-p</span> output/trial work/trial/tiger-full</span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a><span class="va">$PY</span> bin/prepare-trial-pdf.py <span class="st">&quot;</span><span class="va">$SOURCE</span><span class="st">&quot;</span> output/trial/tiger-sanitized.pdf</span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a><span class="va">$PY</span> ../bookscan/vendor/ndlocr-lite/src/ocr.py <span class="dt">\</span></span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">--sourcepdf</span> output/trial/tiger-sanitized.pdf <span class="dt">\</span></span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">--output</span> work/trial/tiger-full <span class="dt">\</span></span>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a>  <span class="at">--pdf-output</span> output/trial/tiger-searchable-unfinalized.pdf <span class="dt">\</span></span>
+<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a>  <span class="at">--pdf-render-dpi</span> 300</span>
+<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a><span class="va">$PY</span> bin/finalize-trial-pdf.py <span class="dt">\</span></span>
+<span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a>  output/trial/tiger-sanitized.pdf <span class="dt">\</span></span>
+<span id="cb14-12"><a href="#cb14-12" aria-hidden="true" tabindex="-1"></a>  output/trial/tiger-searchable-unfinalized.pdf <span class="dt">\</span></span>
+<span id="cb14-13"><a href="#cb14-13" aria-hidden="true" tabindex="-1"></a>  <span class="st">&#39;output/trial/虎よ、虎よ！ - アルフレッド・ベスター.pdf&#39;</span></span>
+<span id="cb14-14"><a href="#cb14-14" aria-hidden="true" tabindex="-1"></a><span class="va">$PY</span> bin/rebuild-text-layer.py <span class="dt">\</span></span>
+<span id="cb14-15"><a href="#cb14-15" aria-hidden="true" tabindex="-1"></a>  output/trial/tiger-sanitized.pdf work/trial/tiger-full <span class="dt">\</span></span>
+<span id="cb14-16"><a href="#cb14-16" aria-hidden="true" tabindex="-1"></a>  output/trial/tiger-text-normalized.pdf <span class="dt">\</span></span>
+<span id="cb14-17"><a href="#cb14-17" aria-hidden="true" tabindex="-1"></a>  <span class="at">--overrides</span> work/eval/tiger-overrides.tsv <span class="dt">\</span></span>
+<span id="cb14-18"><a href="#cb14-18" aria-hidden="true" tabindex="-1"></a>  <span class="at">--glossary</span> work/eval/tiger-glossary.tsv</span>
+<span id="cb14-19"><a href="#cb14-19" aria-hidden="true" tabindex="-1"></a><span class="va">$PY</span> bin/finalize-trial-pdf.py <span class="dt">\</span></span>
+<span id="cb14-20"><a href="#cb14-20" aria-hidden="true" tabindex="-1"></a>  output/trial/tiger-sanitized.pdf output/trial/tiger-text-normalized.pdf <span class="dt">\</span></span>
+<span id="cb14-21"><a href="#cb14-21" aria-hidden="true" tabindex="-1"></a>  <span class="st">&#39;output/trial/虎よ、虎よ！ - アルフレッド・ベスター 空白修正.pdf&#39;</span></span></code></pre></div>
+<p><code>prepare-trial-pdf.py</code>・<code>rebuild-text-layer.py</code>・<code>finalize-trial-pdf.py</code>・<code>margin-recognize.py</code>
+と、<code>deskew-study.py</code>
+の準備段階は、出力が既にあると止まる。<code>ocr-sensitivity.py</code> は
+<code>variants.tsv</code>（<code>--pad-sweep</code> では
+<code>pad-sweep.tsv</code>）があると止まる。<code>evaluate-trial-pdf.py</code>・<code>rank-ocr-lines.py</code>・<code>build-glossary-review.py</code>・<code>extract-glossary-candidates.py</code>
+と、<code>deskew-study.py --score</code> の
+<code>report.json</code>・<code>index.html</code>
+は既存の出力を上書きする。この本で傾き補正したページは0なので、上の手順では閲覧用PDFを直接OCRした。全364ページのOCR結果は
+<code>work/trial/tiger-full/</code>
+に残る。検索・画像照合の結果と特殊な組版ページの制約は <a
+href="docs/progress.html">docs/progress.md</a>
+に記録した。読み上げアプリでの実聴は未確認。</p>
+<h3 id="ocr文字層の評価">OCR文字層の評価</h3>
+<p><code>bin/evaluate-trial-pdf.py</code>
+は通常ページ10件を固定シードで選び、例外ページと抽出が空のページも画像でレビューできるHTMLを作る。画像と照合した正解行を
+<code>work/eval/tiger-gold.tsv</code> に、検索したい語を
+<code>work/eval/tiger-queries.tsv</code>
+に保存する。これらの本文データはGit管理外。</p>
+<div class="sourceCode" id="cb15"><pre
+class="sourceCode sh"><code class="sourceCode bash"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="va">PY</span><span class="op">=</span>../bookscan/vendor/.venv-ndlocr/bin/python</span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a><span class="va">$PY</span> bin/evaluate-trial-pdf.py <span class="dt">\</span></span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>  <span class="st">&#39;output/trial/虎よ、虎よ！ - アルフレッド・ベスター 空白修正.pdf&#39;</span> <span class="dt">\</span></span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>  work/trial/tiger-full review/tiger-eval <span class="dt">\</span></span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">--gold</span> work/eval/tiger-gold.tsv <span class="dt">\</span></span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">--queries</span> work/eval/tiger-queries.tsv <span class="at">--normalized-text-layer</span> <span class="dt">\</span></span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">--overrides</span> work/eval/tiger-overrides.tsv <span class="dt">\</span></span>
+<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a>  <span class="at">--glossary</span> work/eval/tiger-glossary.tsv</span></code></pre></div>
+<p>結果は <code>review/tiger-eval/index.html</code> と
+<code>review/tiger-eval/report.json</code>。通常ページ10行・425文字では編集差0、例外ページ5行・54文字では編集差3。画像で確認した検索語12件のうち5件はPDF文字層に見つからず、いずれも特殊組版ページだった。この小標本を本全体の正解率とみなさない。詳しくは
+<a href="docs/progress.html">進捗と設計メモ</a>。</p>
+<p><code>--ocr-stem</code> の既定値 <code>tiger-sanitized</code> と
+<code>--special-pages</code> の既定値
+<code>155,192,257,311,316,321</code>
+は『虎よ、虎よ！』用。上の例はOCRのファイル名が
+<code>tiger-sanitized_*.json</code>
+なので既定値で動く。『インフィニティ・リミテッド（上）』の
+<code>review/infinity-upper-eval/</code>
+は次の指定で作った。完成品の文字層は4ページ・行10を直す前の補正で作ったため、直した補正ファイルで再実行すると4ページが不一致として報告される。<code>--recognized</code>
+で作ったv2の文字層は保存済みOCRのJSONと一致しないので、このスクリプトでは評価できない。</p>
+<div class="sourceCode" id="cb16"><pre
+class="sourceCode sh"><code class="sourceCode bash"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="va">PY</span><span class="op">=</span>../bookscan/vendor/.venv-ndlocr/bin/python</span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a><span class="va">STEM</span><span class="op">=</span>0101-20150604103726242_check</span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a><span class="va">$PY</span> bin/evaluate-trial-pdf.py <span class="dt">\</span></span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>  <span class="st">&#39;output/trial/インフィニティ・リミテッド（上） - ジェイムズ・P・ホーガン.pdf&#39;</span> <span class="dt">\</span></span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>  work/trial/infinity-upper-ocr review/infinity-upper-eval <span class="at">--ocr-stem</span> <span class="st">&quot;</span><span class="va">$STEM</span><span class="st">&quot;</span> <span class="dt">\</span></span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">--queries</span> work/eval/infinity-upper-queries.tsv <span class="at">--normalized-text-layer</span> <span class="dt">\</span></span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">--overrides</span> work/eval/infinity-upper-overrides.tsv <span class="dt">\</span></span>
+<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a>  <span class="at">--glossary</span> work/eval/infinity-upper-glossary.tsv <span class="dt">\</span></span>
+<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a>  <span class="at">--special-pages</span> 4,12,19,20,49,100,113,285,311,367,376</span></code></pre></div>
+<p><code>bin/extract-glossary-candidates.py</code>
+はPDF全文から繰り返し現れるカタカナ語を集める。今回の候補100件は
+<code>work/eval/tiger-glossary-candidates.tsv</code>（Git管理外）に保存した。原本画像で確認した語だけを
+<code>work/eval/tiger-glossary.tsv</code> の <code>verified=yes</code>
+として使う。語中の空白だけをつなぎ、話者名とセリフの区切りなどは残す。</p>
+<p>ルビ近傍の空白などを優先してローカルLLMに文章の違和感を採点させる場合は、OpenAI互換のローカルサーバーを起動してから
+<code>bin/rank-ocr-lines.py</code> を使う。<code>--url</code>
+でサーバーを、<code>--glossary</code>
+で確認済み辞書を指定できる。今回の20行の結果は
+<code>review/tiger-llm/index.html</code> と
+<code>ranked.tsv</code>（Git管理外）。レビューには元OCRと修正版PDFの文字層を両方表示する。高スコアにも詩や意図的な反復が混じるため、原本画像で確認してから修正する。画像で確認した個別補正は
+<code>work/eval/tiger-overrides.tsv</code>（Git管理外）に記録する。</p>
+</body>
+</html>
