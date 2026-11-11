@@ -236,7 +236,7 @@ function render() {{
     const el = document.querySelector('input[name="h' + i + '"]:checked');
     const v = el ? el.value : 'undecided';
     const custom = document.getElementById('c' + i).value;
-    store[it.id] = {{v, custom}};
+    if (v !== 'undecided') store[it.id] = {{v, custom}};
     document.getElementById('s' + i).classList.toggle('done', v !== 'undecided');
     if (v === 'undecided') return;
     if (v === 'custom') {{
@@ -358,6 +358,11 @@ def main():
                 done[(hunk_id, args.model, PROMPT_VERSION)] = record
             items.append(dict(record, index=index, start=start, end=end))
 
+    # A human verdict that no longer matches a hunk (the text before it changed,
+    # e.g. after a new voicing glossary) would be dropped silently; stop instead.
+    orphans = sorted(set(human) - {item['id'] for item in items})
+    if orphans:
+        raise SystemExit(f'{len(orphans)} human verdicts match no hunk (text changed?): {orphans[:5]}')
     write_header = not history_path.exists()
     with history_path.open('a', newline='') as handle:
         writer = csv.DictWriter(handle, HISTORY, delimiter='\t', lineterminator='\n', extrasaction='ignore')
@@ -471,7 +476,10 @@ def main():
         sections='\n'.join(sections), items=json.dumps(data, ensure_ascii=False), header='\\t'.join(HUMAN)),
         encoding='utf-8')
     print(summary)
+    unreviewed = [i for i in items if i['id'] not in human]
     print(f'{len(new_history)} hunks asked now, {len(merged)} corrections: {args.output / "corrections.tsv"}')
+    print(f'unreviewed LLM/rule decisions: {len(unreviewed)} '
+          f'(applied {sum(i["decision"] == "yomitoku" for i in unreviewed)}); review: {args.review / "index.html"}')
 
 
 if __name__ == '__main__':

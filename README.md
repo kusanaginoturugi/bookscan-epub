@@ -6,26 +6,39 @@
 
 『虎よ、虎よ！』『インフィニティ・リミテッド（上）』『夏への扉』の検索可能PDFを作成した。続けて傾き補正込みの手順で『時間泥棒』『暗黒星雲突破！』『天の光はすべて星』『インフィニティ・リミテッド（下）』を作り、ローカルLLMで作った濁点・半濁点の辞書で補正した版も作った。[成果物の目次](artifacts.html)から完成PDF、辞書、レビューを開ける。目次の原稿は `artifacts.md` で、`bin/build-docs-html.sh` がこのREADMEや作業記録と一緒にHTMLにする（mdへのリンクはhtmlへのリンクになる）。原本・抽出画像・OCR結果は `.gitignore` で管理対象から外す。
 
-### 現在の1冊分の手順（傾き補正込み）
+### 現在の1冊分の手順
 
-原本は `input/bookscan-downloads/`、Pythonは `.venv-ndl`、NDLOCR-Liteは `vendor/ndlocr-lite/src`。作業は `work/searchable/作業名/`、完成品は `output/searchable/書名 - 著者.pdf`。各段は出力があれば飛ばすので、途中から再実行できる。`MAX_PAGES=8` を付けると先頭8ページだけの試運転（作業ディレクトリは別名）になる。
+原本は `input/bookscan-downloads/`、Pythonは `.venv-ndl`、NDLOCR-Liteは `vendor/ndlocr-lite/src`、YomiTokuは `vendor/.venv-yomitoku/bin/yomitoku`。作業は `work/searchable/作業名/`、レビュー画面は `review/作業名-voicing/` と `review/作業名-judge/`、完成品は `output/searchable/書名 - 著者.pdf`。`MAX_PAGES=8` を付けると、先頭8ページだけの試運転（作業ディレクトリは別名）になる。
+
+段の順は、閲覧用PDF（背景補正と傾き補正）→ NDLOCR-Lite → 余白つき再認識 → YomiToku → パ／バ → 判断モデル → 文字層 → 書誌設定。
+- **パ／バ：** 語を切り出して読み直す自動判定で、安全な組だけ確定する。残りは人がレビュー画面で確定する。
+- **判断モデル：** NDLとYomiTokuの残りの食い違いを、ローカルLLMが判断する。
+- **文字層：** パ／バの辞書、LLMと人の差分、`char-map.tsv` を当てる。
+
+OCR、余白つき再認識、YomiTokuは、済んでいれば飛ばす。パ／バ、判断モデル、文字層は、入力の中身が変わったときだけ作り直す（ファイルの日付は見ない）。変わる完成品は消さずに、`output/searchable/old/` へ日付を付けて移す。
+
+YomiTokuかLLM（llama-server）が見つからないと止まる。使わないなら `SKIP_YOMITOKU=1` や `SKIP_JUDGE=1` を付ける。1冊の中で、段の有無とデバイスは最初の実行のまま変えられない（`stages`・`device` に記録）。これらの段より前に作った作業ディレクトリは、`UPGRADE=1` を付けない限り何も変えない。
 
 ```sh
 SOURCE=0101-20150604105123153_check.pdf   # data/bookscan-catalog.tsv の source
-bin/build-searchable-book.sh "$SOURCE" jikan-dorobou
-
-# ローカルLLM（llama-server 127.0.0.1:8080、gemma-4-12B）で濁点・半濁点の辞書を作り、補正版を作る
-.venv-ndl/bin/python bin/auto-variant-glossary.py \
-  work/searchable/jikan-dorobou/text-unfinalized.pdf \
-  work/searchable/jikan-dorobou/variant-glossary.tsv
-bin/build-searchable-book.sh "$SOURCE" jikan-dorobou work/searchable/jikan-dorobou/variant-glossary.tsv
+NDLOCR_DEVICE=cuda bin/build-searchable-book.sh "$SOURCE" jikan-dorobou
+# 最後に、2つのレビュー画面と、まだ人が見ていない判断の数が表示される。
+# 画面で選んだら「TSVをコピー」して保存し、同じコマンドをもう一度実行する（パ／バを先に）。
+wl-paste > work/searchable/jikan-dorobou/voicing-human.tsv
+wl-paste > work/searchable/jikan-dorobou/judge-human.tsv
+# 本全体で原本と違う字を使うなら、対応表を置いてから再実行する（例: 掴を摑に）
+printf 'from\tto\n掴\t摑\n' > work/searchable/jikan-dorobou/char-map.tsv
 
 # 傾き補正したページの文字層の位置を確認（列の縦ずれの傾きが0付近ならよい）
 .venv-ndl/bin/python bin/check-deskew-text.py \
   work/searchable/jikan-dorobou/angles.tsv work/searchable/jikan-dorobou/text-unfinalized.pdf
 ```
 
-OCRは1ページ約1.2秒、余白つき再認識は約3秒（CPU）。辞書の判定は1組数秒。考え方と検証結果は [docs/progress.md](docs/progress.md) の「傾き補正込みで4冊を作成」。
+パ／バのレビューを先に済ませる。パ／バの辞書が変わると、判断モデルの差分の前後4文字も変わる。どの差分にも当たらない人の判定が出ると、判断モデルの段は止まる。
+
+3番目の引数にLLMで作った辞書（`bin/auto-variant-glossary.py`）を渡すと、パ／バと判断モデルの段を飛ばして、その辞書で「辞書補正」版を作る（以前の手順）。
+
+OCRは1ページ約1.2秒、余白つき再認識は約3秒（CPU）。YomiTokuは約0.7秒（GPU）。語の切り出しの読み直しは1冊1分前後。判断モデルは、初回に1冊で200〜300か所を聞いて約10分かかる。聞いた結果は `work/searchable/作業名/judge/history.tsv` に残り、同じ差分は聞き直さない。考え方と検証結果は [docs/progress.md](docs/progress.md) の「傾き補正込みで4冊を作成」と「1冊を通す手順への組み込み」。
 
 GPUを使う場合は、`.venv-ndl` の `onnxruntime` を `onnxruntime-gpu[cuda,cudnn]` に入れ替え、`NDLOCR_DEVICE=cuda` を付ける。OCRは約0.45秒、余白つき再認識は約0.75秒になる（RTX 3060）。CPUとGPUは約2%の行で読みが変わるが、精度は同等。そのため1冊は同じデバイスで通す。作業ディレクトリの `device` に最初のデバイスを記録し、違うデバイスでの再開は止まる。GPUが使えずCPUに切り替わった場合も止まる。入れ替え後も `NDLOCR_DEVICE=cpu`（既定）なら、結果は `onnxruntime` と同じ。検証は [docs/progress.md](docs/progress.md) の「GPU（CUDA）でのOCRと余白つき再認識」。
 

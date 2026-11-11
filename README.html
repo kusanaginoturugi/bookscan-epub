@@ -245,8 +245,8 @@
 <ul>
 <li><a href="#現在の段階" id="toc-現在の段階">現在の段階</a>
 <ul>
-<li><a href="#現在の1冊分の手順傾き補正込み"
-id="toc-現在の1冊分の手順傾き補正込み">現在の1冊分の手順（傾き補正込み）</a></li>
+<li><a href="#現在の1冊分の手順"
+id="toc-現在の1冊分の手順">現在の1冊分の手順</a></li>
 </ul></li>
 <li><a href="#成果物の保管google-drive"
 id="toc-成果物の保管google-drive">成果物の保管（Google Drive）</a></li>
@@ -281,29 +281,50 @@ href="artifacts.html">成果物の目次</a>から完成PDF、辞書、レビュ
 <code>artifacts.md</code> で、<code>bin/build-docs-html.sh</code>
 がこのREADMEや作業記録と一緒にHTMLにする（mdへのリンクはhtmlへのリンクになる）。原本・抽出画像・OCR結果は
 <code>.gitignore</code> で管理対象から外す。</p>
-<h3
-id="現在の1冊分の手順傾き補正込み">現在の1冊分の手順（傾き補正込み）</h3>
+<h3 id="現在の1冊分の手順">現在の1冊分の手順</h3>
 <p>原本は <code>input/bookscan-downloads/</code>、Pythonは
 <code>.venv-ndl</code>、NDLOCR-Liteは
-<code>vendor/ndlocr-lite/src</code>。作業は
-<code>work/searchable/作業名/</code>、完成品は
-<code>output/searchable/書名 - 著者.pdf</code>。各段は出力があれば飛ばすので、途中から再実行できる。<code>MAX_PAGES=8</code>
-を付けると先頭8ページだけの試運転（作業ディレクトリは別名）になる。</p>
+<code>vendor/ndlocr-lite/src</code>、YomiTokuは
+<code>vendor/.venv-yomitoku/bin/yomitoku</code>。作業は
+<code>work/searchable/作業名/</code>、レビュー画面は
+<code>review/作業名-voicing/</code> と
+<code>review/作業名-judge/</code>、完成品は
+<code>output/searchable/書名 - 著者.pdf</code>。<code>MAX_PAGES=8</code>
+を付けると、先頭8ページだけの試運転（作業ディレクトリは別名）になる。</p>
+<p>段の順は、閲覧用PDF（背景補正と傾き補正）→ NDLOCR-Lite →
+余白つき再認識 → YomiToku → パ／バ → 判断モデル → 文字層 → 書誌設定。 -
+<strong>パ／バ：</strong>
+語を切り出して読み直す自動判定で、安全な組だけ確定する。残りは人がレビュー画面で確定する。
+- <strong>判断モデル：</strong>
+NDLとYomiTokuの残りの食い違いを、ローカルLLMが判断する。 -
+<strong>文字層：</strong>
+パ／バの辞書、LLMと人の差分、<code>char-map.tsv</code> を当てる。</p>
+<p>OCR、余白つき再認識、YomiTokuは、済んでいれば飛ばす。パ／バ、判断モデル、文字層は、入力の中身が変わったときだけ作り直す（ファイルの日付は見ない）。変わる完成品は消さずに、<code>output/searchable/old/</code>
+へ日付を付けて移す。</p>
+<p>YomiTokuかLLM（llama-server）が見つからないと止まる。使わないなら
+<code>SKIP_YOMITOKU=1</code> や <code>SKIP_JUDGE=1</code>
+を付ける。1冊の中で、段の有無とデバイスは最初の実行のまま変えられない（<code>stages</code>・<code>device</code>
+に記録）。これらの段より前に作った作業ディレクトリは、<code>UPGRADE=1</code>
+を付けない限り何も変えない。</p>
 <div class="sourceCode" id="cb1"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="va">SOURCE</span><span class="op">=</span>0101-20150604105123153_check.pdf   <span class="co"># data/bookscan-catalog.tsv の source</span></span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="ex">bin/build-searchable-book.sh</span> <span class="st">&quot;</span><span class="va">$SOURCE</span><span class="st">&quot;</span> jikan-dorobou</span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="co"># ローカルLLM（llama-server 127.0.0.1:8080、gemma-4-12B）で濁点・半濁点の辞書を作り、補正版を作る</span></span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="ex">.venv-ndl/bin/python</span> bin/auto-variant-glossary.py <span class="dt">\</span></span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>  work/searchable/jikan-dorobou/text-unfinalized.pdf <span class="dt">\</span></span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>  work/searchable/jikan-dorobou/variant-glossary.tsv</span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="ex">bin/build-searchable-book.sh</span> <span class="st">&quot;</span><span class="va">$SOURCE</span><span class="st">&quot;</span> jikan-dorobou work/searchable/jikan-dorobou/variant-glossary.tsv</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="va">NDLOCR_DEVICE</span><span class="op">=</span>cuda <span class="ex">bin/build-searchable-book.sh</span> <span class="st">&quot;</span><span class="va">$SOURCE</span><span class="st">&quot;</span> jikan-dorobou</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="co"># 最後に、2つのレビュー画面と、まだ人が見ていない判断の数が表示される。</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="co"># 画面で選んだら「TSVをコピー」して保存し、同じコマンドをもう一度実行する（パ／バを先に）。</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="ex">wl-paste</span> <span class="op">&gt;</span> work/searchable/jikan-dorobou/voicing-human.tsv</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="ex">wl-paste</span> <span class="op">&gt;</span> work/searchable/jikan-dorobou/judge-human.tsv</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="co"># 本全体で原本と違う字を使うなら、対応表を置いてから再実行する（例: 掴を摑に）</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="bu">printf</span> <span class="st">&#39;from\tto\n掴\t摑\n&#39;</span> <span class="op">&gt;</span> work/searchable/jikan-dorobou/char-map.tsv</span>
 <span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="co"># 傾き補正したページの文字層の位置を確認（列の縦ずれの傾きが0付近ならよい）</span></span>
 <span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="ex">.venv-ndl/bin/python</span> bin/check-deskew-text.py <span class="dt">\</span></span>
 <span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>  work/searchable/jikan-dorobou/angles.tsv work/searchable/jikan-dorobou/text-unfinalized.pdf</span></code></pre></div>
-<p>OCRは1ページ約1.2秒、余白つき再認識は約3秒（CPU）。辞書の判定は1組数秒。考え方と検証結果は
-<a href="docs/progress.html">docs/progress.md</a>
-の「傾き補正込みで4冊を作成」。</p>
+<p>パ／バのレビューを先に済ませる。パ／バの辞書が変わると、判断モデルの差分の前後4文字も変わる。どの差分にも当たらない人の判定が出ると、判断モデルの段は止まる。</p>
+<p>3番目の引数にLLMで作った辞書（<code>bin/auto-variant-glossary.py</code>）を渡すと、パ／バと判断モデルの段を飛ばして、その辞書で「辞書補正」版を作る（以前の手順）。</p>
+<p>OCRは1ページ約1.2秒、余白つき再認識は約3秒（CPU）。YomiTokuは約0.7秒（GPU）。語の切り出しの読み直しは1冊1分前後。判断モデルは、初回に1冊で200〜300か所を聞いて約10分かかる。聞いた結果は
+<code>work/searchable/作業名/judge/history.tsv</code>
+に残り、同じ差分は聞き直さない。考え方と検証結果は <a
+href="docs/progress.html">docs/progress.md</a>
+の「傾き補正込みで4冊を作成」と「1冊を通す手順への組み込み」。</p>
 <p>GPUを使う場合は、<code>.venv-ndl</code> の <code>onnxruntime</code>
 を <code>onnxruntime-gpu[cuda,cudnn]</code>
 に入れ替え、<code>NDLOCR_DEVICE=cuda</code>
