@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 """Rerun only the NDLOCR-Lite text recognizer on the deskew study pages.
 
-Run with ../bookscan/vendor/.venv-ndlocr/bin/python. The saved line boxes in
+Run with .venv-ndl/bin/python; NDLOCR_SRC overrides the NDLOCR-Lite source
+(default vendor/ndlocr-lite/src). The saved line boxes in
 work/deskew-study are reused, so line geometry and pixel perturbations can be
 varied without rerunning the detector. Output stays in work/ocr-sensitivity and
 is not committed.
@@ -51,14 +52,19 @@ sys.path.insert(0, str(NDL_SRC))
 import ocr  # noqa: E402
 
 
-def recognizers():
+def recognizers(device='cpu'):
     args = SimpleNamespace(rec_classes=str(NDL_SRC / 'config/NDLmoji.yaml'),
-                           device='cpu', enable_tcy=False)
+                           device=device, enable_tcy=False)
     model = NDL_SRC / 'model'
-    return [ocr.get_recognizer(args, weights_path=str(model / name)) for name in (
+    models = [ocr.get_recognizer(args, weights_path=str(model / name)) for name in (
         'parseq-ndl-24x256-30-tiny-189epoch-tegaki3-r8data-202604.onnx',
         'parseq-ndl-24x384-50-tiny-300epoch-tegaki3-r8data-202604.onnx',
         'parseq-ndl-24x768-100-tiny-153epoch-tegaki3-r8data-202604.onnx')]
+    # NDLOCR-Lite only prints a warning when CUDA is missing and falls back to
+    # the CPU, whose readings differ on about 2% of lines. Refuse instead.
+    if device == 'cuda' and any('CUDAExecutionProvider' not in m.session.get_providers() for m in models):
+        raise RuntimeError('CUDAExecutionProvider is unavailable; install onnxruntime-gpu[cuda,cudnn]')
+    return models
 
 
 def render(pdf):

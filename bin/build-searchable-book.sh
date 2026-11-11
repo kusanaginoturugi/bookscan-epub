@@ -8,6 +8,8 @@
 # usage: bin/build-searchable-book.sh SOURCE.pdf SLUG [GLOSSARY.tsv]
 #   DATA_ROOT  checkout holding input/, output/, work/, .venv-ndl, vendor/ (default: repo)
 #   MAX_PAGES  trial with the first N pages
+#   NDLOCR_DEVICE  cpu (default) or cuda for OCR and margin re-recognition;
+#              cuda needs onnxruntime-gpu[cuda,cudnn] in .venv-ndl
 set -eu
 
 BIN=$(cd "$(dirname "$0")" && pwd)
@@ -42,6 +44,19 @@ fi
 # ocr.py names per-page files after the PDF it reads.
 OCR_STEM=$(basename "${ORIGINAL%.pdf}")
 
+# CPU and CUDA read about 2% of lines differently, so one book keeps the device
+# of its first OCR run. Work started before NDLOCR_DEVICE existed ran on the CPU.
+DEVICE=${NDLOCR_DEVICE:-cpu}
+if [ -e "$WORK/device" ]; then
+  STARTED=$(cat "$WORK/device")
+elif [ -e "$WORK/ocr.done" ]; then
+  STARTED=cpu
+else
+  STARTED=$DEVICE
+  echo "$DEVICE" > "$WORK/device"
+fi
+[ "$STARTED" = "$DEVICE" ] || { echo "$WORK was started with NDLOCR_DEVICE=$STARTED" >&2; exit 1; }
+
 echo "[$(date +%T)] prepare $TITLE"
 [ -e "$SANITIZED" ] || "$PY" "$BIN/prepare-trial-pdf.py" "$SOURCE" "$SANITIZED" \
   --angles "$WORK/angles.tsv" "$@" > "$WORK/prepare.log"
@@ -51,10 +66,13 @@ echo "[$(date +%T)] ocr $PAGES pages"
 if [ ! -e "$WORK/ocr.done" ]; then
   mkdir -p "$WORK/ocr"
   "$PY" "$NDLOCR_SRC/ocr.py" --sourcepdf "$ORIGINAL" --output "$WORK/ocr" \
-    --pdf-output "$WORK/original-ocr.pdf" --pdf-render-dpi 300 > "$WORK/ocr.log" 2>&1
+    --pdf-output "$WORK/original-ocr.pdf" --pdf-render-dpi 300 --device "$DEVICE" > "$WORK/ocr.log" 2>&1
   # ocr.py exits 0 even on errors, so count the per-page JSON files.
   FOUND=$(find "$WORK/ocr" -name "${OCR_STEM}_*.json" | wc -l)
   [ "$FOUND" -eq "$PAGES" ] || { echo "OCR wrote $FOUND/$PAGES pages; see $WORK/ocr.log" >&2; exit 1; }
+  # Without a usable GPU, ocr.py only warns and falls back to the CPU.
+  ! grep -q 'CUDAExecutionProvider が利用できない' "$WORK/ocr.log" ||
+    { echo "OCR fell back to the CPU; see $WORK/ocr.log" >&2; exit 1; }
   touch "$WORK/ocr.done"
 fi
 
@@ -62,7 +80,8 @@ echo "[$(date +%T)] margin re-recognition"
 if [ ! -e "$WORK/margin.done" ]; then
   rm -f "$WORK/margin.tsv"
   "$PY" "$BIN/margin-recognize.py" "$WORK/margin.tsv" --pdf "$ORIGINAL" \
-    --ocr-dir "$WORK/ocr" --ocr-stem "$OCR_STEM" > "$WORK/margin.log" 2>&1
+    --ocr-dir "$WORK/ocr" --ocr-stem "$OCR_STEM" --device "$DEVICE" > "$WORK/margin.log" 2>&1 ||
+    { echo "margin re-recognition failed; see $WORK/margin.log" >&2; exit 1; }
   touch "$WORK/margin.done"
 fi
 

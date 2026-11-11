@@ -25,7 +25,31 @@ bin/build-searchable-book.sh "$SOURCE" jikan-dorobou work/searchable/jikan-dorob
   work/searchable/jikan-dorobou/angles.tsv work/searchable/jikan-dorobou/text-unfinalized.pdf
 ```
 
-OCRは1ページ約1.2秒、余白つき再認識は約3秒（CPUのみ）。辞書の判定は1組数秒。考え方と検証結果は [docs/progress.md](docs/progress.md) の「傾き補正込みで4冊を作成」。
+OCRは1ページ約1.2秒、余白つき再認識は約3秒（CPU）。辞書の判定は1組数秒。考え方と検証結果は [docs/progress.md](docs/progress.md) の「傾き補正込みで4冊を作成」。
+
+GPUを使う場合は、`.venv-ndl` の `onnxruntime` を `onnxruntime-gpu[cuda,cudnn]` に入れ替え、`NDLOCR_DEVICE=cuda` を付ける。OCRは約0.45秒、余白つき再認識は約0.75秒になる（RTX 3060）。CPUとGPUは約2%の行で読みが変わるが、精度は同等。そのため1冊は同じデバイスで通す。作業ディレクトリの `device` に最初のデバイスを記録し、違うデバイスでの再開は止まる。GPUが使えずCPUに切り替わった場合も止まる。入れ替え後も `NDLOCR_DEVICE=cpu`（既定）なら、結果は `onnxruntime` と同じ。検証は [docs/progress.md](docs/progress.md) の「GPU（CUDA）でのOCRと余白つき再認識」。
+
+```sh
+.venv-ndl/bin/pip uninstall -y onnxruntime
+.venv-ndl/bin/pip install 'onnxruntime-gpu[cuda,cudnn]==1.31.1'
+NDLOCR_DEVICE=cuda bin/build-searchable-book.sh "$SOURCE" jikan-dorobou
+
+# OCRの比較用標本（3冊141ページ）と、実行結果の比較
+.venv-ndl/bin/python bin/ocr-sample-pages.py work/ocr-engine-check
+.venv-ndl/bin/python bin/compare-ocr-runs.py work/ocr-engine-check cpu saved cuda
+.venv-ndl/bin/python bin/score-margin-runs.py work/ocr-engine-check ocrcpu-reccpu ocrcuda-reccuda
+```
+
+`compare-ocr-runs.py` は `work/ocr-engine-check/書籍/実行名/` にある `ocr.py --output` の結果を読む（`saved` は全冊OCRの保存分）。`score-margin-runs.py` は `書籍/margin-実行名.tsv`（`margin-recognize.py` の出力）を読む。
+
+ほかのOCRとは `bin/score-ocr-engines.py` で比べる。エンジンは `ndl:実行名`・`margin:実行名`・`yomitoku:実行名` で指定する。行の区切りや記号の表記に左右されない採点で、`--diff A B` を付けると、無作為ページでAとBが食い違った行を出す。YomiTokuは別の環境で動かす。
+
+```sh
+../bookscan/vendor/.venv-yomitoku/bin/yomitoku work/ocr-engine-check/tiger/subset.pdf \
+  -f json -o work/ocr-engine-check/tiger/yomitoku -d cuda --dpi 300 --ignore_ruby
+.venv-ndl/bin/python bin/score-ocr-engines.py work/ocr-engine-check \
+  ndl:cpu margin:ocrcpu-reccpu yomitoku:yomitoku --diff margin:ocrcpu-reccpu yomitoku:yomitoku
+```
 
 以下は以前のOCR比較で使ったコマンド。このチェックアウトには当時の `.venv-ndl/` と作業データがなく、原本は隣の `bookscan/pdf/` にある。原本と生成物はGitに含めない。
 

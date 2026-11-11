@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 """Rerun the NDLOCR-Lite recognizer for a whole book with extra line margins.
 
-Run with ../bookscan/vendor/.venv-ndlocr/bin/python. Saved OCR XML supplies the
-line boxes, so only text recognition runs again. Vertical line crops are padded
+Run with .venv-ndl/bin/python, as bin/build-searchable-book.sh does; NDLOCR_SRC
+overrides the NDLOCR-Lite source (default vendor/ndlocr-lite/src). Saved OCR XML
+supplies the line boxes, so only text recognition runs again. Vertical line crops are padded
 left and right with page background. The output TSV keeps the saved OCR and one
 column per margin; book text belongs under work/ and is not committed.
 """
@@ -46,7 +47,7 @@ def recognize_book(args):
         raise FileExistsError(f'{args.output} exists; move it before rerunning')
     args.output.parent.mkdir(parents=True, exist_ok=True)
     extras = [int(value) for value in args.extras.split(',')]
-    models = sensitivity.recognizers()
+    models = sensitivity.recognizers(args.device)
     document = pypdfium2.PdfDocument(str(args.pdf))
     first, last = (int(value) for value in args.pages.split('-')) if args.pages else (1, len(document))
     replicated = total = 0
@@ -120,6 +121,8 @@ def main():
     parser.add_argument('--ocr-stem')
     parser.add_argument('--extras', default='0,8,14,20,30', help='background margin in pixels')
     parser.add_argument('--pages', help='inclusive range such as 1-20')
+    parser.add_argument('--device', choices=['cpu', 'cuda'], default='cpu',
+                        help='cuda needs onnxruntime-gpu; use the same device as the ocr.py run')
     parser.add_argument('--score', type=Path, nargs='+', dest='gold',
                         help='score an existing output TSV against gold TSV files')
     args = parser.parse_args()

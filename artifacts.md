@@ -13,6 +13,17 @@
 | 天の光はすべて星 | 284 | 1 | [PDF](output/searchable/天の光はすべて星%20-%20フレドリック・ブラウン.pdf) | [PDF](output/searchable/天の光はすべて星%20-%20フレドリック・ブラウン%20辞書補正.pdf) | [5語7か所](work/searchable/ten-no-hikari/variant-glossary.tsv) |
 | インフィニティ・リミテッド（下） | 388 | 3 | [PDF](output/searchable/インフィニティ・リミテッド（下）%20-%20ジェイムズ・P・ホーガン.pdf) | [PDF](output/searchable/インフィニティ・リミテッド（下）%20-%20ジェイムズ・P・ホーガン%20辞書補正.pdf) | [20語61か所](work/searchable/infinity-lower/variant-glossary.tsv) |
 
+## OCRのCPUとGPUの比較（2026-11-11）
+
+虎よ・インフィニティ上巻・夏への扉から141ページを抜き出し、NDLOCR-LiteをCPUとCUDAで比べた。精度は同等で、速さは約3倍。詳細は[作業記録](docs/progress.md)の「GPU（CUDA）でのOCRと余白つき再認識」。
+
+| 種類 | ファイル | 内容 |
+|---|---|---|
+| 標本 | [manifest.json](work/ocr-engine-check/manifest.json) | 冊ごとの `subset.pdf` のページと、正解行93行 |
+| `ocr.py` の比較 | [report-ocr.txt](work/ocr-engine-check/report-ocr.txt) | 保存分・CPU・CUDA 2回。食い違い43行の一覧つき |
+| 本番の文字列の比較 | [report-margin.txt](work/ocr-engine-check/report-margin.txt) | 余白つき再認識を含む。正解行の誤り CPU 20/3300、CUDA 19/3300 |
+| YomiTokuとの比較 | [report-engines.txt](work/ocr-engine-check/report-engines.txt) | 正規化と部分文字列で採点。正解行の誤り 本番NDL 14〜15/3374、YomiToku 94/3374。無作為ページの食い違い130か所の一覧つき（画像確認ではNDLが正しい90、YomiTokuが正しい28、両方誤り12） |
+
 ## 夏への扉
 
 | 種類 | ファイル | 内容 |
