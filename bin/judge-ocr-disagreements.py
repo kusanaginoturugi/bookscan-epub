@@ -162,6 +162,25 @@ def hunks(line, other, max_hunks):
     return out
 
 
+def resolve(verdict, item, text):
+    """(to, start, end) for a human verdict. A row whose `from` is the whole
+    snippet (left + NDL + right, with empty left/right) replaces the snippet.
+    Older rows typed into the hunk box are read as the whole snippet when they
+    start with the left context or end with the right one."""
+    left, right = item['left'], item['right']
+    start, end = item['start'], item['end']
+    wide = (start - len(left), end + len(right))
+    to = verdict['to']
+    if not verdict['left'] and not verdict['right'] and verdict['from'] == left + item['ndl'] + right:
+        return (to,) + wide
+    if verdict['verdict'] == 'custom':
+        if left and right and to.startswith(left) and to.endswith(right) and len(to) >= len(left) + len(right):
+            return to[len(left):len(to) - len(right)], start, end
+        if (left and to.startswith(left)) or (right and to.endswith(right)):
+            return (to,) + wide
+    return to, start, end
+
+
 def read_tsv(path):
     if not path or not path.exists():
         return []
@@ -176,6 +195,7 @@ body{{font:15px sans-serif;margin:1.5em;color:#222;background:#fff}}
 section{{border-top:2px solid #999;padding:.8em 0}} h2{{font-size:1.1em;margin:.2em 0}}
 .applied h2::after{{content:"（反映済み）";color:#c00}} .split h2::after{{content:"（判断が割れた・NDLのまま）";color:#a60}}
 .kept h2::after{{content:"（NDLのまま）";color:#666}}
+section.human h2::after{{content:"（確認済み）";color:#070}}
 .ex{{display:flex;gap:10px;align-items:flex-start;margin:.5em 0}} .opts label{{margin-right:1em}}
 table{{border-collapse:collapse}} td{{padding:2px 8px;border:1px solid #ccc;font-size:16px}}
 tr.now td{{background:#e3f4e3;font-weight:bold}}
@@ -183,6 +203,8 @@ tr.now td{{background:#e3f4e3;font-weight:bold}}
 textarea{{width:100%;height:10em;font-family:monospace}}
 </style>
 <h1>{title}</h1>
+<p><b>使い方</b>: 原本と違う箇所だけ選び直し（「自分で書く」は、横の欄の前後を含む文字列を正しく書き直す）、見終えたところで「ここまで確認済み」を押す（それより前の未確認が「今の読みでよい」になる）。
+最後に「TSVをコピー」して保存する。確認済みの箇所は、作り直すと画面の最後に回る。</p>
 <p>NDLOCR-LiteとYomiTokuで読みが割れ、ローカルLLM（{model}）が判断した箇所。各箇所の緑の行が、いま文字層に入っている読み。<b>反映済み</b>はYomiTokuの読みに置き換えた箇所。
 原本画像と違うものだけ選び直せばよい。正しいと確かめた箇所は、その読みを選ぶと人の確認として記録される。選んだ結果は下のTSVにまとまるので、コピーして <code>{human}</code> に保存し、
 <code>judge-ocr-disagreements.py --human</code> に渡して作り直す。人の判定は常にLLMより優先する。選択はこのブラウザにだけ一時保存される。</p>
@@ -204,7 +226,12 @@ function render() {{
     store[it.id] = {{v, custom}};
     document.getElementById('s' + i).classList.toggle('done', v !== 'undecided');
     if (v === 'undecided') return;
-    const to = v === 'ndl' ? it.from : v === 'yomitoku' ? it.yomitoku : custom;
+    if (v === 'custom') {{
+      // The box holds the whole snippet (context included), so replace all of it.
+      out.push([it.id, it.page, it.line_id, '', it.left + it.from + it.right, custom, '', v].join('\\t'));
+      return;
+    }}
+    const to = v === 'ndl' ? it.from : v === 'yomitoku' ? it.yomitoku : it.now;
     out.push([it.id, it.page, it.line_id, it.left, it.from, to, it.right, v].join('\\t'));
   }});
   try {{ localStorage.setItem(KEY, JSON.stringify(store)); }} catch (e) {{}}
@@ -219,6 +246,16 @@ ITEMS.forEach((it, i) => {{
   if (s.custom) document.getElementById('c' + i).value = s.custom;
 }});
 document.addEventListener('change', render);
+document.querySelectorAll('button.upto').forEach(b => b.addEventListener('click', () => {{
+  // Mark every unanswered item up to this one as checked with its current reading.
+  for (let i = 0; i <= Number(b.dataset.n); i++) {{
+    if (!document.querySelector('input[name="h' + i + '"]:checked') ||
+        document.querySelector('input[name="h' + i + '"]:checked').value === 'undecided') {{
+      document.querySelector('input[name="h' + i + '"][value="ok"]').checked = true;
+    }}
+  }}
+  render();
+}}));
 document.addEventListener('input', render);
 document.getElementById('copy').addEventListener('click', async () => {{
   const area = document.getElementById('tsv');
@@ -307,8 +344,11 @@ def main():
     for item in items:
         verdict = human.get(item['id'])
         if verdict:
-            if verdict['to'] != item['ndl']:
-                corrections.append((item, verdict['to'], 'human'))
+            text = lines[item['index']]['text']
+            to, start, end = resolve(verdict, item, text)
+            item['human_snippet'] = text[item['start'] - len(item['left']):start] + to + text[end:item['end'] + len(item['right'])]
+            if to != text[start:end]:
+                corrections.append((dict(item, start=start, end=end), to, 'human'))
         elif item['decision'] == 'yomitoku':
             corrections.append((item, item['yomitoku'], 'llm'))
     # Hunks closer than their context would overlap when applied; merge them.
@@ -331,7 +371,7 @@ def main():
                              text[c['start']:c['end']], c['to'], text[c['end']:c['end'] + CONTEXT], c['source']])
 
     order = {'yomitoku': 0, 'split': 1, 'ndl': 2}
-    items.sort(key=lambda it: (order[it['decision']], it['page'], it['line_id']))
+    items.sort(key=lambda it: (it['id'] in human, order[it['decision']], it['page'], it['line_id']))
     images = args.review / 'img'
     images.mkdir(parents=True, exist_ok=True)
     document = pypdfium2.PdfDocument(str(args.pdf))
@@ -352,7 +392,8 @@ def main():
         verdict = human.get(item['id'])
         data.append({'id': item['id'], 'page': item['page'], 'line_id': item['line_id'], 'left': item['left'],
                      'from': item['ndl'], 'yomitoku': item['yomitoku'], 'right': item['right'],
-                     'human': {'v': verdict['verdict'], 'custom': verdict['to']} if verdict else None})
+                     'now': item['yomitoku'] if item['decision'] == 'yomitoku' else item['ndl'],
+                     'human': {'v': verdict['verdict'], 'custom': item['human_snippet']} if verdict else None})
         esc = html.escape
         # Prompt order: first asks A=NDL, B=YomiToku; second swaps them.
         said = lambda answer, a, b: {'A': a, 'B': b}.get(answer, '答えなし')
@@ -374,15 +415,18 @@ def main():
         options = ''.join(f'<label><input type="radio" name="h{n}" value="{v}">{label}</label>'
                           for v, label in (('ndl', f'NDL「{esc(item["ndl"])}」{mark("ndl")}'),
                                            ('yomitoku', f'YomiToku「{esc(item["yomitoku"])}」{mark("yomitoku")}'),
-                                           ('custom', '自分で書く'), ('undecided', 'LLMの判断のまま')))
+                                           ('ok', '今の読みでよい'), ('custom', '自分で書く'),
+                                           ('undecided', '未確認')))
         sections.append(
-            f'<section id="s{n}" class="{labels[item["decision"]]}"><h2>#{n + 1} {item["page"]}ページ・行{item["line_id"]}</h2>'
+            f'<section id="s{n}" class="{"human" if verdict else labels[item["decision"]]}"><h2>#{n + 1} {item["page"]}ページ・行{item["line_id"]}</h2>'
             f'<table><tr class="now"><td>文字層の今の読み</td><td>{esc(item["left"])}{esc(now)}{esc(item["right"])}（{why}）</td></tr>'
             f'<tr><td>NDL</td><td>{esc(item["left"])}<b>{esc(item["ndl"])}</b>{esc(item["right"])}</td></tr>'
             f'<tr><td>YomiToku</td><td>{esc(item["left"])}<b>{esc(item["yomitoku"])}</b>{esc(item["right"])}</td></tr>'
             f'<tr><td>LLM</td><td>{llm}</td></tr></table>'
             f'<div class="ex"><img src="img/{n}-thumb.jpg"><img src="img/{n}-line.jpg"><img src="img/{n}-zoom.jpg"></div>'
-            f'<div class="opts">{options} <input id="c{n}" size="12" placeholder="自分で書く文字列"></div></section>')
+            f'<div class="opts">{options} <input id="c{n}" size="24" value="{esc(item["left"] + item["ndl"] + item["right"])}" '
+            f'title="前後の文字も含めて、正しい文字列に書き直す"> '
+            f'<button class="upto" data-n="{n}">ここまで確認済み</button></div></section>')
     summary = (f'判断した{len(items)}か所: 反映 {sum(i["decision"] == "yomitoku" for i in items)}、'
                f'割れた {sum(i["decision"] == "split" for i in items)}、NDLのまま {sum(i["decision"] == "ndl" for i in items)}。'
                f'人の判定 {sum(1 for i in items if i["id"] in human)}。規則で除外した差分: '
