@@ -34,6 +34,7 @@
 | 種類 | ファイル | 内容 |
 |---|---|---|
 | 完成品 | [検索可能PDF](output/trial/夏への扉%20-%20ロバート・A・ハインライン.pdf) | 356ページ。高さ400px以上の縦書き行は余白30pxの再認識、短い行は保存済みOCR。ダッシュ補正と、辞書による濁点・半濁点の補正（38か所）あり |
+| 括弧補正版 | [検索可能PDF（括弧補正）](output/trial/夏への扉%20-%20ロバート・A・ハインライン%20括弧補正.pdf)・[文字層版](output/trial/summer-door-text-unfinalized-brackets.pdf) | 完成品と同じ手順に `--fix-brackets` を追加。〝〟92組と〈〉43個を直し、15・16ページの `"` は残した。完成品との違いは括弧と引用符だけ。置き換えは未決定 |
 | 注釈試作 | [薄色・右開き・注釈入りPDF](output/trial/夏への扉%20-%20ロバート・A・ハインライン%20注釈試作%20Firefox版%20薄色右開き.pdf) | PDFページ21・23・24に注釈と出典リンク。本文の偶数ページ176枚の端線を修正。Readest用の右開き指定入り。追加の[語句候補](data/summer-door-note-candidates.md) |
 | 再認識 | [余白別認識結果](work/margin/summer-door.tsv)・[実行ログ](work/margin/summer-door.log) | 全6181行。保存済みOCRと余白0・8・14・20・30pxの読み |
 | 正解 | [無作為35行](work/margin/summer-door-gold-random.tsv) | 読みが変わる群15行、同じ群10行、ルビに近い行10行。完成品の編集差2 |
@@ -48,6 +49,7 @@ OCRのページ別JSON・TXT・XMLは `work/trial/summer-door-ocr/` に保存し
 |---|---|---|
 | 完成品 | [検索可能PDF](output/trial/インフィニティ・リミテッド（上）%20-%20ジェイムズ・P・ホーガン.pdf) | 388ページ、透明テキスト層付き |
 | 試験版 | [余白30pxの文字層 v2](output/trial/インフィニティ・リミテッド（上）%20-%20ジェイムズ・P・ホーガン%20v2.pdf) | 認識モデルを余白30pxで再実行し、ダッシュを補正。無作為23行の編集差58→7。短い行の閉じかぎ括弧が33行で落ちる（`--min-height` 導入前）。置き換えは未決定 |
+| 括弧補正版 | [v2 括弧補正](output/trial/インフィニティ・リミテッド（上）%20-%20ジェイムズ・P・ホーガン%20v2%20括弧補正.pdf)・[文字層版](output/trial/infinity-upper-text-unfinalized-v2-brackets.pdf) | v2と同じ手順に `--fix-brackets` を追加。〝〟134個と〈〉90個を直した。v2との違いは括弧と引用符だけ。置き換えは未決定 |
 | 評価（完成品） | [ページ画像と文字層のレビュー](review/infinity-upper-eval/index.html) | 通常10ページ、例外ページ、空白ページの画像。v2は対象外 |
 | 評価（完成品） | [集計JSON](review/infinity-upper-eval/report.json)・[標本TSV](review/infinity-upper-eval/sample.tsv) | 文字層一致、検索語13件、標本一覧。4ページ・行10の補正を直した後に再実行すると、4ページが不一致になる（完成品は直す前の補正のまま） |
 | 辞書 | [画像確認済み13語](work/eval/infinity-upper-glossary.tsv) | 補正に使う表記 |
@@ -82,6 +84,7 @@ OCRのページ別JSON・TXT・XMLは `work/trial/infinity-upper-ocr/` に保存
 |---|---|---|
 | 完成品 | [検索可能PDF（空白修正）](output/trial/虎よ、虎よ！%20-%20アルフレッド・ベスター%20空白修正.pdf) | 364ページ、透明テキスト層付き |
 | 試験版 | [空白修正 v2](output/trial/虎よ、虎よ！%20-%20アルフレッド・ベスター%20空白修正%20v2.pdf)・[評価](review/tiger-eval-v2/index.html) | 15ページ・行9、254ページ・行4の個別補正を追加。正解15行の編集差3、検索語7/12は完成品と同じ。置き換えは未決定 |
+| 括弧補正版 | [空白修正 v2 括弧補正](output/trial/虎よ、虎よ！%20-%20アルフレッド・ベスター%20空白修正%20v2%20括弧補正.pdf)・[文字層版](output/trial/tiger-text-normalized-v2-brackets.pdf) | 空白修正 v2と同じ手順に `--fix-brackets` を追加。〝〟21個と〈〉8個を直した。v2との違いは括弧と引用符だけ。置き換えは未決定 |
 | 評価 | [ページ画像と文字層のレビュー](review/tiger-eval/index.html)・[集計JSON](review/tiger-eval/report.json) | 通常・例外ページ、検索語の照合 |
 | 辞書 | [確認済み語](work/eval/tiger-glossary.tsv)・[頻出語候補](work/eval/tiger-glossary-candidates.tsv) | 候補は未確認 |
 | 補正 | [個別補正](work/eval/tiger-overrides.tsv)・[画像照合した正解行](work/eval/tiger-gold.tsv)・[検索語](work/eval/tiger-queries.tsv) | 原本画像で確認した内容 |
