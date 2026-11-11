@@ -341,7 +341,9 @@ href="docs/progress.html">docs/progress.md</a>
 <span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="co"># 画面でコピーしたTSVを $WORK/voicing-glossary.tsv に保存してから</span></span>
 <span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a><span class="ex">bin/build-searchable-book.sh</span> <span class="st">&quot;</span><span class="va">$SOURCE</span><span class="st">&quot;</span> <span class="va">$SLUG</span> <span class="va">$WORK</span>/voicing-glossary.tsv</span></code></pre></div>
 <p><code>--yomitoku-dir</code>
-は省略できる（本の中で両方の表記が出る組だけになる）。<code>build-searchable-book.sh</code>
+は省略できる（本の中で両方の表記が出る組だけになる）。確定した辞書を正解として自動判定を採点するには、<code>bin/check-voicing-judges.py 原本PDF OCRディレクトリ 辞書TSV 出力TSV --ocr-stem STEM --recognized margin.tsv --yomitoku-dir DIR --device cuda</code>
+を使う。語を原本から切り出して読み直す判定と、<code>--llm-sample N</code>
+を付けたときのLLMの判定（llama-server）を出現箇所ごとに比べる。<code>build-searchable-book.sh</code>
 が受け取る辞書は1つなので、LLMで作った <code>variant-glossary.tsv</code>
 とは別の版になる。</p>
 <p>ほかのOCRとは <code>bin/score-ocr-engines.py</code>

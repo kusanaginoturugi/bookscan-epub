@@ -56,7 +56,7 @@ firefox-developer-edition review/$SLUG-voicing/index.html
 bin/build-searchable-book.sh "$SOURCE" $SLUG $WORK/voicing-glossary.tsv
 ```
 
-`--yomitoku-dir` は省略できる（本の中で両方の表記が出る組だけになる）。`build-searchable-book.sh` が受け取る辞書は1つなので、LLMで作った `variant-glossary.tsv` とは別の版になる。
+`--yomitoku-dir` は省略できる（本の中で両方の表記が出る組だけになる）。確定した辞書を正解として自動判定を採点するには、`bin/check-voicing-judges.py 原本PDF OCRディレクトリ 辞書TSV 出力TSV --ocr-stem STEM --recognized margin.tsv --yomitoku-dir DIR --device cuda` を使う。語を原本から切り出して読み直す判定と、`--llm-sample N` を付けたときのLLMの判定（llama-server）を出現箇所ごとに比べる。`build-searchable-book.sh` が受け取る辞書は1つなので、LLMで作った `variant-glossary.tsv` とは別の版になる。
 
 ほかのOCRとは `bin/score-ocr-engines.py` で比べる。エンジンは `ndl:実行名`・`margin:実行名`・`yomitoku:実行名` で指定する。行の区切りや記号の表記に左右されない採点で、`--diff A B` を付けると、無作為ページでAとBが食い違った行を出す。YomiTokuは別の環境で動かす。
 
