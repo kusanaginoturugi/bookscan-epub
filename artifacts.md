@@ -1,6 +1,6 @@
 # 検索可能PDFとレビューの目次
 
-このページは、このリポジトリで作った成果物への入口。PDF、OCR結果、レビューの一部はGit管理外のローカルファイルなので、同じ作業ディレクトリで開く。完成品と試験版のPDFは、ページ単位の奇数ページ見開き（`/PageLayout /TwoPageLeft`）で、1ページ目をページ全体に合わせて開く（`/OpenAction` の `/Fit`）設定を持つ。Firefoxでの効き方は[作業記録](docs/progress.md)のPDFの初期表示設定を参照。
+このページは、このリポジトリで作った成果物への入口。PDF、OCR結果、レビューの一部はGit管理外のローカルファイルなので、同じ作業ディレクトリで開く。`output/` のPDFはGoogle Driveの `bookscan-epub/output/` にも置いてある。リンクが切れていたら、[README](README.md)の「成果物の保管」の手順で `rclone copy` して戻す。完成品と試験版のPDFは、ページ単位の奇数ページ見開き（`/PageLayout /TwoPageLeft`）で、1ページ目をページ全体に合わせて開く（`/OpenAction` の `/Fit`）設定を持つ。Firefoxでの効き方は[作業記録](docs/progress.md)のPDFの初期表示設定を参照。
 
 ## 傾き補正込みの4冊（2026-11-10）
 

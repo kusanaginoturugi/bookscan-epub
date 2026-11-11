@@ -136,6 +136,21 @@ ruby bin/build-review.rb --ignore-leaders \
 
 設計と進捗は [docs/progress.md](docs/progress.md) に記録する。[data/epub-candidates.tsv](data/epub-candidates.tsv) は旧EPUB方針での一次選別結果であり、検索可能PDFの対象を絞る根拠には使わない。
 
+## 成果物の保管（Google Drive）
+
+`output/` と `work/` はGitに入らない。そのため、完成品はGoogle Driveの `bookscan-epub/` に、このリポジトリと同じフォルダ構成で置く。Driveには `rclone` のリモート `gdrive:` で接続する。リモートは自分で作ったOAuthクライアントIDを使い、scope は `drive.file`（rcloneが置いたファイルとフォルダにだけ触れる）。ブラウザから入れたファイルは、rcloneからは見えない。OAuthアプリは本番に公開してあるので、許可は期限切れにならない。ホームページとプライバシーポリシーは https://kusanaginoturugi.github.io/rclone/ に置いてある。別のマシンでは `~/.config/rclone/rclone.conf` の `[gdrive]` をコピーするか、同じクライアントIDで `rclone config` する。
+
+```sh
+# このマシンからDriveへ（既存のファイルは消さない）
+rclone copy output gdrive:bookscan-epub/output
+rclone copy work/searchable gdrive:bookscan-epub/work/searchable --include '*.tsv'
+# 別のマシンでDriveから戻す（artifacts.html のリンクがそのまま開ける）
+rclone copy gdrive:bookscan-epub/output output
+rclone copy gdrive:bookscan-epub/work/searchable work/searchable
+```
+
+`rclone sync` は送り先にしかないファイルを消すので使わない。中身は買った本のスキャンなので、共有リンク（`rclone link` やブラウザの「リンクを知っている全員」）は作らない。
+
 ## BOOKSCAN PDF の閲覧用コピー
 
 原本は別プロジェクトの `../bookscan/pdf/`、このプロジェクトで作る閲覧用コピーは `output/readable-pdf/`。83冊の書誌候補は `data/bookscan-catalog.tsv` に記録し、元のランダム名との対応を残す。書名と著者から `書名 - 著者.pdf` を作る。書誌情報は主に表紙OCRから作った候補なので、必要に応じて原画像で校正する。

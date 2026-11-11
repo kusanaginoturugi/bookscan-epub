@@ -255,6 +255,12 @@
 - `--fix-variants` は、正しいと選んだ語の1字違いをすべて書き換える。そのため、「両方正しい」とした語がほかの選択語の1字違いになる場合だけ、その語も `verified=yes`（`note=keep:…`）として書き出し、書き換えから守る。ある組で正しいと選んだ語を、別の組で誤りとして選ぶと、画面に「矛盾」と表示する。TSVの組み立てはnodeで、置き換えの結果は `fix_variants` で確かめた（ビート→ピート、ペル→ベル、両方正しいとしたベン／ペンは変えない）。
 - 『夏への扉』で試作した。YomiTokuを全356ページで実行すると237秒（`work/voicing/summer-door/yomitoku/`）。候補はYomiTokuなしで19組、ありで52組になった。増えた組には、本の中で1回しか出ない誤読（バトロール→パトロール、ペーコン→ベーコン、リンパーガー→リンバーガーなど）がある。画像で確かめて作った既存の辞書15語のうち13語が候補に入った。残るチューブとジッパーは、今の本文に誤読が残っておらず、直す対象がない。画面は `review/summer-door-voicing/index.html`（6.1MB、Git管理外）。人による確定はまだしていない。
 
+## 成果物のGoogle Drive保管（2026-11-11）
+
+- `output/` と `work/` はGit管理外で、傾き補正込みの4冊は別の作業場所で作ったため、このチェックアウトでは artifacts.html のリンクが12か所切れていた。そこで、完成品をGoogle Driveの `bookscan-epub/` に、リポジトリと同じ構成で置くことにした。
+- `rclone` v1.76.0 のリモート `gdrive:` を作った。rcloneの共有クライアントIDは2026年中に使えなくなるので、自分のGoogle CloudプロジェクトでOAuthクライアントを作った。scope は `drive.file`。アプリを公開するにはホームページとプライバシーポリシーが要るので、[ホームページ](https://kusanaginoturugi.github.io/rclone/)と[プライバシーポリシー](https://kusanaginoturugi.github.io/rclone/privacy.html)をGitHub Pages（`kusanaginoturugi.github.io` リポジトリの `rclone/`）に置き、承認済みドメインを `kusanaginoturugi.github.io` にして本番に公開した。「テスト中」のままだと許可が7日で切れるが、公開後に `rclone config reconnect gdrive:` で許可を取り直せば切れない。
+- このマシンの `output/`（26ファイル、1.606GiB）を `rclone copy` で送った（161秒）。`rclone check --one-way` で26ファイルが一致し、差分は0だった。傾き補正込みの4冊と `work/searchable/*.tsv` は、作った作業場所から送る必要がある。
+
 ## 次の作業
 
 1. ユーザーの通読結果を受けて、両方の順序でBと答えた組（少数派が正しい）を補正に使うか決める。確認済みのテレパシー・ズボン・キャタピラは、暗黒星雲突破！とインフィニティ下巻の辞書補正版へ反映する候補。架空の固有名詞は行画像をLLMに見せる方式を検討する。
