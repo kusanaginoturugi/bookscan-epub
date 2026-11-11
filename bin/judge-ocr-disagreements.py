@@ -178,12 +178,13 @@ section{{border-top:2px solid #999;padding:.8em 0}} h2{{font-size:1.1em;margin:.
 .kept h2::after{{content:"（NDLのまま）";color:#666}}
 .ex{{display:flex;gap:10px;align-items:flex-start;margin:.5em 0}} .opts label{{margin-right:1em}}
 table{{border-collapse:collapse}} td{{padding:2px 8px;border:1px solid #ccc;font-size:16px}}
+tr.now td{{background:#e3f4e3;font-weight:bold}}
 .done h2{{color:#777}} #out{{position:sticky;bottom:0;background:#f4f4f4;padding:.6em;border-top:2px solid #999}}
 textarea{{width:100%;height:10em;font-family:monospace}}
 </style>
 <h1>{title}</h1>
-<p>NDLOCR-LiteとYomiTokuで読みが割れ、ローカルLLM（{model}）が判断した箇所。<b>反映済み</b>はすでに文字層に入っている。
-原本画像と違うものだけ選び直せばよい。選んだ結果は下のTSVにまとまるので、コピーして <code>{human}</code> に保存し、
+<p>NDLOCR-LiteとYomiTokuで読みが割れ、ローカルLLM（{model}）が判断した箇所。各箇所の緑の行が、いま文字層に入っている読み。<b>反映済み</b>はYomiTokuの読みに置き換えた箇所。
+原本画像と違うものだけ選び直せばよい。正しいと確かめた箇所は、その読みを選ぶと人の確認として記録される。選んだ結果は下のTSVにまとまるので、コピーして <code>{human}</code> に保存し、
 <code>judge-ocr-disagreements.py --human</code> に渡して作り直す。人の判定は常にLLMより優先する。選択はこのブラウザにだけ一時保存される。</p>
 <p>{summary}</p>
 {sections}
@@ -353,15 +354,33 @@ def main():
                      'from': item['ndl'], 'yomitoku': item['yomitoku'], 'right': item['right'],
                      'human': {'v': verdict['verdict'], 'custom': verdict['to']} if verdict else None})
         esc = html.escape
+        # Prompt order: first asks A=NDL, B=YomiToku; second swaps them.
+        said = lambda answer, a, b: {'A': a, 'B': b}.get(answer, '答えなし')
+        first = said(item['first'], 'NDL', 'YomiToku')
+        second = said(item['second'], 'YomiToku', 'NDL')
+        reading = {'NDL': item['ndl'], 'YomiToku': item['yomitoku']}
+        llm = (f'1回目: {esc(reading.get(first, ""))}（{first}）／'
+               f'2回目（順序を入れ替え）: {esc(reading.get(second, ""))}（{second}）')
+        if verdict:
+            now, why = verdict['to'], '人の判定'
+        elif item['decision'] == 'yomitoku':
+            now, why = item['yomitoku'], 'YomiTokuの読み。LLMが2回とも選んだ'
+        elif item['decision'] == 'split':
+            now, why = item['ndl'], 'NDLの読み。LLMの答えが割れた'
+        else:
+            now, why = item['ndl'], 'NDLの読み。LLMが2回とも選んだ'
+        current = 'yomitoku' if item['decision'] == 'yomitoku' else 'ndl'
+        mark = lambda v: '（反映中）' if v == current and not verdict else ''
         options = ''.join(f'<label><input type="radio" name="h{n}" value="{v}">{label}</label>'
-                          for v, label in (('ndl', f'NDL「{esc(item["ndl"])}」'),
-                                           ('yomitoku', f'YomiToku「{esc(item["yomitoku"])}」'),
-                                           ('custom', '自分で書く'), ('undecided', '未確認')))
+                          for v, label in (('ndl', f'NDL「{esc(item["ndl"])}」{mark("ndl")}'),
+                                           ('yomitoku', f'YomiToku「{esc(item["yomitoku"])}」{mark("yomitoku")}'),
+                                           ('custom', '自分で書く'), ('undecided', 'LLMの判断のまま')))
         sections.append(
             f'<section id="s{n}" class="{labels[item["decision"]]}"><h2>#{n + 1} {item["page"]}ページ・行{item["line_id"]}</h2>'
-            f'<table><tr><td>NDL</td><td>{esc(item["left"])}<b>{esc(item["ndl"])}</b>{esc(item["right"])}</td></tr>'
+            f'<table><tr class="now"><td>文字層の今の読み</td><td>{esc(item["left"])}{esc(now)}{esc(item["right"])}（{why}）</td></tr>'
+            f'<tr><td>NDL</td><td>{esc(item["left"])}<b>{esc(item["ndl"])}</b>{esc(item["right"])}</td></tr>'
             f'<tr><td>YomiToku</td><td>{esc(item["left"])}<b>{esc(item["yomitoku"])}</b>{esc(item["right"])}</td></tr>'
-            f'<tr><td>LLM</td><td>{esc(item["first"])} / {esc(item["second"])}（逆順）</td></tr></table>'
+            f'<tr><td>LLM</td><td>{llm}</td></tr></table>'
             f'<div class="ex"><img src="img/{n}-thumb.jpg"><img src="img/{n}-line.jpg"><img src="img/{n}-zoom.jpg"></div>'
             f'<div class="opts">{options} <input id="c{n}" size="12" placeholder="自分で書く文字列"></div></section>')
     summary = (f'判断した{len(items)}か所: 反映 {sum(i["decision"] == "yomitoku" for i in items)}、'
