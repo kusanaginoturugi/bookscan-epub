@@ -351,18 +351,24 @@ href="docs/progress.html">docs/progress.md</a>
 <code>書籍/margin-実行名.tsv</code>（<code>margin-recognize.py</code>
 の出力）を読む。</p>
 <p>濁点・半濁点（バ／パ）の取り違えは、<code>bin/build-voicing-review.py</code>
-が作るレビュー画面で人が確定して辞書にする。候補は、本の中で両方の表記が出る組と、YomiTokuが別の表記に読んだ組。組ごとに、ページの縮小画像・行・3倍拡大を並べる。選んだ結果は画面の下にTSVでまとまるので、「TSVをコピー」で保存して辞書として渡す。</p>
-<div class="sourceCode" id="cb3"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="va">SLUG</span><span class="op">=</span>jikan-dorobou<span class="kw">;</span> <span class="va">STEM</span><span class="op">=</span><span class="va">${SOURCE</span><span class="op">%</span>.pdf<span class="va">}</span><span class="kw">;</span> <span class="va">WORK</span><span class="op">=</span>work/searchable/<span class="va">$SLUG</span></span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="ex">../bookscan/vendor/.venv-yomitoku/bin/yomitoku</span> input/bookscan-downloads/<span class="va">$SOURCE</span> <span class="dt">\</span></span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">-f</span> json <span class="at">-o</span> work/voicing/<span class="va">$SLUG</span>/yomitoku <span class="at">-d</span> cuda <span class="at">--dpi</span> 300 <span class="at">--ignore_ruby</span></span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="ex">.venv-ndl/bin/python</span> bin/build-voicing-review.py input/bookscan-downloads/<span class="va">$SOURCE</span> <span class="dt">\</span></span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>  <span class="va">$WORK</span>/ocr review/<span class="va">$SLUG</span>-voicing <span class="at">--ocr-stem</span> <span class="st">&quot;</span><span class="va">$STEM</span><span class="st">&quot;</span> <span class="at">--recognized</span> <span class="va">$WORK</span>/margin.tsv <span class="dt">\</span></span>
-<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">--yomitoku-dir</span> work/voicing/<span class="va">$SLUG</span>/yomitoku <span class="at">--title</span> <span class="st">&quot;</span><span class="va">$SLUG</span><span class="st"> 濁点・半濁点レビュー&quot;</span></span>
-<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a><span class="ex">firefox-developer-edition</span> review/<span class="va">$SLUG</span>-voicing/index.html</span>
-<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="co"># 画面でコピーしたTSVを $WORK/voicing-glossary.tsv に保存してから</span></span>
-<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a><span class="ex">bin/build-searchable-book.sh</span> <span class="st">&quot;</span><span class="va">$SOURCE</span><span class="st">&quot;</span> <span class="va">$SLUG</span> <span class="va">$WORK</span>/voicing-glossary.tsv</span></code></pre></div>
+が片付ける。<code>build-searchable-book.sh</code> もこれを使う。 -
+<strong>候補：</strong>
+本の中で両方の表記が出る組と、YomiTokuが別の表記に読んだ組。 -
+<strong>自動判定（<code>--auto-crop</code>）：</strong>
+語を原本から切り出して読み直し、安全な組だけを確定する。 -
+<strong>レビュー画面：</strong>
+組ごとに、ページの縮小画像・行・3倍拡大を並べる。人が選んだ組だけが、画面の下のTSV（a、b、choice）にまとまる。それを
+<code>--human</code> に渡すと、自動判定より優先される。 -
+<strong>辞書：</strong> <code>--glossary-out</code>
+が、人の選択、次に自動判定から、<code>--fix-variants</code>
+用の辞書を書き出す。</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="ex">.venv-ndl/bin/python</span> bin/build-voicing-review.py input/bookscan-downloads/<span class="va">$SOURCE</span> <span class="dt">\</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>  <span class="va">$WORK</span>/ocr review/<span class="va">$SLUG</span>-voicing <span class="at">--ocr-stem</span> <span class="st">&quot;</span><span class="va">$STEM</span><span class="st">&quot;</span> <span class="at">--recognized</span> <span class="va">$WORK</span>/margin.tsv <span class="dt">\</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">--yomitoku-dir</span> <span class="va">$WORK</span>/yomitoku <span class="at">--auto-crop</span> <span class="at">--device</span> cuda <span class="dt">\</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">--human</span> <span class="va">$WORK</span>/voicing-human.tsv <span class="at">--glossary-out</span> <span class="va">$WORK</span>/voicing-glossary.tsv</span></code></pre></div>
 <p><code>--yomitoku-dir</code>
-は省略できる（本の中で両方の表記が出る組だけになる）。確定した辞書を正解として自動判定を採点するには、<code>bin/check-voicing-judges.py 原本PDF OCRディレクトリ 辞書TSV 出力TSV --ocr-stem STEM --recognized margin.tsv --yomitoku-dir DIR --device cuda</code>
+は省略できる（本の中で両方の表記が出る組だけになる）。<code>--human</code>
+には、以前の辞書形式のファイル（<code>term</code>・<code>variants</code>・<code>note</code>）も渡せる。確定した辞書を正解として自動判定を採点するには、<code>bin/check-voicing-judges.py 原本PDF OCRディレクトリ 辞書TSV 出力TSV --ocr-stem STEM --recognized margin.tsv --yomitoku-dir DIR --device cuda</code>
 を使う。語を原本から切り出して読み直す判定と、<code>--llm-sample N</code>
 を付けたときのLLMの判定（llama-server）を出現箇所ごとに比べる。<code>build-searchable-book.sh</code>
 が受け取る辞書は1つなので、LLMで作った <code>variant-glossary.tsv</code>
