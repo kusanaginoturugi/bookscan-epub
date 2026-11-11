@@ -42,6 +42,22 @@ NDLOCR_DEVICE=cuda bin/build-searchable-book.sh "$SOURCE" jikan-dorobou
 
 `compare-ocr-runs.py` は `work/ocr-engine-check/書籍/実行名/` にある `ocr.py --output` の結果を読む（`saved` は全冊OCRの保存分）。`score-margin-runs.py` は `書籍/margin-実行名.tsv`（`margin-recognize.py` の出力）を読む。
 
+濁点・半濁点（バ／パ）の取り違えは、`bin/build-voicing-review.py` が作るレビュー画面で人が確定して辞書にする。候補は、本の中で両方の表記が出る組と、YomiTokuが別の表記に読んだ組。組ごとに、ページの縮小画像・行・3倍拡大を並べる。選んだ結果は画面の下にTSVでまとまるので、「TSVをコピー」で保存して辞書として渡す。
+
+```sh
+SLUG=jikan-dorobou; STEM=${SOURCE%.pdf}; WORK=work/searchable/$SLUG
+../bookscan/vendor/.venv-yomitoku/bin/yomitoku input/bookscan-downloads/$SOURCE \
+  -f json -o work/voicing/$SLUG/yomitoku -d cuda --dpi 300 --ignore_ruby
+.venv-ndl/bin/python bin/build-voicing-review.py input/bookscan-downloads/$SOURCE \
+  $WORK/ocr review/$SLUG-voicing --ocr-stem "$STEM" --recognized $WORK/margin.tsv \
+  --yomitoku-dir work/voicing/$SLUG/yomitoku --title "$SLUG 濁点・半濁点レビュー"
+firefox-developer-edition review/$SLUG-voicing/index.html
+# 画面でコピーしたTSVを $WORK/voicing-glossary.tsv に保存してから
+bin/build-searchable-book.sh "$SOURCE" $SLUG $WORK/voicing-glossary.tsv
+```
+
+`--yomitoku-dir` は省略できる（本の中で両方の表記が出る組だけになる）。`build-searchable-book.sh` が受け取る辞書は1つなので、LLMで作った `variant-glossary.tsv` とは別の版になる。
+
 ほかのOCRとは `bin/score-ocr-engines.py` で比べる。エンジンは `ndl:実行名`・`margin:実行名`・`yomitoku:実行名` で指定する。行の区切りや記号の表記に左右されない採点で、`--diff A B` を付けると、無作為ページでAとBが食い違った行を出す。YomiTokuは別の環境で動かす。
 
 ```sh

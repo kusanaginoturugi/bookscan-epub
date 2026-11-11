@@ -13,6 +13,10 @@
 | 天の光はすべて星 | 284 | 1 | [PDF](output/searchable/天の光はすべて星%20-%20フレドリック・ブラウン.pdf) | [PDF](output/searchable/天の光はすべて星%20-%20フレドリック・ブラウン%20辞書補正.pdf) | [5語7か所](work/searchable/ten-no-hikari/variant-glossary.tsv) |
 | インフィニティ・リミテッド（下） | 388 | 3 | [PDF](output/searchable/インフィニティ・リミテッド（下）%20-%20ジェイムズ・P・ホーガン.pdf) | [PDF](output/searchable/インフィニティ・リミテッド（下）%20-%20ジェイムズ・P・ホーガン%20辞書補正.pdf) | [20語61か所](work/searchable/infinity-lower/variant-glossary.tsv) |
 
+## 濁点・半濁点のレビュー（2026-11-11）
+
+『夏への扉』の [濁点・半濁点レビュー](review/summer-door-voicing/index.html)。濁点・半濁点1字だけが違うカタカナ語52組を、原本の縮小画像・行・3倍拡大で確かめて選ぶ。選んだ結果は画面の下のTSVにまとまり、`--fix-variants` の辞書になる。YomiTokuの全ページの結果は `work/voicing/summer-door/yomitoku/`。
+
 ## OCRのCPUとGPUの比較（2026-11-11）
 
 虎よ・インフィニティ上巻・夏への扉から141ページを抜き出し、NDLOCR-LiteをCPUとCUDAで比べた。精度は同等で、速さは約3倍。詳細は[作業記録](docs/progress.md)の「GPU（CUDA）でのOCRと余白つき再認識」。
