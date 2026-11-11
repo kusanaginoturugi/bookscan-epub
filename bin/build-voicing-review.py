@@ -165,7 +165,10 @@ function choices() {{
 }}
 function render() {{
   const c = choices();
-  try {{ localStorage.setItem(KEY, JSON.stringify(c)); }} catch (e) {{}}
+  // Keyed by the pair, so a rebuilt page with a different order keeps choices.
+  const store = {{}};
+  PAIRS.forEach((p, i) => {{ store[p.a + '/' + p.b] = c[i]; }});
+  try {{ localStorage.setItem(KEY, JSON.stringify(store)); }} catch (e) {{}}
   const rows = new Map();
   const add = (term, count, variant, note) => {{
     const r = rows.get(term) || {{term, count, variants: [], notes: []}};
@@ -199,7 +202,7 @@ function render() {{
     + (clash.length ? '。矛盾（正しいと誤りの両方に選んだ語）: ' + clash.join('、') : '');
 }}
 PAIRS.forEach((p, i) => {{
-  const v = saved[i];
+  const v = saved[p.a + '/' + p.b];
   if (v) {{ const el = document.querySelector('input[name="p' + i + '"][value="' + v + '"]'); if (el) el.checked = true; }}
 }});
 document.addEventListener('change', render);

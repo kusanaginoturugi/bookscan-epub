@@ -35,6 +35,9 @@ def main():
     parser.add_argument('--fix-brackets', action='store_true',
                         help='in vertical lines turn <> into 〈〉 and pair ASCII double quotes '
                              'into 〝〟 per page (pages whose quotes do not pair up are kept)')
+    parser.add_argument('--corrections', type=Path,
+                        help='TSV from judge-ocr-disagreements.py (page, line_id, left, from, to, right); '
+                             'applied after the other fixes, before quote pairing')
     parser.add_argument('--fix-variants', action='store_true',
                         help='replace dakuten/handakuten misreadings of --glossary terms')
     parser.add_argument('--ndl-src', type=Path,
@@ -57,6 +60,12 @@ def main():
         parser.error('--fix-variants needs --glossary')
     variants = Counter()
 
+    corrections = {}
+    if args.corrections:
+        with args.corrections.open(newline='') as handle:
+            for row in csv.DictReader(handle, delimiter='\t'):
+                corrections.setdefault((int(row['page']), int(row['line_id'])), []).append(row)
+    applied = 0
     overrides = {}
     if args.overrides:
         with args.overrides.open(newline='') as handle:
@@ -108,6 +117,14 @@ def main():
                 text = clean_text(text, vertical, glossary)
                 if args.fix_variants:
                     text = fix_variants(text, glossary, variants)
+                for row in corrections.pop(key, []):
+                    # The surrounding characters must still be there, so a stale
+                    # correction stops the build instead of landing elsewhere.
+                    old = row['left'] + row['from'] + row['right']
+                    if text.count(old) != 1:
+                        raise ValueError(f'correction does not match line {key}: {row["id"]}')
+                    text = text.replace(old, row['left'] + row['to'] + row['right'])
+                    applied += 1
             removed_spaces += (original.count(' ') + original.count('　') -
                                text.count(' ') - text.count('　'))
             info = data['imginfo']
@@ -139,11 +156,15 @@ def main():
                              'img_height': info['img_height']})
     if overrides:
         raise ValueError(f'overrides not found in OCR: {list(overrides)}')
+    if corrections:
+        raise ValueError(f'corrections for lines not in OCR or overridden: {list(corrections)[:5]}')
     if recognized:
         raise ValueError(f'recognized lines not found in OCR: {list(recognized)[:5]}')
     embed_text_layer_pdf(str(args.sanitized_pdf), str(args.output_pdf), page_results)
     print(f'{args.output_pdf}: {count} pages, {changed_lines} lines normalized, '
           f'{removed_spaces} spaces removed')
+    if args.corrections:
+        print(f'{applied} corrections applied from {args.corrections}')
     if args.fix_brackets:
         print(f'{quotes} double quotes paired into 〝〟; quotes left unpaired on pages '
               f'{",".join(map(str, unpaired_pages)) or "none"}')

@@ -34,6 +34,7 @@
 | 種類 | ファイル | 内容 |
 |---|---|---|
 | 完成品 | [検索可能PDF](output/trial/夏への扉%20-%20ロバート・A・ハインライン.pdf) | 356ページ（2026-11-11 置き換え）。高さ400px以上の縦書き行は余白30pxの再認識、短い行は保存済みOCR。ダッシュ・括弧・引用符の補正と、[レビュー画面](review/summer-door-voicing/index.html)でユーザーが確定した[52語の辞書](work/eval/summer-door-voicing-glossary.tsv)による濁点・半濁点の補正（40種69か所）。正解35行の編集差0 |
+| LLM判断版 | [検索可能PDF（LLM判断）](output/trial/夏への扉%20-%20ロバート・A・ハインライン%20LLM判断.pdf)・[判断のレビュー](review/summer-door-judge/index.html)・[判断の履歴](work/judge/summer-door/history.tsv)・[適用した差分](work/judge/summer-door/corrections.tsv) | 完成品に、NDLとYomiTokuの食い違いをローカルLLMで判断した53か所（52件）を足した版。正解35行の編集差は0のまま。「単刀直入」を「直人」にするなどの誤りが混じるので、レビューしてから置き換える |
 | 旧版 | [2026-11-05の完成品](output/trial/old/夏への扉%20-%20ロバート・A・ハインライン%202026-11-05.pdf)・[括弧補正のみ](output/trial/old/夏への扉%20-%20ロバート・A・ハインライン%20括弧補正.pdf) | 旧完成品は画像確認済み15語の辞書（13種38か所）で、括弧・引用符の補正なし。正解35行の編集差2 |
 | 注釈試作 | [薄色・右開き・注釈入りPDF](output/trial/夏への扉%20-%20ロバート・A・ハインライン%20注釈試作%20Firefox版%20薄色右開き.pdf) | PDFページ21・23・24に注釈と出典リンク。本文の偶数ページ176枚の端線を修正。Readest用の右開き指定入り。追加の[語句候補](data/summer-door-note-candidates.md) |
 | 再認識 | [余白別認識結果](work/margin/summer-door.tsv)・[実行ログ](work/margin/summer-door.log) | 全6181行。保存済みOCRと余白0・8・14・20・30pxの読み |

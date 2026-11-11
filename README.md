@@ -58,6 +58,16 @@ bin/build-searchable-book.sh "$SOURCE" $SLUG $WORK/voicing-glossary.tsv
 
 `--yomitoku-dir` は省略できる（本の中で両方の表記が出る組だけになる）。確定した辞書を正解として自動判定を採点するには、`bin/check-voicing-judges.py 原本PDF OCRディレクトリ 辞書TSV 出力TSV --ocr-stem STEM --recognized margin.tsv --yomitoku-dir DIR --device cuda` を使う。語を原本から切り出して読み直す判定と、`--llm-sample N` を付けたときのLLMの判定（llama-server）を出現箇所ごとに比べる。`build-searchable-book.sh` が受け取る辞書は1つなので、LLMで作った `variant-glossary.tsv` とは別の版になる。
 
+規則と画像で直せなかった、NDLとYomiTokuの読みの食い違い（漢字の取り違えなど）は、`bin/judge-ocr-disagreements.py` でローカルLLMに判断させる。2つのOCRの行を座標で対応させて、差分ごとに分ける。パ／バ、括弧、`"`（あとで〝〟に組み直す）、ダッシュ、濁点の付け外し、小書きの仮名、片方にしかない文字は聞かない。残りを、行の2通りの表記で順序を入れ替えて2回聞き、2回ともYomiTokuを選んだ差分だけを `corrections.tsv` に書き出す。聞いた結果は `history.tsv` に追記され、同じ差分は聞き直さない。レビュー画面では、反映した差分を先頭に並べる。画面で選んだ結果をTSVで保存して `--human` に渡すと、人の判定が常に優先される。差分は `rebuild-text-layer.py --corrections` が、ほかの補正のあと、引用符を組み直す前に当てる。前後4文字が一致しないと、適用せずに止まる。
+
+```sh
+.venv-ndl/bin/python bin/judge-ocr-disagreements.py input/bookscan-downloads/$SOURCE $WORK/ocr \
+  work/voicing/$SLUG/yomitoku work/judge/$SLUG review/$SLUG-judge --ocr-stem "$STEM" \
+  --recognized $WORK/margin.tsv --glossary $WORK/voicing-glossary.tsv \
+  --human work/eval/$SLUG-judge-human.tsv --title "$SLUG LLM判断のレビュー"
+# rebuild-text-layer.py に --corrections work/judge/$SLUG/corrections.tsv を足して文字層を作る
+```
+
 ほかのOCRとは `bin/score-ocr-engines.py` で比べる。エンジンは `ndl:実行名`・`margin:実行名`・`yomitoku:実行名` で指定する。行の区切りや記号の表記に左右されない採点で、`--diff A B` を付けると、無作為ページでAとBが食い違った行を出す。YomiTokuは別の環境で動かす。
 
 ```sh
@@ -145,10 +155,12 @@ ruby bin/build-review.rb --ignore-leaders \
 rclone copy output gdrive:bookscan-epub/output
 rclone copy work/searchable gdrive:bookscan-epub/work/searchable --include '*.tsv'
 rclone copy work/eval gdrive:bookscan-epub/work/eval --include '*.tsv'   # 人が確定した辞書・正解
+rclone copy work/judge gdrive:bookscan-epub/work/judge   # LLM判断の履歴と適用する差分
 # 別のマシンでDriveから戻す（artifacts.html のリンクがそのまま開ける）
 rclone copy gdrive:bookscan-epub/output output
 rclone copy gdrive:bookscan-epub/work/searchable work/searchable
 rclone copy gdrive:bookscan-epub/work/eval work/eval
+rclone copy gdrive:bookscan-epub/work/judge work/judge
 ```
 
 `rclone sync` は送り先にしかないファイルを消すので使わない。中身は買った本のスキャンなので、共有リンク（`rclone link` やブラウザの「リンクを知っている全員」）は作らない。
