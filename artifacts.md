@@ -13,6 +13,15 @@
 | 天の光はすべて星 | 284 | 1 | [PDF](output/searchable/天の光はすべて星%20-%20フレドリック・ブラウン.pdf) | [PDF](output/searchable/天の光はすべて星%20-%20フレドリック・ブラウン%20辞書補正.pdf) | [5語7か所](work/searchable/ten-no-hikari/variant-glossary.tsv) |
 | インフィニティ・リミテッド（下） | 388 | 3 | [PDF](output/searchable/インフィニティ・リミテッド（下）%20-%20ジェイムズ・P・ホーガン.pdf) | [PDF](output/searchable/インフィニティ・リミテッド（下）%20-%20ジェイムズ・P・ホーガン%20辞書補正.pdf) | [20語61か所](work/searchable/infinity-lower/variant-glossary.tsv) |
 
+## 巨人たちの星（2026-11-12）
+
+前の2冊の語彙とパ／バの選択を引き継いで、`bin/build-searchable-book.sh` で通した。人のレビュー前。
+
+| 種類 | ファイル | 内容 |
+|---|---|---|
+| 完成品 | [検索可能PDF](output/searchable/巨人たちの星%20-%20ジェイムズ・P・ホーガン.pdf) | 484ページ。巻末目録（475〜482ページ）はレビューの対象外 |
+| レビュー | [パ／バ](review/kyojin-tachi-no-hoshi-voicing/index.html)・[判断モデル](review/kyojin-tachi-no-hoshi-judge/index.html) | パ／バは29組と自動修正7語（プローヒリオ→ブローヒリオ76か所など）、判断モデルは割れた37か所 |
+
 ## ガニメデの優しい巨人（2026-11-12）
 
 前作の語彙とパ／バの選択を引き継いで、`bin/build-searchable-book.sh` で通した。パ／バと判断モデルの割れた箇所は、ユーザーがすべてレビューした。

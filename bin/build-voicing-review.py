@@ -448,12 +448,18 @@ def main():
         text = line['text']
         return f'{line["page"]}:{line["line_id"]}:{text[max(0, start - 4):start]}[{text[start:end]}→{to}]{text[end:end + 4]}'
 
+    def fix_word(place, to):
+        # Fixes of the same word go together (プローヒリオ→ブローヒリオ, 73 places).
+        index, start, end = place
+        return f'{lines[index]["text"][start:end]}→{to}'
+
     agreed = {}
     if args.auto_crop:
         agreed = agreed_fixes(occurrences, readings, yomitoku, lines, settled)
         fixes = {place: (to, 'auto-agree') for place, to in agreed.items()
-                 if fix_verdicts.get(fix_id(place, to)) != 'reject'}
-    for gone in set(fix_verdicts) - {fix_id(place, to) for place, to in agreed.items()}:
+                 if 'reject' not in (fix_verdicts.get(fix_id(place, to)), fix_verdicts.get(fix_word(place, to)))}
+    proposed = {fix_id(p, to) for p, to in agreed.items()} | {fix_word(p, to) for p, to in agreed.items()}
+    for gone in set(fix_verdicts) - proposed:
         print(f'warning: human verdict for an automatic fix that is no longer proposed: {gone}')
     for key, to in custom.items():
         for word in key:
@@ -483,11 +489,16 @@ def main():
     order = sorted(pairs, key=lambda k: (-len(pairs[k]['yomi']),
                                          -sum(len(occurrences.get(w, [])) for w in k), k))
     examples = {key: pick_examples(key, pairs[key], occurrences, args.examples) for key in order}
-    # Automatic fixes are shown after the pairs, one place each, to keep or reject.
-    fix_items = sorted(agreed.items())
-    for place, to in fix_items:
-        examples[('fix:', fix_id(place, to))] = [place]
-    order_all = order + [('fix:', fix_id(place, to)) for place, to in fix_items]
+    # Automatic fixes are shown after the pairs, one item per word, to keep or reject.
+    fix_groups = defaultdict(list)
+    for place, to in sorted(agreed.items()):
+        fix_groups[fix_word(place, to)].append(place)
+    fix_items = sorted(fix_groups.items(), key=lambda kv: (-len(kv[1]), kv[0]))
+    for word_key, places in fix_items:
+        spread = places if len(places) <= args.examples else [places[i * len(places) // args.examples]
+                                                               for i in range(args.examples)]
+        examples[('fix:', word_key)] = spread
+    order_all = order + [('fix:', word_key) for word_key, _ in fix_items]
 
     images = args.output / 'img'
     images.mkdir(parents=True, exist_ok=True)
@@ -505,26 +516,26 @@ def main():
 
     # Section ids follow the page order: pairs first, then the automatic fixes.
     sections, data, fix_data = [], [], []
-    for n, (place, to) in enumerate(fix_items, len(order)):
-        fid = fix_id(place, to)
-        index, start, end = place
-        line = lines[index]
-        word = line['text'][start:end]
-        verdict = fix_verdicts.get(fid, '')
-        fix_data.append({'kind': 'fix', 'id': fid, 'a': word, 'b': to, 'auto': '', 'human': verdict})
+    for n, (word_key, places) in enumerate(fix_items, len(order)):
+        word, to = word_key.split('→')
+        verdict = fix_verdicts.get(word_key, '')
+        fix_data.append({'kind': 'fix', 'id': word_key, 'a': word, 'b': to, 'auto': '', 'human': verdict})
         options = ''.join(f'<label><input type="radio" name="p{n}" value="{value}">{label}</label>'
                           for value, label in (('keep', f'直す（{html.escape(to)}）'),
                                                ('reject', f'直さない（{html.escape(word)}のまま）'),
                                                ('undecided', '未確認（直したまま）')))
-        fix_sections_html = (
-            f'<section id="s{n}" class="fix"><h2>#{n + 1} 自動修正 {line["page"]}ページ: '
-            f'{html.escape(word)} → {html.escape(to)}</h2><p>語を切り出して読み直した結果とYomiTokuが、'
-            f'NDLと違う同じ綴りを読んだので直した。原本と違えば「直さない」を選ぶ。</p>'
+        figures = ''.join(
+            f'<figure><img src="img/{n}-{k}-thumb.jpg"><img src="img/{n}-{k}-line.jpg">'
+            f'<img src="img/{n}-{k}-zoom.jpg"><figcaption>{lines[index]["page"]}ページ</figcaption></figure>'
+            for k, (index, _, _) in enumerate(examples[('fix:', word_key)]))
+        pages = sorted({lines[index]['page'] for index, _, _ in places})
+        sections.append(
+            f'<section id="s{n}" class="fix"><h2>#{n + 1} 自動修正 {html.escape(word)} → {html.escape(to)}'
+            f'（{len(places)}か所）</h2><p>語を切り出して読み直した結果とYomiTokuが、NDLと違う同じ綴りを読んだので直した。'
+            f'原本と違えば「直さない」を選ぶ（{len(places)}か所すべてに当たる）。ページ: '
+            f'{html.escape(", ".join(map(str, pages[:20])))}{" ほか" if len(pages) > 20 else ""}</p>'
             f'<div class="opts">{options} <a href="#" class="go" data-n="{n}">次の未確認へ ↓</a></div>'
-            f'<div class="ex"><figure><img src="img/{n}-0-thumb.jpg"><img src="img/{n}-0-line.jpg">'
-            f'<img src="img/{n}-0-zoom.jpg"><figcaption>{line["page"]}ページ<br>NDL: {html.escape(word)}'
-            f'<br>直した綴り: {html.escape(to)}</figcaption></figure></div></section>')
-        sections.append(fix_sections_html)
+            f'<div class="ex">{figures}</div></section>')
     fix_count = len(sections)
     sections_pairs = []
     for n, key in enumerate(order):
@@ -563,7 +574,7 @@ def main():
     auto_count = sum(1 for k in order if auto.get(k))
     summary = (f'{len(order)}組。うちYomiTokuと割れた組 {sum(bool(pairs[k]["yomi"]) for k in order)}。'
                f'自動判定 {auto_count}組、人の選択 {len(human)}組、どちらもない {sum(1 for k in order if not auto.get(k) and k not in human)}組。'
-               f'自動修正 {fix_count}か所（最後に並ぶ）。本文の行 {len(lines)}、YomiTokuのページ {len(yomitoku)}。')
+               f'自動修正 {sum(len(p) for _, p in fix_items)}か所・{fix_count}語（最後に並ぶ）。本文の行 {len(lines)}、YomiTokuのページ {len(yomitoku)}。')
     (args.output / 'index.html').write_text(PAGE.format(
         title=html.escape(args.title), summary=summary, sections='\n'.join(sections_pairs + sections),
         human=html.escape(str(args.human.resolve() if args.human else '人の選択TSV')), pairs=json.dumps(data, ensure_ascii=False)), encoding='utf-8')
