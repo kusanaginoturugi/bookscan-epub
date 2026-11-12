@@ -368,6 +368,20 @@ ITEMS.forEach((it, i) => {{
   if (s.custom) document.getElementById('c' + i).value = s.custom;
 }});
 document.addEventListener('change', render);
+document.addEventListener('change', e => {{
+  // A choice also goes to unanswered items with the same readings and context.
+  const m = e.target.name && e.target.name.match(/^h(\\d+)$/);
+  if (!m) return;
+  const i = Number(m[1]);
+  ITEMS.forEach((it, j) => {{
+    if (j === i || it.sig !== ITEMS[i].sig) return;
+    const cur = document.querySelector('input[name="h' + j + '"]:checked');
+    if (cur && cur.value !== 'undecided') return;
+    const el = document.querySelector('input[name="h' + j + '"][value="' + e.target.value + '"]');
+    if (el) {{ el.checked = true; document.getElementById('c' + j).value = document.getElementById('c' + i).value; }}
+  }});
+  render();
+}});
 const COUNT = ITEMS.length;
 const OPEN = i => {{ const el = document.querySelector('input[name="h' + i + '"]:checked'); return ITEMS[i].focus && (!el || el.value === 'undecided'); }};
 function isOpen(i) {{ return OPEN(i); }}
@@ -555,8 +569,25 @@ def main():
     # A human verdict that no longer matches a hunk (the text before it changed,
     # e.g. after a new voicing glossary) would be dropped silently; stop instead.
     orphans = sorted(set(human) - {item['id'] for item in items})
+    # The same name or phrase recurs (フォーサイス＝スコット): a verdict on one hunk
+    # applies to unreviewed hunks with the same readings and the same 4 characters
+    # on each side, unless verdicts on such hunks disagree.
+    signature = lambda it: (it['left'], it['ndl'], it['yomitoku'], it['right'])
+    by_signature = defaultdict(set)
+    for item in items:
+        verdict = human.get(item['id'])
+        if verdict:
+            by_signature[signature(item)].add((verdict['verdict'], verdict['to'], verdict['from'], verdict['left'], verdict['right']))
+    propagated = {}
+    for item in items:
+        found = by_signature.get(signature(item))
+        if item['id'] not in human and found and len(found) == 1:
+            v, to, frm, left, right = next(iter(found))
+            propagated[item['id']] = dict(id=item['id'], page=item['page'], line_id=item['line_id'], left=left,
+                                          to=to, right=right, verdict=v, propagated='yes', **{'from': frm})
     if orphans:
         raise SystemExit(f'{len(orphans)} human verdicts match no hunk (text changed?): {orphans[:5]}')
+    human.update(propagated)
     write_header = not history_path.exists()
     with history_path.open('a', newline='') as handle:
         writer = csv.DictWriter(handle, HISTORY, delimiter='\t', lineterminator='\n', extrasaction='ignore')
@@ -623,7 +654,8 @@ def main():
                      'from': item['ndl'], 'yomitoku': item['yomitoku'], 'right': item['right'],
                      'now': item['yomitoku'] if item['decision'] == 'yomitoku' else item['ndl'],
                      'human': {'v': verdict['verdict'], 'custom': item['human_snippet']} if verdict else None,
-                     'focus': group(item) == 0})
+                     'focus': group(item) == 0,
+                     'sig': '|'.join((item['left'], item['ndl'], item['yomitoku'], item['right']))})
         esc = html.escape
         # Prompt order: first asks A=NDL, B=YomiToku; second swaps them.
         said = lambda answer, a, b: {'A': a, 'B': b}.get(answer, '答えなし')
@@ -643,7 +675,9 @@ def main():
             llm = '聞いていない（形が同じ文字。前後の文字と、本の中に出てくる語で決めた）'
         elif item['first'] == 'skip':
             llm = f'聞いていない（規則でNDLのまま: {esc(item["model"][5:])}）'
-        if verdict:
+        if verdict and verdict.get('propagated'):
+            now, why = verdict['to'], '人の判定（同じ形の箇所の判定を当てた）'
+        elif verdict:
             now, why = verdict['to'], '人の判定'
         elif item['first'] == 'rule':
             now, why = item['yomitoku'], 'YomiTokuの読み。旧字体の規則'
