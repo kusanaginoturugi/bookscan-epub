@@ -13,7 +13,7 @@ from pathlib import Path
 from pypdf import PdfReader
 
 from text_layer_utils import (clean_text, fix_brackets, fix_dashes, fix_quotes, fix_variants,
-                              load_glossary)
+                              line_joins, load_glossary)
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -101,7 +101,8 @@ def main():
         path = args.ocr_dir / f'{args.ocr_stem}_{page:05}.json'
         data = json.loads(path.read_text())
         lines = []
-        for item in data['contents'][0]:
+        joins = line_joins([item['text'] for item in data['contents'][0]])
+        for position, item in enumerate(data['contents'][0]):
             box = item['boundingBox']
             x0, x1 = min(p[0] for p in box), max(p[0] for p in box)
             y0, y1 = min(p[1] for p in box), max(p[1] for p in box)
@@ -127,7 +128,7 @@ def main():
                     text = fix_brackets(text)
                 text = clean_text(text, vertical, glossary)
                 if args.fix_variants:
-                    text = fix_variants(text, glossary, variants)
+                    text = fix_variants(text, glossary, variants, joins[position])
                 for row in corrections.pop(key, []):
                     # The surrounding characters must still be there, so a stale
                     # correction stops the build instead of landing elsewhere.

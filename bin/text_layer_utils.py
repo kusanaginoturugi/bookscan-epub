@@ -65,10 +65,30 @@ def fix_quotes(texts):
 VOICING = str.maketrans('バビブベボパピプペポ', 'パピプペポバビブベボ')
 
 
-def fix_variants(text, glossary, counts=None):
+KATAKANA = re.compile(r'[ァ-ヴー]')
+
+
+def line_joins(texts):
+    """[(joined_to_previous, joined_to_next)] for the OCR lines of a page in
+    reading order. A katakana word may run over the line break (パター|ン), so a
+    line ending in katakana before one starting with katakana counts as joined;
+    the fragment at either side is then not a word of its own."""
+    texts = [t.strip() for t in texts]
+    out = []
+    for i, text in enumerate(texts):
+        prev = texts[i - 1] if i > 0 else ''
+        nxt = texts[i + 1] if i + 1 < len(texts) else ''
+        out.append((bool(text and prev and KATAKANA.match(text[0]) and KATAKANA.match(prev[-1])),
+                    bool(text and nxt and KATAKANA.match(text[-1]) and KATAKANA.match(nxt[0]))))
+    return out
+
+
+def fix_variants(text, glossary, counts=None, joined=(False, False)):
     # OCR confuses dakuten and handakuten (ビ/ピ). Replace a reading that
     # differs from a verified term by one such kana, unless it is part of a
-    # longer katakana word or is itself a verified term.
+    # longer katakana word, is itself a verified term, or is a fragment of a
+    # word running over the line break (joined, from line_joins).
+    lo, hi = len(text) - len(text.lstrip()), len(text.rstrip())
     for term in glossary:
         for index, char in enumerate(term):
             swapped = char.translate(VOICING)
@@ -76,7 +96,15 @@ def fix_variants(text, glossary, counts=None):
             if swapped == char or variant in glossary:
                 continue
             pattern = rf'(?<![ァ-ヴー]){re.escape(variant)}(?![ァ-ヴー])'
-            text, found = re.subn(pattern, term, text)
+            found = 0
+
+            def replace(match):
+                nonlocal found
+                if (joined[0] and match.start() == lo) or (joined[1] and match.end() == hi):
+                    return match.group()
+                found += 1
+                return term
+            text = re.sub(pattern, replace, text)
             if found and counts is not None:
                 counts[(variant, term)] += found
     return text

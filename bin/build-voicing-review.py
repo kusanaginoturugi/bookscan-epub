@@ -44,7 +44,7 @@ import numpy as np
 import pypdfium2
 from PIL import ImageDraw
 
-from text_layer_utils import catalog_pages, fix_brackets, fix_dashes, parse_pages
+from text_layer_utils import catalog_pages, fix_brackets, fix_dashes, line_joins, parse_pages
 
 TOKEN = re.compile(r"(?<![ァ-ヴー])(?![ァィゥェォッャュョヮヵヶー])[ァ-ヴ][ァ-ヴー]*")  # no ー or small kana first
 VOICED = set('バビブベボパピプペポ')
@@ -66,7 +66,9 @@ def load_lines(args):
     lines = []
     for path in sorted(args.ocr_dir.glob(f'{args.ocr_stem}_*.json')):
         page = int(path.stem.rsplit('_', 1)[1])
-        for item in json.loads(path.read_text())['contents'][0]:
+        items = json.loads(path.read_text())['contents'][0]
+        joins = line_joins([item['text'] for item in items])
+        for position, item in enumerate(items):
             text = item['text']
             row = recognized.get((page, int(item['id'])))
             if row and int(row['height']) >= args.min_height:
@@ -77,7 +79,7 @@ def load_lines(args):
             xs = [p[0] for p in item['boundingBox']]
             ys = [p[1] for p in item['boundingBox']]
             lines.append(dict(page=page, box=(min(xs), min(ys), max(xs), max(ys)),
-                              vertical=vertical, text=text))
+                              vertical=vertical, text=text, joined=joins[position]))
     return lines
 
 
@@ -93,9 +95,14 @@ def load_yomitoku(directory):
 def find_pairs(lines, yomitoku, min_length):
     occurrences = defaultdict(list)  # word -> [(line index, start, end)]
     for index, line in enumerate(lines):
-        for match in TOKEN.finditer(line['text']):
-            # A lone kana is usually a word split at the line end (ボ|ストン); as a
-            # glossary term it would rewrite every standalone ボ in the book.
+        text = line['text']
+        lo, hi = len(text) - len(text.lstrip()), len(text.rstrip())
+        for match in TOKEN.finditer(text):
+            # A word running over the line break (パター|ン) is not a word of its
+            # own at either side; a lone kana is usually such a piece too, and as
+            # a glossary term it would rewrite every standalone ボ in the book.
+            if (line['joined'][0] and match.start() == lo) or (line['joined'][1] and match.end() == hi):
+                continue
             if len(match.group()) >= 2 and VOICED & set(match.group()):
                 occurrences[match.group()].append((index, match.start(), match.end()))
     pairs = {}

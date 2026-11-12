@@ -40,7 +40,7 @@ from pathlib import Path
 import pypdfium2
 
 from text_layer_utils import (catalog_pages, clean_text, fix_brackets, fix_dashes, fix_variants,
-                              load_glossary, parse_pages)
+                              line_joins, load_glossary, parse_pages)
 
 ROOT = Path(__file__).resolve().parent
 PROMPTS = {
@@ -142,7 +142,9 @@ def load_lines(args, glossary):
     lines = []
     for path in sorted(args.ocr_dir.glob(f'{args.ocr_stem}_*.json')):
         page = int(path.stem.rsplit('_', 1)[1])
-        for item in json.loads(path.read_text())['contents'][0]:
+        items = json.loads(path.read_text())['contents'][0]
+        joins = line_joins([item['text'] for item in items])
+        for position, item in enumerate(items):
             key = (page, int(item['id']))
             if key in overridden:
                 continue
@@ -155,9 +157,9 @@ def load_lines(args, glossary):
                 text = fix_brackets(fix_dashes(text))
             text = clean_text(text, vertical, glossary)
             if glossary:
-                text = fix_variants(text, glossary)
+                text = fix_variants(text, glossary, joined=joins[position])
             lines.append(dict(page=page, line_id=key[1], box=box_of(item['boundingBox']),
-                              vertical=vertical, text=text))
+                              vertical=vertical, text=text, joined=joins[position]))
     return lines
 
 
@@ -208,6 +210,21 @@ def resolve(verdict, item, text):
 
 def line_shaped(item):
     return bool(set(item['ndl']) <= LINE_SHAPED and item['ndl']) or bool(set(item['yomitoku']) <= LINE_SHAPED and item['yomitoku'])
+
+
+def at_join(line, start, end):
+    """Whether the katakana run holding text[start:end] reaches a line edge that
+    continues on the neighbouring line (line_joins)."""
+    text = line['text']
+    lo, hi = len(text) - len(text.lstrip()), len(text.rstrip())
+    is_kana = lambda ch: '\u30a1' <= ch <= '\u30fa' or ch == 'ー'
+    j = end
+    while j < hi and is_kana(text[j]):
+        j += 1
+    i = start
+    while i > lo and is_kana(text[i - 1]):
+        i -= 1
+    return (line['joined'][1] and j == hi) or (line['joined'][0] and i == lo)
 
 
 def read_tsv(path):
@@ -379,11 +396,15 @@ def main():
             counts['misaligned lines'] += 1
             continue
         for start, end, frm, to, category in found:
-            counts[category] += 1
             text = line['text']
+            if category == 'voicing' and at_join(line, start, end):
+                # The voicing step skips a word running over the line break
+                # (ピー|ル); the LLM decides it with the neighbouring lines (v2).
+                category = 'joined-voicing'
+            counts[category] += 1
             left, right = text[max(0, start - CONTEXT):start], text[end:end + CONTEXT]
             hunk_id = f'{line["page"]}:{line["line_id"]}:{left}[{frm}→{to}]{right}'
-            if category not in ('judge', 'old-form'):
+            if category not in ('judge', 'old-form', 'joined-voicing'):
                 # Rules keep NDL here, but a human verdict on the hunk still wins.
                 if hunk_id in human:
                     items.append(dict(id=hunk_id, page=line['page'], line_id=line['line_id'], left=left,
@@ -422,7 +443,9 @@ def main():
                 done[(hunk_id, args.model, version)] = record
                 return record
 
-            if args.prompt == 'v1+v2':
+            if category == 'joined-voicing':
+                record = dict(asked('v2'))
+            elif args.prompt == 'v1+v2':
                 # v1 decides; v2 (context and caution) can veto a change to YomiToku.
                 # On the Summer Door review this kept 40 of v1's 41 fixes and cut
                 # its breakages from 6 to 2.
