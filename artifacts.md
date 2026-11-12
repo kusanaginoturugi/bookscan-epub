@@ -15,16 +15,16 @@
 
 ## ガニメデの優しい巨人（2026-11-12）
 
-前作の語彙とパ／バの選択を引き継いで、`bin/build-searchable-book.sh` で通した。人のレビュー前。
+前作の語彙とパ／バの選択を引き継いで、`bin/build-searchable-book.sh` で通した。パ／バと判断モデルの割れた箇所は、ユーザーがすべてレビューした。
 
 | 種類 | ファイル | 内容 |
 |---|---|---|
 | 完成品 | [検索可能PDF](output/searchable/ガニメデの優しい巨人%20-%20ジェイムズ・P・ホーガン.pdf) | 340ページ。巻末目録（326〜335ページ）はレビューの対象外 |
-| レビュー | [パ／バ](review/ganymede-no-yasashii-kyojin-voicing/index.html)・[判断モデル](review/ganymede-no-yasashii-kyojin-judge/index.html) | パ／バは4組と自動修正1か所、判断モデルは割れた38か所 |
+| レビュー | [パ／バ](review/ganymede-no-yasashii-kyojin-voicing/index.html)・[判断モデル](review/ganymede-no-yasashii-kyojin-judge/index.html) | パ／バ4組と自動修正1か所、判断モデルの割れた箇所をすべて確認済み |
 
 ## 星を継ぐもの（2026-11-12）
 
-`bin/build-searchable-book.sh`（YomiToku、パ／バ、判断モデル込み）で初めて通した本。人のレビュー前。
+`bin/build-searchable-book.sh`（YomiToku、パ／バ、判断モデル込み）で初めて通した本。パ／バと判断モデルの割れた箇所は、ユーザーがすべてレビューした。
 
 | 種類 | ファイル | 内容 |
 |---|---|---|
