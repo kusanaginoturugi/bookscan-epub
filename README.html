@@ -301,7 +301,11 @@ NDLとYomiTokuの残りの食い違いを、ローカルLLMが判断する。 -
 パ／バの辞書、LLMと人の差分、<code>char-map.tsv</code> を当てる。</p>
 <p>OCR、余白つき再認識、YomiTokuは、済んでいれば飛ばす。パ／バ、判断モデル、文字層は、入力の中身が変わったときだけ作り直す（ファイルの日付は見ない）。変わる完成品は消さずに、<code>output/searchable/old/</code>
 へ日付を付けて移す。</p>
-<p>YomiTokuかLLM（llama-server）が見つからないと止まる。使わないなら
+<p>巻末の目録（本の最後の20ページで、30行以上あり1行の平均が16字未満のページ）は、パ／バと判断モデルのレビューから外す。文字層には残る。外したいページがほかにもあれば、<code>work/searchable/作業名/skip-pages.txt</code>
+に <code>312-322</code>
+のように書く。レビュー画面の下の「次の未確認」（キーは
+<code>n</code>、戻るは
+<code>p</code>）で、まだ見ていない箇所へ移れる。選んだら次へ自動で進む。YomiTokuかLLM（llama-server）が見つからないと止まる。使わないなら
 <code>SKIP_YOMITOKU=1</code> や <code>SKIP_JUDGE=1</code>
 を付ける。1冊の中で、段の有無とデバイスは最初の実行のまま変えられない（<code>stages</code>・<code>device</code>
 に記録）。これらの段より前に作った作業ディレクトリは、<code>UPGRADE=1</code>

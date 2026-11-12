@@ -80,3 +80,26 @@ def fix_variants(text, glossary, counts=None):
             if found and counts is not None:
                 counts[(variant, term)] += found
     return text
+
+
+def parse_pages(spec):
+    """{page numbers} from '312-322,330'."""
+    pages = set()
+    for part in filter(None, (p.strip() for p in (spec or '').split(','))):
+        first, _, last = part.partition('-')
+        pages.update(range(int(first), int(last or first) + 1))
+    return pages
+
+
+def catalog_pages(ocr_dir, ocr_stem, tail=20, min_lines=30, max_average=16):
+    """Back-matter catalog pages: among the last `tail` pages, those with many
+    short lines (a publisher's list of titles), unlike body text (about 18
+    lines of 40 characters per page in these paperbacks)."""
+    import json
+    paths = sorted(ocr_dir.glob(f'{ocr_stem}_*.json'))
+    found = set()
+    for path in paths[-tail:]:
+        texts = [item['text'] for item in json.loads(path.read_text())['contents'][0]]
+        if len(texts) >= min_lines and sum(map(len, texts)) / len(texts) < max_average:
+            found.add(int(path.stem.rsplit('_', 1)[1]))
+    return found

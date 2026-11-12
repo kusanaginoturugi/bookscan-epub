@@ -29,6 +29,8 @@
 #              a missing YomiToku or LLM stops the build. YomiToku off also turns
 #              the judge off. A book keeps the stages it was started with.
 #   WORK/char-map.tsv  (from, to) characters this book prints differently, e.g. 掴 摑
+#   WORK/skip-pages.txt  pages left out of both reviews, e.g. 312-322 (back-matter
+#              catalogs are found automatically; the text layer keeps all pages)
 #   UPGRADE=1  run the new stages on a work dir made before them (it is otherwise
 #              left as it was)
 set -eu
@@ -159,15 +161,19 @@ fi
 YOMI_ARGS=
 [ "$USE_YOMITOKU" = off ] || YOMI_ARGS="--yomitoku-dir $WORK/yomitoku"
 
+# Back-matter catalogs are left out of both reviews (detected, plus WORK/skip-pages.txt).
+SKIP_ARGS=--skip-catalog
+[ ! -e "$WORK/skip-pages.txt" ] || SKIP_ARGS="$SKIP_ARGS --skip-pages $(tr -d ' \n' < "$WORK/skip-pages.txt")"
+
 # バ/パ: word-crop re-reads decide safe pairs; human choices win.
 VOICING_GLOSSARY=${GLOSSARY:-$WORK/voicing-glossary.tsv}
 if [ -z "$GLOSSARY" ]; then
-  KEY=$(inputs_key "$WORK/voicing-human.tsv" "$WORK/margin.tsv" "$WORK/stages")
+  KEY=$(inputs_key "$WORK/voicing-human.tsv" "$WORK/margin.tsv" "$WORK/stages" "$WORK/skip-pages.txt")skip-catalog
   if [ ! -e "$VOICING_GLOSSARY" ] || [ "$(cat "$WORK/voicing.key" 2>/dev/null)" != "$KEY" ]; then
     echo "[$(date +%T)] voicing"
     # shellcheck disable=SC2086
     "$PY" "$BIN/build-voicing-review.py" "$ORIGINAL" "$WORK/ocr" "$REVIEW-voicing" --ocr-stem "$OCR_STEM" \
-      --recognized "$WORK/margin.tsv" $YOMI_ARGS --auto-crop --device "$DEVICE" \
+      --recognized "$WORK/margin.tsv" $YOMI_ARGS $SKIP_ARGS --auto-crop --device "$DEVICE" \
       --human "$WORK/voicing-human.tsv" --glossary-out "$VOICING_GLOSSARY" \
       --title "$TITLE 濁点・半濁点レビュー" > "$WORK/voicing.log" 2>&1 ||
       fail "voicing step failed; see $WORK/voicing.log"
@@ -180,14 +186,14 @@ fi
 CORRECTIONS=
 if [ "$USE_JUDGE" = on ] && [ -z "$GLOSSARY" ]; then
   CORRECTIONS=$WORK/judge/corrections.tsv
-  KEY=$(inputs_key "$VOICING_GLOSSARY" "$WORK/judge-human.tsv" "$WORK/margin.tsv" "$WORK/stages")
+  KEY=$(inputs_key "$VOICING_GLOSSARY" "$WORK/judge-human.tsv" "$WORK/margin.tsv" "$WORK/stages" "$WORK/skip-pages.txt")skip-catalog
   if [ ! -e "$CORRECTIONS" ] || [ "$(cat "$WORK/judge.key" 2>/dev/null)" != "$KEY$LLM_MODEL$JUDGE_PROMPT" ]; then
     echo "[$(date +%T)] judge"
     curl -sf -m 10 "$LLM_URL/models" > /dev/null ||
       fail "no LLM server at $LLM_URL (start llama-server, set LLM_URL, or SKIP_JUDGE=1)"
     "$PY" "$BIN/judge-ocr-disagreements.py" "$ORIGINAL" "$WORK/ocr" "$WORK/yomitoku" "$WORK/judge" \
       "$REVIEW-judge" --ocr-stem "$OCR_STEM" --recognized "$WORK/margin.tsv" \
-      --glossary "$VOICING_GLOSSARY" --human "$WORK/judge-human.tsv" \
+      --glossary "$VOICING_GLOSSARY" --human "$WORK/judge-human.tsv" $SKIP_ARGS \
       --url "$LLM_URL/chat/completions" --model "$LLM_MODEL" --prompt "$JUDGE_PROMPT" \
       --title "$TITLE LLM判断のレビュー" \
       > "$WORK/judge.log" 2>&1 || fail "judge step failed; see $WORK/judge.log"

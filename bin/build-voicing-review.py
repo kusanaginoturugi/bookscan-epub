@@ -44,7 +44,7 @@ import numpy as np
 import pypdfium2
 from PIL import ImageDraw
 
-from text_layer_utils import fix_brackets, fix_dashes
+from text_layer_utils import catalog_pages, fix_brackets, fix_dashes, parse_pages
 
 TOKEN = re.compile(r"(?<![ァ-ヴー])(?![ァィゥェォッャュョヮヵヶー])[ァ-ヴ][ァ-ヴー]*")  # no ー or small kana first
 VOICED = set('バビブベボパピプペポ')
@@ -255,12 +255,12 @@ figcaption{{font-size:13px;writing-mode:horizontal-tb;max-width:9em}}
 </style>
 <h1>{title}</h1>
 <p>濁点・半濁点だけが違うカタカナ語の組。各組で原本画像と同じつづりを選ぶ。<b>赤枠</b>はYomiTokuが別のつづりで読んだ箇所。
-「両方正しい」は別の語として両方を残す。<b>自動</b>と書いた組は、語を切り出して読み直した結果で決めてある（選ばなければそのまま使う）。
+「両方正しい」は別の語として両方を残す。画面下の「次の未確認」（キーは n、戻るは p）で、自動判定のない組を順に回れる。<b>自動</b>と書いた組は、語を切り出して読み直した結果で決めてある（選ばなければそのまま使う）。
 人が選んだものだけが下のTSV（a、b、choice）にまとまるので、コピーして <code>{human}</code> に保存し、作り直す。
 人の選択は常に自動判定より優先する。選択はこのブラウザにも一時保存される。</p>
 <p>{summary}</p>
 {sections}
-<div id="out"><button id="copy">TSVをコピー</button> <span id="status"></span>
+<div id="out"><button id="prev">↑ 前の未確認（p）</button> <button id="next">次の未確認 ↓（n）</button> <label><input type="checkbox" id="advance" checked>選んだら次の未確認へ進む</label> <button id="copy">TSVをコピー</button> <span id="status"></span>
 <textarea id="tsv" readonly></textarea></div>
 <script>
 const PAIRS = {pairs};
@@ -297,6 +297,36 @@ PAIRS.forEach((p, i) => {{
   if (v) {{ const el = document.querySelector('input[name="p' + i + '"][value="' + v + '"]'); if (el) el.checked = true; }}
 }});
 document.addEventListener('change', render);
+const COUNT = PAIRS.length;
+const OPEN = i => choice(i) === 'undecided' && !PAIRS[i].auto;
+function isOpen(i) {{ return OPEN(i); }}
+function jump(from, dir) {{
+  for (let i = from + dir; i >= 0 && i < COUNT; i += dir) {{
+    if (isOpen(i)) {{ document.getElementById('s' + i).scrollIntoView({{behavior: 'smooth', block: 'start'}}); return; }}
+  }}
+  document.getElementById('status').textContent = dir > 0 ? 'この先に未確認はない' : 'この前に未確認はない';
+}}
+function current() {{
+  let at = -1;
+  for (let i = 0; i < COUNT; i++) {{
+    if (document.getElementById('s' + i).getBoundingClientRect().top <= 12) at = i; else break;
+  }}
+  return at;
+}}
+document.getElementById('next').addEventListener('click', () => jump(current(), 1));
+document.getElementById('prev').addEventListener('click', () => jump(Math.max(current(), 0), -1));
+document.querySelectorAll('a.go').forEach(a => a.addEventListener('click', e => {{ e.preventDefault(); jump(Number(a.dataset.n), 1); }}));
+document.addEventListener('keydown', e => {{
+  if (e.target.tagName === 'INPUT' && e.target.type === 'text' || e.target.tagName === 'TEXTAREA') return;
+  if (e.key === 'n') jump(current(), 1);
+  if (e.key === 'p') jump(Math.max(current(), 0), -1);
+}});
+document.addEventListener('change', e => {{
+  // After a choice, move on to the next item that still needs a look.
+  const m = e.target.name && e.target.name.match(/^[hp](\\d+)$/);
+  if (m && e.target.value !== 'undecided' && document.getElementById('advance').checked) setTimeout(() => jump(Number(m[1]), 1), 150);
+}});
+
 document.getElementById('copy').addEventListener('click', async () => {{
   const area = document.getElementById('tsv');
   try {{ await navigator.clipboard.writeText(area.value); }}
@@ -327,9 +357,15 @@ def main():
     parser.add_argument('--device', choices=['cpu', 'cuda'], default='cpu')
     parser.add_argument('--human', type=Path, help='pair choices saved from the page (a, b, choice)')
     parser.add_argument('--glossary-out', type=Path, help='glossary TSV for --glossary --fix-variants')
+    parser.add_argument('--skip-pages', help="pages left out of the review, e.g. '312-322'")
+    parser.add_argument('--skip-catalog', action='store_true',
+                        help="also leave out back-matter catalog pages (text_layer_utils.catalog_pages)")
     args = parser.parse_args()
 
-    lines = load_lines(args)
+    skip = parse_pages(args.skip_pages) | (catalog_pages(args.ocr_dir, args.ocr_stem) if args.skip_catalog else set())
+    lines = [line for line in load_lines(args) if line['page'] not in skip]
+    if skip:
+        print(f'pages left out: {",".join(map(str, sorted(skip)))}')
     yomitoku = load_yomitoku(args.yomitoku_dir) if args.yomitoku_dir else {}
     occurrences, pairs = find_pairs(lines, yomitoku, args.min_length)
     yomi_read = {}
@@ -402,7 +438,8 @@ def main():
                                                ('both', '両方正しい'), ('undecided', rest)))
         sections.append(f'<section id="s{n}"><h2>#{n + 1} {html.escape(a)}（{ca}）／{html.escape(b)}（{cb}）'
                         f'{"【自動】" if decided else ""}</h2><p>YomiTokuと割れた箇所: {len(pairs[key]["yomi"])}。{html.escape(notes.get(key, ""))}</p>'
-                        f'<div class="opts">{options}</div><div class="ex">{"".join(figures)}</div></section>')
+                        f'<div class="opts">{options} <a href="#" class="go" data-n="{n}">次の未確認へ ↓</a></div>'
+                        f'<div class="ex">{"".join(figures)}</div></section>')
     auto_count = sum(1 for k in order if auto.get(k))
     summary = (f'{len(order)}組。うちYomiTokuと割れた組 {sum(bool(pairs[k]["yomi"]) for k in order)}。'
                f'自動判定 {auto_count}組、人の選択 {len(human)}組、どちらもない {sum(1 for k in order if not auto.get(k) and k not in human)}組。'

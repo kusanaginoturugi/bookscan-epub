@@ -39,8 +39,8 @@ from pathlib import Path
 
 import pypdfium2
 
-from text_layer_utils import (clean_text, fix_brackets, fix_dashes, fix_variants,
-                              load_glossary)
+from text_layer_utils import (catalog_pages, clean_text, fix_brackets, fix_dashes, fix_variants,
+                              load_glossary, parse_pages)
 
 ROOT = Path(__file__).resolve().parent
 PROMPTS = {
@@ -232,14 +232,14 @@ tr.now td{{background:#e3f4e3;font-weight:bold}}
 textarea{{width:100%;height:10em;font-family:monospace}}
 </style>
 <h1>{title}</h1>
-<p><b>使い方</b>: 原本と違う箇所だけ選び直し（「自分で書く」は、横の欄の前後を含む文字列を正しく書き直す）、見終えたところで「ここまで確認済み」を押す（それより前の未確認が「今の読みでよい」になる）。
+<p><b>使い方</b>: 画面下の「次の未確認」（キーは n、戻るは p）で、まだ選んでいない箇所へ移れる。原本と違う箇所だけ選び直し（「自分で書く」は、横の欄の前後を含む文字列を正しく書き直す）、見終えたところで「ここまで確認済み」を押す（それより前の未確認が「今の読みでよい」になる）。
 最後に「TSVをコピー」して保存する。確認済みの箇所は、作り直すと画面の最後に回る。</p>
 <p>NDLOCR-LiteとYomiTokuで読みが割れ、ローカルLLM（{model}）が判断した箇所。各箇所の緑の行が、いま文字層に入っている読み。<b>反映済み</b>はYomiTokuの読みに置き換えた箇所。
 原本画像と違うものだけ選び直せばよい。正しいと確かめた箇所は、その読みを選ぶと人の確認として記録される。選んだ結果は下のTSVにまとまるので、コピーして <code>{human}</code> に保存し、
 <code>judge-ocr-disagreements.py --human</code> に渡して作り直す。人の判定は常にLLMより優先する。選択はこのブラウザにだけ一時保存される。</p>
 <p>{summary}</p>
 {sections}
-<div id="out"><button id="copy">TSVをコピー</button> <span id="status"></span><textarea id="tsv" readonly></textarea></div>
+<div id="out"><button id="prev">↑ 前の未確認（p）</button> <button id="next">次の未確認 ↓（n）</button> <label><input type="checkbox" id="advance" checked>選んだら次の未確認へ進む</label> <button id="copy">TSVをコピー</button> <span id="status"></span><textarea id="tsv" readonly></textarea></div>
 <script>
 const ITEMS = {items};
 const KEY = 'judge-review:' + document.title;
@@ -275,6 +275,35 @@ ITEMS.forEach((it, i) => {{
   if (s.custom) document.getElementById('c' + i).value = s.custom;
 }});
 document.addEventListener('change', render);
+const COUNT = ITEMS.length;
+const OPEN = i => {{ const el = document.querySelector('input[name="h' + i + '"]:checked'); return !el || el.value === 'undecided'; }};
+function isOpen(i) {{ return OPEN(i); }}
+function jump(from, dir) {{
+  for (let i = from + dir; i >= 0 && i < COUNT; i += dir) {{
+    if (isOpen(i)) {{ document.getElementById('s' + i).scrollIntoView({{behavior: 'smooth', block: 'start'}}); return; }}
+  }}
+  document.getElementById('status').textContent = dir > 0 ? 'この先に未確認はない' : 'この前に未確認はない';
+}}
+function current() {{
+  let at = -1;
+  for (let i = 0; i < COUNT; i++) {{
+    if (document.getElementById('s' + i).getBoundingClientRect().top <= 12) at = i; else break;
+  }}
+  return at;
+}}
+document.getElementById('next').addEventListener('click', () => jump(current(), 1));
+document.getElementById('prev').addEventListener('click', () => jump(Math.max(current(), 0), -1));
+document.querySelectorAll('a.go').forEach(a => a.addEventListener('click', e => {{ e.preventDefault(); jump(Number(a.dataset.n), 1); }}));
+document.addEventListener('keydown', e => {{
+  if (e.target.tagName === 'INPUT' && e.target.type === 'text' || e.target.tagName === 'TEXTAREA') return;
+  if (e.key === 'n') jump(current(), 1);
+  if (e.key === 'p') jump(Math.max(current(), 0), -1);
+}});
+document.addEventListener('change', e => {{
+  // After a choice, move on to the next item that still needs a look.
+  const m = e.target.name && e.target.name.match(/^[hp](\\d+)$/);
+  if (m && e.target.value !== 'undecided' && document.getElementById('advance').checked) setTimeout(() => jump(Number(m[1]), 1), 150);
+}});
 document.querySelectorAll('button.upto').forEach(b => b.addEventListener('click', () => {{
   // Mark every unanswered item up to this one as checked with its current reading.
   for (let i = 0; i <= Number(b.dataset.n); i++) {{
@@ -312,6 +341,9 @@ def main():
     parser.add_argument('--overrides', type=Path, help='lines replaced by hand are not judged')
     parser.add_argument('--human', type=Path, help='TSV saved from the review page')
     parser.add_argument('--max-hunks', type=int, default=4)
+    parser.add_argument('--skip-pages', help="pages not judged, e.g. '312-322'")
+    parser.add_argument('--skip-catalog', action='store_true',
+                        help='also skip back-matter catalog pages (text_layer_utils.catalog_pages)')
     parser.add_argument('--url', default='http://127.0.0.1:8080/v1/chat/completions')
     parser.add_argument('--model', default='dahara1/gemma-4-12B-it-qat-UD-japanese-imatrix:Q4_K_XL')
     parser.add_argument('--prompt', choices=sorted(PROMPTS) + ['v1+v2'], default='v1+v2',
@@ -323,7 +355,10 @@ def main():
     ask = load_module('auto_variant_glossary', ROOT / 'auto-variant-glossary.py').ask
     crops = load_module('voicing_review', ROOT / 'build-voicing-review.py').crops
     glossary = load_glossary(args.glossary) if args.glossary else []
-    lines = load_lines(args, glossary)
+    skip = parse_pages(args.skip_pages) | (catalog_pages(args.ocr_dir, args.ocr_stem) if args.skip_catalog else set())
+    lines = [line for line in load_lines(args, glossary) if line['page'] not in skip]
+    if skip:
+        print(f'pages not judged: {",".join(map(str, sorted(skip)))}')
     yomitoku = load_yomitoku(args.yomitoku_dir)
     args.output.mkdir(parents=True, exist_ok=True)
     history_path = args.output / 'history.tsv'
@@ -512,7 +547,8 @@ def main():
             f'<div class="ex"><img src="img/{n}-thumb.jpg"><img src="img/{n}-line.jpg"><img src="img/{n}-zoom.jpg"></div>'
             f'<div class="opts">{options} <input id="c{n}" size="24" value="{esc(item["left"] + item["ndl"] + item["right"])}" '
             f'title="前後の文字も含めて、正しい文字列に書き直す"> '
-            f'<button class="upto" data-n="{n}">ここまで確認済み</button></div></section>')
+            f'<button class="upto" data-n="{n}">ここまで確認済み</button> '
+            f'<a href="#" class="go" data-n="{n}">次の未確認へ ↓</a></div></section>')
     summary = (f'判断した{len(items)}か所: 反映 {sum(i["decision"] == "yomitoku" for i in items)}、'
                f'割れた {sum(i["decision"] == "split" for i in items)}、NDLのまま {sum(i["decision"] == "ndl" for i in items)}。'
                f'人の判定 {sum(1 for i in items if i["id"] in human)}。規則で除外した差分: '
