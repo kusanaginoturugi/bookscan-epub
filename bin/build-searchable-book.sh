@@ -179,7 +179,7 @@ SKIP_ARGS=--skip-catalog
 # バ/パ: word-crop re-reads decide safe pairs; human choices win.
 VOICING_GLOSSARY=${GLOSSARY:-$WORK/voicing-glossary.tsv}
 if [ -z "$GLOSSARY" ]; then
-  KEY=$(inputs_key "$WORK/voicing-human.tsv" "$WORK/margin.tsv" "$WORK/stages" "$WORK/skip-pages.txt")skip-catalog,line-joins,reread-all,fix-review
+  KEY=$(inputs_key "$WORK/voicing-human.tsv" "$WORK/margin.tsv" "$WORK/stages" "$WORK/skip-pages.txt")skip-catalog,line-joins,reread-all,fix-review,save-path
   if [ ! -e "$VOICING_GLOSSARY" ] || [ "$(cat "$WORK/voicing.key" 2>/dev/null)" != "$KEY" ]; then
     echo "[$(date +%T)] voicing"
     # shellcheck disable=SC2086
@@ -201,7 +201,7 @@ WORD_ARGS=
 CORRECTIONS=
 if [ "$USE_JUDGE" = on ] && [ -z "$GLOSSARY" ]; then
   CORRECTIONS=$WORK/judge/corrections.tsv
-  KEY=$(inputs_key "$VOICING_GLOSSARY" "$WORK/voicing-corrections.tsv" "$WORK/judge-human.tsv" "$WORK/margin.tsv" "$WORK/stages" "$WORK/skip-pages.txt")skip-catalog,line-joins,joined-voicing,lookalike,propagate,book-word
+  KEY=$(inputs_key "$VOICING_GLOSSARY" "$WORK/voicing-corrections.tsv" "$WORK/judge-human.tsv" "$WORK/margin.tsv" "$WORK/stages" "$WORK/skip-pages.txt")skip-catalog,line-joins,joined-voicing,lookalike,propagate,book-word,save-path
   if [ ! -e "$CORRECTIONS" ] || [ "$(cat "$WORK/judge.key" 2>/dev/null)" != "$KEY$LLM_MODEL$JUDGE_PROMPT" ]; then
     echo "[$(date +%T)] judge"
     curl -sf -m 10 "$LLM_URL/models" > /dev/null ||

@@ -380,7 +380,7 @@ textarea{{width:100%;height:10em;font-family:monospace}}
 <code>judge-ocr-disagreements.py --human</code> に渡して作り直す。人の判定は常にLLMより優先する。選択はこのブラウザにだけ一時保存される。</p>
 <p>{summary}</p>
 {sections}
-<div id="out"><button id="prev">↑ 前の未確認（p）</button> <button id="next">次の未確認 ↓（n）</button> <label><input type="checkbox" id="advance" checked>選んだら次の未確認へ進む</label> <button id="copy">TSVをコピー</button> <span id="status"></span><textarea id="tsv" readonly></textarea></div>
+<div id="out"><button id="prev">↑ 前の未確認（p）</button> <button id="next">次の未確認 ↓（n）</button> <label><input type="checkbox" id="advance" checked>選んだら次の未確認へ進む</label> <button id="copy">TSVをコピー</button> → 保存: <code id="save">wl-paste &gt; {human}</code> <span id="status"></span><textarea id="tsv" readonly></textarea></div>
 <script>
 const ITEMS = {items};
 const KEY = 'judge-review:' + document.title;
@@ -787,7 +787,7 @@ def main():
                + '、'.join(f'{k} {v}' for k, v in sorted(counts.items()) if k != 'judge'))
     (args.review / 'index.html').write_text(PAGE.format(
         title=html.escape(args.title), model=html.escape(args.model),
-        human=html.escape(str(args.human or 'work/eval/作業名-judge-human.tsv')), summary=summary,
+        human=html.escape(str(args.human.resolve() if args.human else 'work/eval/作業名-judge-human.tsv')), summary=summary,
         sections=page_sections, items=json.dumps(data, ensure_ascii=False), header='\\t'.join(HUMAN)),
         encoding='utf-8')
     print(summary)

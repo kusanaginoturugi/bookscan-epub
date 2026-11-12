@@ -293,7 +293,7 @@ figcaption{{font-size:13px;writing-mode:horizontal-tb;max-width:9em}}
 人の選択は常に自動判定より優先する。選択はこのブラウザにも一時保存される。</p>
 <p>{summary}</p>
 {sections}
-<div id="out"><button id="prev">↑ 前の未確認（p）</button> <button id="next">次の未確認 ↓（n）</button> <label><input type="checkbox" id="advance" checked>選んだら次の未確認へ進む</label> <button id="copy">TSVをコピー</button> <span id="status"></span>
+<div id="out"><button id="prev">↑ 前の未確認（p）</button> <button id="next">次の未確認 ↓（n）</button> <label><input type="checkbox" id="advance" checked>選んだら次の未確認へ進む</label> <button id="copy">TSVをコピー</button> → 保存: <code id="save">wl-paste &gt; {human}</code> <span id="status"></span>
 <textarea id="tsv" readonly></textarea></div>
 <script>
 const PAIRS = {pairs};
@@ -566,7 +566,7 @@ def main():
                f'自動修正 {fix_count}か所（最後に並ぶ）。本文の行 {len(lines)}、YomiTokuのページ {len(yomitoku)}。')
     (args.output / 'index.html').write_text(PAGE.format(
         title=html.escape(args.title), summary=summary, sections='\n'.join(sections_pairs + sections),
-        human=html.escape(str(args.human or '人の選択TSV')), pairs=json.dumps(data, ensure_ascii=False)), encoding='utf-8')
+        human=html.escape(str(args.human.resolve() if args.human else '人の選択TSV')), pairs=json.dumps(data, ensure_ascii=False)), encoding='utf-8')
     print(summary)
     print(f'{len(order)} pairs, {sum(len(v) for v in examples.values())} examples: {args.output / "index.html"}')
 
