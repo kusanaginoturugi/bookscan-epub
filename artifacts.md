@@ -13,6 +13,16 @@
 | 天の光はすべて星 | 284 | 1 | [PDF](output/searchable/天の光はすべて星%20-%20フレドリック・ブラウン.pdf) | [PDF](output/searchable/天の光はすべて星%20-%20フレドリック・ブラウン%20辞書補正.pdf) | [5語7か所](work/searchable/ten-no-hikari/variant-glossary.tsv) |
 | インフィニティ・リミテッド（下） | 388 | 3 | [PDF](output/searchable/インフィニティ・リミテッド（下）%20-%20ジェイムズ・P・ホーガン.pdf) | [PDF](output/searchable/インフィニティ・リミテッド（下）%20-%20ジェイムズ・P・ホーガン%20辞書補正.pdf) | [20語61か所](work/searchable/infinity-lower/variant-glossary.tsv) |
 
+## 内なる宇宙（上・下）（2026-11-12）
+
+前の3冊の語彙とパ／バの選択を引き継いで、`bin/build-searchable-book.sh` で通した。人のレビュー前。
+
+| 種類 | ファイル | 内容 |
+|---|---|---|
+| 完成品 | [上巻](output/searchable/内なる宇宙（上）%20-%20ジェイムズ・P・ホーガン.pdf)・[下巻](output/searchable/内なる宇宙（下）%20-%20ジェイムズ・P・ホーガン.pdf) | 404ページと388ページ。巻末目録（上巻388〜401、下巻378〜385ページ）はレビューの対象外 |
+| レビュー（上巻） | [パ／バ](review/uchinaru-uchu-jo-voicing/index.html)・[判断モデル](review/uchinaru-uchu-jo-judge/index.html) | パ／バは7組と自動修正1語、判断モデルは割れた30か所 |
+| レビュー（下巻） | [パ／バ](review/uchinaru-uchu-ge-voicing/index.html)・[判断モデル](review/uchinaru-uchu-ge-judge/index.html) | パ／バは5組と自動修正1語、判断モデルは割れた49か所 |
+
 ## 巨人たちの星（2026-11-12）
 
 前の2冊の語彙とパ／バの選択を引き継いで、`bin/build-searchable-book.sh` で通した。パ／バと判断モデルの割れた箇所は、ユーザーがすべてレビューした。
