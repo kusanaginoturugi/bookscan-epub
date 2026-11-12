@@ -57,9 +57,9 @@ NDLOCR_DEVICE=cuda bin/build-searchable-book.sh "$SOURCE" jikan-dorobou
 
 濁点・半濁点（バ／パ）の取り違えは、`bin/build-voicing-review.py` が片付ける。`build-searchable-book.sh` もこれを使う。
 - **候補：** 本の中で両方の表記が出る組と、YomiTokuが別の表記に読んだ組。
-- **自動判定（`--auto-crop`）：** 語を原本から切り出して読み直し、安全な組だけを確定する。
-- **レビュー画面：** 組ごとに、ページの縮小画像・行・3倍拡大を並べる。人が選んだ組だけが、画面の下のTSV（a、b、choice）にまとまる。それを `--human` に渡すと、自動判定より優先される。
-- **辞書：** `--glossary-out` が、人の選択、次に自動判定から、`--fix-variants` 用の辞書を書き出す。
+- **自動判定（`--auto-crop`）：** 濁点・半濁点を含むカタカナ語をすべて原本から切り出して読み直し、安全な組だけを確定する。組として決まっていない箇所で、読み直しとYomiTokuがNDLと違う同じ綴りを読んだら、その箇所を直す（自動修正）。
+- **レビュー画面：** 組ごとに、ページの縮小画像・行・3倍拡大を並べる。選択肢は2つの綴り、「両方正しい」、「どちらも違う」（正しい綴りを書く）。自動修正は最後に並び、「直さない」を選べる。人が選んだものだけが、画面の下のTSV（a、b、choice。自動修正は `fix:ID`）にまとまる。それを `--human` に渡すと、自動判定より優先される。
+- **辞書と修正：** `--glossary-out` が、人の選択、次に自動判定から、`--fix-variants` 用の辞書を書き出す。`--corrections-out` は、自動修正と「どちらも違う」の箇所ごとの修正を書き出す。これは `rebuild-text-layer.py --word-corrections` が、括弧の補正のあと、辞書の前に当てる。行をまたぐカタカナ語の片割れ（パター｜ン）は組に入れない。
 
 ```sh
 .venv-ndl/bin/python bin/build-voicing-review.py input/bookscan-downloads/$SOURCE \
@@ -70,7 +70,7 @@ NDLOCR_DEVICE=cuda bin/build-searchable-book.sh "$SOURCE" jikan-dorobou
 
 `--yomitoku-dir` は省略できる（本の中で両方の表記が出る組だけになる）。`--human` には、以前の辞書形式のファイル（`term`・`variants`・`note`）も渡せる。確定した辞書を正解として自動判定を採点するには、`bin/check-voicing-judges.py 原本PDF OCRディレクトリ 辞書TSV 出力TSV --ocr-stem STEM --recognized margin.tsv --yomitoku-dir DIR --device cuda` を使う。語を原本から切り出して読み直す判定と、`--llm-sample N` を付けたときのLLMの判定（llama-server）を出現箇所ごとに比べる。`build-searchable-book.sh` が受け取る辞書は1つなので、LLMで作った `variant-glossary.tsv` とは別の版になる。
 
-規則と画像で直せなかった、NDLとYomiTokuの読みの食い違い（漢字の取り違えなど）は、`bin/judge-ocr-disagreements.py` でローカルLLMに判断させる。2つのOCRの行を座標で対応させて、差分ごとに分ける。パ／バ、括弧、`"`（あとで〝〟に組み直す）、ダッシュ、濁点の付け外し、小書きの仮名、片方にしかない文字は聞かない。残りを、行の2通りの表記で順序を入れ替えて2回聞き、2回ともYomiTokuを選んだ差分だけを `corrections.tsv` に書き出す。聞いた結果は `history.tsv` に追記され、同じ差分は聞き直さない。レビュー画面では、反映した差分を先頭に並べる。画面で選んだ結果をTSVで保存して `--human` に渡すと、人の判定が常に優先される。差分は `rebuild-text-layer.py --corrections` が、ほかの補正のあと、引用符を組み直す前に当てる。前後4文字が一致しないと、適用せずに止まる。NDLの字が新字体で、YomiTokuの字がその旧字体（掴／摑、顛／顚など）の差分は、聞かずにYomiTokuを採る。規則で聞かなかった差分も、人の判定があればそれを使う。線や記号（一・―・ー・「」など）の差分は、レビュー画面で6倍に拡大して印を付ける。本全体で原本と違う字を使い分けている場合（この本はすべて摑なのに、OCRは掴と読む箇所が残るなど）は、`rebuild-text-layer.py --char-map 対応表TSV`（列は `from`・`to`）で、差分を当てたあとに1文字ずつ置き換える。
+規則と画像で直せなかった、NDLとYomiTokuの読みの食い違い（漢字の取り違えなど）は、`bin/judge-ocr-disagreements.py` でローカルLLMに判断させる。2つのOCRの行を座標で対応させて、差分ごとに分ける。パ／バ、括弧、`"`（あとで〝〟に組み直す）、ダッシュ、濁点の付け外し、小書きの仮名、片方にしかない文字は聞かない。残りを、行の2通りの表記で順序を入れ替えて2回聞き、2回ともYomiTokuを選んだ差分だけを `corrections.tsv` に書き出す。聞いた結果は `history.tsv` に追記され、同じ差分は聞き直さない。レビュー画面では、LLMの答えが割れた差分だけを本体に並べる。2回とも同じ答えだった差分と規則で決めた差分は、折りたたみの別枠に入れる（だいたい当たっている）。画面で選んだ結果をTSVで保存して `--human` に渡すと、人の判定が常に優先される。差分は `rebuild-text-layer.py --corrections` が、ほかの補正のあと、引用符を組み直す前に当てる。前後4文字が一致しないと、適用せずに止まる。NDLの字が新字体で、YomiTokuの字がその旧字体（掴／摑、顛／顚など）の差分は、聞かずにYomiTokuを採る。規則で聞かなかった差分も、人の判定があればそれを使う。線や記号（一・―・ー・「」など）の差分は、レビュー画面で6倍に拡大して印を付ける。本全体で原本と違う字を使い分けている場合（この本はすべて摑なのに、OCRは掴と読む箇所が残るなど）は、`rebuild-text-layer.py --char-map 対応表TSV`（列は `from`・`to`）で、差分を当てたあとに1文字ずつ置き換える。
 
 ```sh
 .venv-ndl/bin/python bin/judge-ocr-disagreements.py input/bookscan-downloads/$SOURCE $WORK/ocr \

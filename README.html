@@ -361,13 +361,17 @@ href="docs/progress.html">docs/progress.md</a>
 <strong>候補：</strong>
 本の中で両方の表記が出る組と、YomiTokuが別の表記に読んだ組。 -
 <strong>自動判定（<code>--auto-crop</code>）：</strong>
-語を原本から切り出して読み直し、安全な組だけを確定する。 -
-<strong>レビュー画面：</strong>
-組ごとに、ページの縮小画像・行・3倍拡大を並べる。人が選んだ組だけが、画面の下のTSV（a、b、choice）にまとまる。それを
-<code>--human</code> に渡すと、自動判定より優先される。 -
-<strong>辞書：</strong> <code>--glossary-out</code>
+濁点・半濁点を含むカタカナ語をすべて原本から切り出して読み直し、安全な組だけを確定する。組として決まっていない箇所で、読み直しとYomiTokuがNDLと違う同じ綴りを読んだら、その箇所を直す（自動修正）。
+- <strong>レビュー画面：</strong>
+組ごとに、ページの縮小画像・行・3倍拡大を並べる。選択肢は2つの綴り、「両方正しい」、「どちらも違う」（正しい綴りを書く）。自動修正は最後に並び、「直さない」を選べる。人が選んだものだけが、画面の下のTSV（a、b、choice。自動修正は
+<code>fix:ID</code>）にまとまる。それを <code>--human</code>
+に渡すと、自動判定より優先される。 - <strong>辞書と修正：</strong>
+<code>--glossary-out</code>
 が、人の選択、次に自動判定から、<code>--fix-variants</code>
-用の辞書を書き出す。</p>
+用の辞書を書き出す。<code>--corrections-out</code>
+は、自動修正と「どちらも違う」の箇所ごとの修正を書き出す。これは
+<code>rebuild-text-layer.py --word-corrections</code>
+が、括弧の補正のあと、辞書の前に当てる。行をまたぐカタカナ語の片割れ（パター｜ン）は組に入れない。</p>
 <div class="sourceCode" id="cb3"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="ex">.venv-ndl/bin/python</span> bin/build-voicing-review.py input/bookscan-downloads/<span class="va">$SOURCE</span> <span class="dt">\</span></span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>  <span class="va">$WORK</span>/ocr review/<span class="va">$SLUG</span>-voicing <span class="at">--ocr-stem</span> <span class="st">&quot;</span><span class="va">$STEM</span><span class="st">&quot;</span> <span class="at">--recognized</span> <span class="va">$WORK</span>/margin.tsv <span class="dt">\</span></span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">--yomitoku-dir</span> <span class="va">$WORK</span>/yomitoku <span class="at">--auto-crop</span> <span class="at">--device</span> cuda <span class="dt">\</span></span>
@@ -383,7 +387,7 @@ href="docs/progress.html">docs/progress.md</a>
 でローカルLLMに判断させる。2つのOCRの行を座標で対応させて、差分ごとに分ける。パ／バ、括弧、<code>"</code>（あとで〝〟に組み直す）、ダッシュ、濁点の付け外し、小書きの仮名、片方にしかない文字は聞かない。残りを、行の2通りの表記で順序を入れ替えて2回聞き、2回ともYomiTokuを選んだ差分だけを
 <code>corrections.tsv</code> に書き出す。聞いた結果は
 <code>history.tsv</code>
-に追記され、同じ差分は聞き直さない。レビュー画面では、反映した差分を先頭に並べる。画面で選んだ結果をTSVで保存して
+に追記され、同じ差分は聞き直さない。レビュー画面では、LLMの答えが割れた差分だけを本体に並べる。2回とも同じ答えだった差分と規則で決めた差分は、折りたたみの別枠に入れる（だいたい当たっている）。画面で選んだ結果をTSVで保存して
 <code>--human</code> に渡すと、人の判定が常に優先される。差分は
 <code>rebuild-text-layer.py --corrections</code>
 が、ほかの補正のあと、引用符を組み直す前に当てる。前後4文字が一致しないと、適用せずに止まる。NDLの字が新字体で、YomiTokuの字がその旧字体（掴／摑、顛／顚など）の差分は、聞かずにYomiTokuを採る。規則で聞かなかった差分も、人の判定があればそれを使う。線や記号（一・―・ー・「」など）の差分は、レビュー画面で6倍に拡大して印を付ける。本全体で原本と違う字を使い分けている場合（この本はすべて摑なのに、OCRは掴と読む箇所が残るなど）は、<code>rebuild-text-layer.py --char-map 対応表TSV</code>（列は

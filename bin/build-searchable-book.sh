@@ -80,6 +80,20 @@ else
 fi
 [ "$STARTED" = "$DEVICE" ] || { echo "$WORK was started with NDLOCR_DEVICE=$STARTED" >&2; exit 1; }
 
+LLM_URL=${LLM_URL:-http://127.0.0.1:8080/v1}
+LLM_MODEL=${LLM_MODEL:-dahara1/gemma-4-12B-it-qat-UD-japanese-imatrix:Q4_K_XL}
+fail() { echo "$*" >&2; exit 1; }
+# The judge's LLM (about 8GB) left loaded in llama-server makes CUDA OCR and
+# word crops fail to allocate; unload that one model (others are left alone).
+free_gpu() {
+  [ "$DEVICE" = cuda ] || return 0
+  curl -sf -m 5 "$LLM_URL/models" 2>/dev/null |
+    grep -q "\"id\":\"$LLM_MODEL\"[^}]*\"value\":\"loaded\"" || return 0
+  curl -sf -m 60 -X POST "${LLM_URL%/v1}/models/unload" -H 'Content-Type: application/json' \
+    -d "{\"model\":\"$LLM_MODEL\"}" > /dev/null && echo "[$(date +%T)] unloaded $LLM_MODEL from the GPU"
+}
+free_gpu
+
 echo "[$(date +%T)] prepare $TITLE"
 [ -e "$SANITIZED" ] || "$PY" "$BIN/prepare-trial-pdf.py" "$SOURCE" "$SANITIZED" \
   --angles "$WORK/angles.tsv" "$@" > "$WORK/prepare.log"
@@ -118,7 +132,6 @@ if [ -n "$GLOSSARY" ]; then
   FINAL="${FINAL%.pdf} 辞書補正.pdf"
 fi
 
-fail() { echo "$*" >&2; exit 1; }
 # Hash of file names and contents (missing files count too), for rerun checks.
 inputs_key() { for f in "$@"; do printf '%s\n' "$f"; [ ! -e "$f" ] || cat "$f"; done | sha256sum | cut -c1-16; }
 
@@ -143,8 +156,6 @@ else
   echo "$STAGES" > "$WORK/stages"
 fi
 YOMITOKU=${YOMITOKU:-$DATA_ROOT/vendor/.venv-yomitoku/bin/yomitoku}
-LLM_URL=${LLM_URL:-http://127.0.0.1:8080/v1}
-LLM_MODEL=${LLM_MODEL:-dahara1/gemma-4-12B-it-qat-UD-japanese-imatrix:Q4_K_XL}
 JUDGE_PROMPT=${JUDGE_PROMPT:-v1+v2}
 REVIEW=$DATA_ROOT/review/$(basename "$WORK")
 
@@ -168,32 +179,36 @@ SKIP_ARGS=--skip-catalog
 # バ/パ: word-crop re-reads decide safe pairs; human choices win.
 VOICING_GLOSSARY=${GLOSSARY:-$WORK/voicing-glossary.tsv}
 if [ -z "$GLOSSARY" ]; then
-  KEY=$(inputs_key "$WORK/voicing-human.tsv" "$WORK/margin.tsv" "$WORK/stages" "$WORK/skip-pages.txt")skip-catalog,line-joins
+  KEY=$(inputs_key "$WORK/voicing-human.tsv" "$WORK/margin.tsv" "$WORK/stages" "$WORK/skip-pages.txt")skip-catalog,line-joins,reread-all,fix-review
   if [ ! -e "$VOICING_GLOSSARY" ] || [ "$(cat "$WORK/voicing.key" 2>/dev/null)" != "$KEY" ]; then
     echo "[$(date +%T)] voicing"
     # shellcheck disable=SC2086
     "$PY" "$BIN/build-voicing-review.py" "$ORIGINAL" "$WORK/ocr" "$REVIEW-voicing" --ocr-stem "$OCR_STEM" \
       --recognized "$WORK/margin.tsv" $YOMI_ARGS $SKIP_ARGS --auto-crop --device "$DEVICE" \
       --human "$WORK/voicing-human.tsv" --glossary-out "$VOICING_GLOSSARY" \
+      --corrections-out "$WORK/voicing-corrections.tsv" \
       --title "$TITLE 濁点・半濁点レビュー" > "$WORK/voicing.log" 2>&1 ||
       fail "voicing step failed; see $WORK/voicing.log"
     echo "$KEY" > "$WORK/voicing.key"
   fi
-  grep -E '^[0-9]+組' "$WORK/voicing.log" || true
+  grep -E '^[0-9]+組|^corrections:|^warning:' "$WORK/voicing.log" || true
 fi
+
+WORD_ARGS=
+[ ! -e "$WORK/voicing-corrections.tsv" ] || [ -n "$GLOSSARY" ] || WORD_ARGS="--word-corrections $WORK/voicing-corrections.tsv"
 
 # Remaining disagreements: a local LLM decides, human verdicts win.
 CORRECTIONS=
 if [ "$USE_JUDGE" = on ] && [ -z "$GLOSSARY" ]; then
   CORRECTIONS=$WORK/judge/corrections.tsv
-  KEY=$(inputs_key "$VOICING_GLOSSARY" "$WORK/judge-human.tsv" "$WORK/margin.tsv" "$WORK/stages" "$WORK/skip-pages.txt")skip-catalog,line-joins,joined-voicing
+  KEY=$(inputs_key "$VOICING_GLOSSARY" "$WORK/voicing-corrections.tsv" "$WORK/judge-human.tsv" "$WORK/margin.tsv" "$WORK/stages" "$WORK/skip-pages.txt")skip-catalog,line-joins,joined-voicing
   if [ ! -e "$CORRECTIONS" ] || [ "$(cat "$WORK/judge.key" 2>/dev/null)" != "$KEY$LLM_MODEL$JUDGE_PROMPT" ]; then
     echo "[$(date +%T)] judge"
     curl -sf -m 10 "$LLM_URL/models" > /dev/null ||
       fail "no LLM server at $LLM_URL (start llama-server, set LLM_URL, or SKIP_JUDGE=1)"
     "$PY" "$BIN/judge-ocr-disagreements.py" "$ORIGINAL" "$WORK/ocr" "$WORK/yomitoku" "$WORK/judge" \
       "$REVIEW-judge" --ocr-stem "$OCR_STEM" --recognized "$WORK/margin.tsv" \
-      --glossary "$VOICING_GLOSSARY" --human "$WORK/judge-human.tsv" $SKIP_ARGS \
+      --glossary "$VOICING_GLOSSARY" --human "$WORK/judge-human.tsv" $SKIP_ARGS $WORD_ARGS \
       --url "$LLM_URL/chat/completions" --model "$LLM_MODEL" --prompt "$JUDGE_PROMPT" \
       --title "$TITLE LLM判断のレビュー" \
       > "$WORK/judge.log" 2>&1 || fail "judge step failed; see $WORK/judge.log"
@@ -203,9 +218,11 @@ if [ "$USE_JUDGE" = on ] && [ -z "$GLOSSARY" ]; then
 fi
 
 set -- --glossary "$VOICING_GLOSSARY" --fix-variants
+# shellcheck disable=SC2086
+[ -z "$WORD_ARGS" ] || set -- "$@" $WORD_ARGS
 [ -z "$CORRECTIONS" ] || set -- "$@" --corrections "$CORRECTIONS"
 [ ! -e "$WORK/char-map.tsv" ] || set -- "$@" --char-map "$WORK/char-map.tsv"
-KEY=$(inputs_key "$VOICING_GLOSSARY" ${CORRECTIONS:+"$CORRECTIONS"} "$WORK/char-map.tsv" "$WORK/margin.tsv" "$WORK/angles.tsv")line-joins
+KEY=$(inputs_key "$VOICING_GLOSSARY" ${WORD_ARGS:+"$WORK/voicing-corrections.tsv"} ${CORRECTIONS:+"$CORRECTIONS"} "$WORK/char-map.tsv" "$WORK/margin.tsv" "$WORK/angles.tsv")line-joins
 echo "[$(date +%T)] text layer"
 if [ ! -e "$TEXT" ] || [ "$(cat "$WORK/text.key" 2>/dev/null)" != "$KEY" ]; then
   [ ! -e "$TEXT" ] || mv -f "$TEXT" "$TEXT.prev"

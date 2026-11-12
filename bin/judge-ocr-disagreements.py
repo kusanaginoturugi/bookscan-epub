@@ -39,8 +39,8 @@ from pathlib import Path
 
 import pypdfium2
 
-from text_layer_utils import (catalog_pages, clean_text, fix_brackets, fix_dashes, fix_variants,
-                              line_joins, load_glossary, parse_pages)
+from text_layer_utils import (apply_corrections, catalog_pages, clean_text, fix_brackets, fix_dashes,
+                              fix_variants, line_joins, load_corrections, load_glossary, parse_pages)
 
 ROOT = Path(__file__).resolve().parent
 PROMPTS = {
@@ -131,6 +131,7 @@ def iou(a, b):
 
 
 def load_lines(args, glossary):
+    word_corrections = load_corrections(args.word_corrections)
     """NDL lines with the text rebuild-text-layer.py places before corrections and quotes."""
     recognized, overridden = {}, set()
     if args.recognized:
@@ -155,6 +156,7 @@ def load_lines(args, glossary):
             vertical = item['isVertical'] == 'true'
             if vertical:
                 text = fix_brackets(fix_dashes(text))
+            text = apply_corrections(text, word_corrections.get(key, []), key)
             text = clean_text(text, vertical, glossary)
             if glossary:
                 text = fix_variants(text, glossary, joined=joins[position])
@@ -241,6 +243,7 @@ body{{font:15px sans-serif;margin:1.5em;color:#222;background:#fff}}
 section{{border-top:2px solid #999;padding:.8em 0}} h2{{font-size:1.1em;margin:.2em 0}}
 .applied h2::after{{content:"（反映済み）";color:#c00}} .split h2::after{{content:"（判断が割れた・NDLのまま）";color:#a60}}
 .kept h2::after{{content:"（NDLのまま）";color:#666}}
+details.group{{border-top:3px double #999;margin-top:1.5em;padding-top:.5em}} details.group>summary{{font-size:1.15em;cursor:pointer;padding:.4em 0}}
 section.human h2::after{{content:"（確認済み）";color:#070}}
 .ex{{display:flex;gap:10px;align-items:flex-start;margin:.5em 0}} .opts label{{margin-right:1em}}
 table{{border-collapse:collapse}} td{{padding:2px 8px;border:1px solid #ccc;font-size:16px}}
@@ -293,7 +296,7 @@ ITEMS.forEach((it, i) => {{
 }});
 document.addEventListener('change', render);
 const COUNT = ITEMS.length;
-const OPEN = i => {{ const el = document.querySelector('input[name="h' + i + '"]:checked'); return !el || el.value === 'undecided'; }};
+const OPEN = i => {{ const el = document.querySelector('input[name="h' + i + '"]:checked'); return ITEMS[i].focus && (!el || el.value === 'undecided'); }};
 function isOpen(i) {{ return OPEN(i); }}
 function jump(from, dir) {{
   for (let i = from + dir; i >= 0 && i < COUNT; i += dir) {{
@@ -356,6 +359,7 @@ def main():
     parser.add_argument('--min-height', type=int, default=400)
     parser.add_argument('--glossary', type=Path, help='glossary used with --fix-variants for the book')
     parser.add_argument('--overrides', type=Path, help='lines replaced by hand are not judged')
+    parser.add_argument('--word-corrections', type=Path, help='voicing corrections, as given to rebuild-text-layer.py')
     parser.add_argument('--human', type=Path, help='TSV saved from the review page')
     parser.add_argument('--max-hunks', type=int, default=4)
     parser.add_argument('--skip-pages', help="pages not judged, e.g. '312-322'")
@@ -500,8 +504,11 @@ def main():
             writer.writerow([c['id'], c['page'], c['line_id'], text[max(0, c['start'] - CONTEXT):c['start']],
                              text[c['start']:c['end']], c['to'], text[c['end']:c['end'] + CONTEXT], c['source']])
 
+    # Split answers need a person; answers the LLM gave twice alike (and rule
+    # decisions) are mostly right and go to a folded section; human-decided last.
+    group = lambda it: 2 if it['id'] in human else 0 if it['decision'] == 'split' else 1
     order = {'yomitoku': 0, 'split': 1, 'ndl': 2}
-    items.sort(key=lambda it: (it['id'] in human, order[it['decision']], it['page'], it['line_id']))
+    items.sort(key=lambda it: (group(it), order[it['decision']], it['page'], it['line_id']))
     images = args.review / 'img'
     images.mkdir(parents=True, exist_ok=True)
     document = pypdfium2.PdfDocument(str(args.pdf))
@@ -518,14 +525,15 @@ def main():
                 picture.save(images / f'{n}-{name}.jpg', quality=85)
     document.close()
 
-    sections, data = [], []
+    sections, data = {0: [], 1: [], 2: []}, []
     labels = {'yomitoku': 'applied', 'split': 'split', 'ndl': 'kept'}
     for n, item in enumerate(items):
         verdict = human.get(item['id'])
         data.append({'id': item['id'], 'page': item['page'], 'line_id': item['line_id'], 'left': item['left'],
                      'from': item['ndl'], 'yomitoku': item['yomitoku'], 'right': item['right'],
                      'now': item['yomitoku'] if item['decision'] == 'yomitoku' else item['ndl'],
-                     'human': {'v': verdict['verdict'], 'custom': item['human_snippet']} if verdict else None})
+                     'human': {'v': verdict['verdict'], 'custom': item['human_snippet']} if verdict else None,
+                     'focus': group(item) == 0})
         esc = html.escape
         # Prompt order: first asks A=NDL, B=YomiToku; second swaps them.
         said = lambda answer, a, b: {'A': a, 'B': b}.get(answer, '答えなし')
@@ -560,7 +568,7 @@ def main():
                                            ('yomitoku', f'YomiToku「{esc(item["yomitoku"])}」{mark("yomitoku")}'),
                                            ('ok', '今の読みでよい'), ('custom', '自分で書く'),
                                            ('undecided', '未確認')))
-        sections.append(
+        sections[group(item)].append(
             f'<section id="s{n}" class="{"human" if verdict else labels[item["decision"]]}"><h2>#{n + 1} {item["page"]}ページ・行{item["line_id"]}'
             f'{"【線・記号：6倍で表示】" if line_shaped(item) else ""}</h2>'
             f'<table><tr class="now"><td>文字層の今の読み</td><td>{esc(item["left"])}{esc(now)}{esc(item["right"])}（{why}）</td></tr>'
@@ -572,14 +580,24 @@ def main():
             f'title="前後の文字も含めて、正しい文字列に書き直す"> '
             f'<button class="upto" data-n="{n}">ここまで確認済み</button> '
             f'<a href="#" class="go" data-n="{n}">次の未確認へ ↓</a></div></section>')
-    summary = (f'判断した{len(items)}か所: 反映 {sum(i["decision"] == "yomitoku" for i in items)}、'
+    sure = [i for i in items if group(i) == 1]
+    page_sections = '\n'.join(sections[0])
+    if sure:
+        page_sections += (f'<details class="group"><summary>LLMが2回とも同じ答え、または規則で決めた箇所（{len(sure)}件。'
+                          f'反映 {sum(i["decision"] == "yomitoku" for i in sure)}、NDLのまま {sum(i["decision"] == "ndl" for i in sure)}）'
+                          f'— だいたい当たっているので、気になるときだけ開く</summary>\n' + '\n'.join(sections[1]) + '</details>')
+    if sections[2]:
+        page_sections += (f'<details class="group"><summary>人が判定済みの箇所（{len(sections[2])}件）</summary>\n'
+                          + '\n'.join(sections[2]) + '</details>')
+    summary = (f'確認が要るのは、LLMの答えが割れた {len(sections[0])}か所（下に並ぶ）。'
+               f'判断した{len(items)}か所: 反映 {sum(i["decision"] == "yomitoku" for i in items)}、'
                f'割れた {sum(i["decision"] == "split" for i in items)}、NDLのまま {sum(i["decision"] == "ndl" for i in items)}。'
                f'人の判定 {sum(1 for i in items if i["id"] in human)}。規則で除外した差分: '
                + '、'.join(f'{k} {v}' for k, v in sorted(counts.items()) if k != 'judge'))
     (args.review / 'index.html').write_text(PAGE.format(
         title=html.escape(args.title), model=html.escape(args.model),
         human=html.escape(str(args.human or 'work/eval/作業名-judge-human.tsv')), summary=summary,
-        sections='\n'.join(sections), items=json.dumps(data, ensure_ascii=False), header='\\t'.join(HUMAN)),
+        sections=page_sections, items=json.dumps(data, ensure_ascii=False), header='\\t'.join(HUMAN)),
         encoding='utf-8')
     print(summary)
     unreviewed = [i for i in items if i['id'] not in human]

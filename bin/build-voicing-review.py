@@ -37,6 +37,7 @@ import html
 import importlib.util
 import json
 import re
+import unicodedata
 from collections import Counter, defaultdict
 from pathlib import Path
 
@@ -78,7 +79,7 @@ def load_lines(args):
                 text = fix_brackets(fix_dashes(text))
             xs = [p[0] for p in item['boundingBox']]
             ys = [p[1] for p in item['boundingBox']]
-            lines.append(dict(page=page, box=(min(xs), min(ys), max(xs), max(ys)),
+            lines.append(dict(page=page, line_id=int(item['id']), box=(min(xs), min(ys), max(xs), max(ys)),
                               vertical=vertical, text=text, joined=joins[position]))
     return lines
 
@@ -175,6 +176,28 @@ def auto_decide(key, occurrences, readings, yomi_read):
     return winner, note
 
 
+def base(word):
+    """The word with dakuten and handakuten removed (バルブ, パルプ -> ハルフ)."""
+    return ''.join(unicodedata.normalize('NFD', ch)[0] for ch in word)
+
+
+def agreed_fixes(occurrences, readings, yomitoku, lines, settled):
+    """{place: spelling} where the word-crop re-read and YomiToku agree on another
+    spelling that differs from NDL's only in dakuten/handakuten. Places of
+    pairs already settled (auto or human) are left to the glossary."""
+    fixes = {}
+    for word, places in occurrences.items():
+        for place in places:
+            if place in settled:
+                continue
+            page_text = yomitoku.get(lines[place[0]]['page'], '')
+            for token in TOKEN.findall(readings.get(place, '')):
+                if token != word and len(token) == len(word) and base(token) == base(word) and token in page_text:
+                    fixes[place] = token
+                    break
+    return fixes
+
+
 def load_human(path):
     """{(a, b): choice} from the page TSV (a, b, choice) or an older glossary TSV."""
     decisions = {}
@@ -183,6 +206,9 @@ def load_human(path):
     with path.open(newline='') as handle:
         rows = list(csv.DictReader(handle, delimiter='\t'))
     for row in rows:
+        if 'choice' in row and row['a'].startswith('fix:'):
+            decisions[('fix:', row['a'][4:])] = row['choice']  # keep / reject an automatic fix
+            continue
         if 'choice' in row:
             decisions[tuple(sorted((row['a'], row['b'])))] = row['choice']
             continue
@@ -262,7 +288,7 @@ figcaption{{font-size:13px;writing-mode:horizontal-tb;max-width:9em}}
 </style>
 <h1>{title}</h1>
 <p>濁点・半濁点だけが違うカタカナ語の組。各組で原本画像と同じつづりを選ぶ。<b>赤枠</b>はYomiTokuが別のつづりで読んだ箇所。
-「両方正しい」は別の語として両方を残す。画面下の「次の未確認」（キーは n、戻るは p）で、自動判定のない組を順に回れる。<b>自動</b>と書いた組は、語を切り出して読み直した結果で決めてある（選ばなければそのまま使う）。
+「両方正しい」は別の語として両方を残す。「どちらも違う」は横の欄に正しい綴りを書く（その組の全箇所を直す）。画面下の「次の未確認」（キーは n、戻るは p）で、自動判定のない組を順に回れる。<b>自動</b>と書いた組は、語を切り出して読み直した結果で決めてある（選ばなければそのまま使う）。
 人が選んだものだけが下のTSV（a、b、choice）にまとまるので、コピーして <code>{human}</code> に保存し、作り直す。
 人の選択は常に自動判定より優先する。選択はこのブラウザにも一時保存される。</p>
 <p>{summary}</p>
@@ -287,23 +313,32 @@ function render() {{
     const v = choice(i);
     document.getElementById('s' + i).classList.toggle('done', v !== 'undecided' || !!p.auto);
     if (v === 'undecided') return;
-    store[p.a + '/' + p.b] = v;
-    const word = v === 'a' ? p.a : v === 'b' ? p.b : 'both';
+    if (p.kind === 'fix') {{
+      store['fix:' + p.id] = v;
+      lines.push(['fix:' + p.id, '', v].join('\\t'));
+      return;
+    }}
+    const typed = document.getElementById('c' + i).value.trim();
+    if (v === 'custom' && !typed) return;
+    store[p.a + '/' + p.b] = v === 'custom' ? 'custom:' + typed : v;
+    const word = v === 'a' ? p.a : v === 'b' ? p.b : v === 'custom' ? typed : 'both';
     lines.push([p.a, p.b, word].join('\\t'));
-    if (word !== 'both') {{ winners.add(word); losers.add(word === p.a ? p.b : p.a); }}
+    if (v === 'a' || v === 'b') {{ winners.add(word); losers.add(word === p.a ? p.b : p.a); }}
   }});
   try {{ localStorage.setItem(KEY, JSON.stringify(store)); }} catch (e) {{}}
   document.getElementById('tsv').value = lines.join('\\n') + '\\n';
   const clash = [...winners].filter(t => losers.has(t));
   document.getElementById('status').textContent = (lines.length - 1) + ' 組を人が選択（'
-    + PAIRS.filter(p => p.auto).length + ' 組は自動判定あり、' + PAIRS.length + ' 組中）'
+    + PAIRS.filter(p => p.auto).length + ' 組は自動判定あり、' + PAIRS.filter(p => p.kind !== 'fix').length + ' 組中）'
     + (clash.length ? '。矛盾（正しいと誤りの両方に選んだ語）: ' + clash.join('、') : '');
 }}
 PAIRS.forEach((p, i) => {{
-  const v = saved[p.a + '/' + p.b] || p.human;
+  let v = saved[p.kind === 'fix' ? 'fix:' + p.id : p.a + '/' + p.b] || p.human;
+  if (v && v.startsWith('custom:') && p.kind !== 'fix') {{ document.getElementById('c' + i).value = v.slice(7); v = 'custom'; }}
   if (v) {{ const el = document.querySelector('input[name="p' + i + '"][value="' + v + '"]'); if (el) el.checked = true; }}
 }});
 document.addEventListener('change', render);
+document.addEventListener('input', render);
 const COUNT = PAIRS.length;
 const OPEN = i => choice(i) === 'undecided' && !PAIRS[i].auto;
 function isOpen(i) {{ return OPEN(i); }}
@@ -364,6 +399,9 @@ def main():
     parser.add_argument('--device', choices=['cpu', 'cuda'], default='cpu')
     parser.add_argument('--human', type=Path, help='pair choices saved from the page (a, b, choice)')
     parser.add_argument('--glossary-out', type=Path, help='glossary TSV for --glossary --fix-variants')
+    parser.add_argument('--corrections-out', type=Path,
+                        help='per-place corrections (crop and YomiToku agree; "both wrong" choices) '
+                             'for rebuild-text-layer.py --word-corrections')
     parser.add_argument('--skip-pages', help="pages left out of the review, e.g. '312-322'")
     parser.add_argument('--skip-catalog', action='store_true',
                         help="also leave out back-matter catalog pages (text_layer_utils.catalog_pages)")
@@ -382,19 +420,58 @@ def main():
                 text = yomitoku.get(lines[place[0]]['page'], '')
                 yomi_read[place] = info['yomi'].get(place[:2]) or (word if word in text else None)
     human = load_human(args.human)
+    fix_verdicts = {k[1]: human.pop(k) for k in [k for k in human if k[0] == 'fix:']}
+    # Candidates only change with the code (e.g. words split over a line break
+    # stopped being pairs); report choices for pairs that are gone and skip them.
     unknown = [k for k in human if k not in pairs]
-    if unknown:
-        raise SystemExit(f'human choices for pairs not found in the text: {unknown[:5]}')
-    auto, notes = {}, {}
+    for key in unknown:
+        print(f'warning: human choice for a pair that is no longer a candidate: {"/".join(key)} -> {human.pop(key)}')
+    auto, notes, fixes = {}, {}, {}
     if args.auto_crop:
-        places = {place for key in pairs for word in key for place in occurrences.get(word, [])}
+        # Every katakana word with dakuten/handakuten is re-read from a full-size
+        # crop: the line-wide read shrinks the marks away.
+        places = {place for word in occurrences for place in occurrences[word]}
         readings = crop_readings(lines, places, args.pdf, args.device)
         for key in pairs:
             auto[key], notes[key] = auto_decide(key, occurrences, readings, yomi_read)
+    custom = {k: c for k, c in human.items() if c != 'both' and c not in k}
     decisions = {k: c for k, c in auto.items() if c}
     sources = {k: 'auto' for k in decisions}
-    decisions.update(human)
-    sources.update({k: 'human' for k in human})
+    decisions.update({k: c for k, c in human.items() if k not in custom})
+    sources.update({k: 'human' for k in human if k not in custom})
+    for key in custom:
+        decisions.pop(key, None)
+    settled = {place for key in list(decisions) + list(custom) for word in key for place in occurrences.get(word, [])}
+    def fix_id(place, to):
+        index, start, end = place
+        line = lines[index]
+        text = line['text']
+        return f'{line["page"]}:{line["line_id"]}:{text[max(0, start - 4):start]}[{text[start:end]}→{to}]{text[end:end + 4]}'
+
+    agreed = {}
+    if args.auto_crop:
+        agreed = agreed_fixes(occurrences, readings, yomitoku, lines, settled)
+        fixes = {place: (to, 'auto-agree') for place, to in agreed.items()
+                 if fix_verdicts.get(fix_id(place, to)) != 'reject'}
+    for gone in set(fix_verdicts) - {fix_id(place, to) for place, to in agreed.items()}:
+        print(f'warning: human verdict for an automatic fix that is no longer proposed: {gone}')
+    for key, to in custom.items():
+        for word in key:
+            for place in occurrences.get(word, []):
+                fixes[place] = (to, 'human')
+    if args.corrections_out:
+        with args.corrections_out.open('w', newline='') as handle:
+            writer = csv.writer(handle, delimiter='\t', lineterminator='\n')
+            writer.writerow(['id', 'page', 'line_id', 'left', 'from', 'to', 'right', 'source'])
+            for (index, start, end), (to, source) in sorted(fixes.items()):
+                line = lines[index]
+                text = line['text']
+                left, right = text[max(0, start - 4):start], text[end:end + 4]
+                writer.writerow([fix_id((index, start, end), to),
+                                 line['page'], line['line_id'], left, text[start:end], to, right, source])
+    sources_count = Counter(source for _, source in fixes.values())
+    print(f'corrections: {sources_count["auto-agree"]} where crop and YomiToku agree, '
+          f'{sources_count["human"]} from "both wrong" choices')
     if args.glossary_out:
         rows, clash = glossary_rows(decisions, sources, occurrences)
         if clash:
@@ -406,11 +483,16 @@ def main():
     order = sorted(pairs, key=lambda k: (-len(pairs[k]['yomi']),
                                          -sum(len(occurrences.get(w, [])) for w in k), k))
     examples = {key: pick_examples(key, pairs[key], occurrences, args.examples) for key in order}
+    # Automatic fixes are shown after the pairs, one place each, to keep or reject.
+    fix_items = sorted(agreed.items())
+    for place, to in fix_items:
+        examples[('fix:', fix_id(place, to))] = [place]
+    order_all = order + [('fix:', fix_id(place, to)) for place, to in fix_items]
 
     images = args.output / 'img'
     images.mkdir(parents=True, exist_ok=True)
     by_page = defaultdict(list)
-    for n, key in enumerate(order):
+    for n, key in enumerate(order_all):
         for k, (index, start, end) in enumerate(examples[key]):
             by_page[lines[index]['page']].append((n, k, index, start, end))
     document = pypdfium2.PdfDocument(str(args.pdf))
@@ -421,13 +503,37 @@ def main():
                 picture.save(images / f'{n}-{k}-{kind}.jpg', quality=85)
     document.close()
 
-    sections, data = [], []
+    # Section ids follow the page order: pairs first, then the automatic fixes.
+    sections, data, fix_data = [], [], []
+    for n, (place, to) in enumerate(fix_items, len(order)):
+        fid = fix_id(place, to)
+        index, start, end = place
+        line = lines[index]
+        word = line['text'][start:end]
+        verdict = fix_verdicts.get(fid, '')
+        fix_data.append({'kind': 'fix', 'id': fid, 'a': word, 'b': to, 'auto': '', 'human': verdict})
+        options = ''.join(f'<label><input type="radio" name="p{n}" value="{value}">{label}</label>'
+                          for value, label in (('keep', f'直す（{html.escape(to)}）'),
+                                               ('reject', f'直さない（{html.escape(word)}のまま）'),
+                                               ('undecided', '未確認（直したまま）')))
+        fix_sections_html = (
+            f'<section id="s{n}" class="fix"><h2>#{n + 1} 自動修正 {line["page"]}ページ: '
+            f'{html.escape(word)} → {html.escape(to)}</h2><p>語を切り出して読み直した結果とYomiTokuが、'
+            f'NDLと違う同じ綴りを読んだので直した。原本と違えば「直さない」を選ぶ。</p>'
+            f'<div class="opts">{options} <a href="#" class="go" data-n="{n}">次の未確認へ ↓</a></div>'
+            f'<div class="ex"><figure><img src="img/{n}-0-thumb.jpg"><img src="img/{n}-0-line.jpg">'
+            f'<img src="img/{n}-0-zoom.jpg"><figcaption>{line["page"]}ページ<br>NDL: {html.escape(word)}'
+            f'<br>直した綴り: {html.escape(to)}</figcaption></figure></div></section>')
+        sections.append(fix_sections_html)
+    fix_count = len(sections)
+    sections_pairs = []
     for n, key in enumerate(order):
         a, b = key
         ca, cb = len(occurrences.get(a, [])), len(occurrences.get(b, []))
         choice = human.get(key)
         data.append({'a': a, 'b': b, 'ca': ca, 'cb': cb, 'auto': auto.get(key) or '',
-                     'human': {a: 'a', b: 'b', 'both': 'both'}.get(choice, '')})
+                     'human': {a: 'a', b: 'b', 'both': 'both'}.get(choice, f'custom:{choice}' if choice else '')})
+        agreed = sorted({fixes[place][0] for w in key for place in occurrences.get(w, []) if place in fixes})
         figures = []
         for k, (index, start, end) in enumerate(examples[key]):
             line = lines[index]
@@ -442,17 +548,24 @@ def main():
         rest = f'自動判定に任せる（{html.escape(decided)}）' if decided else '保留（自動判定なし）'
         options = ''.join(f'<label><input type="radio" name="p{n}" value="{value}">{label}</label>'
                           for value, label in (('a', html.escape(a)), ('b', html.escape(b)),
-                                               ('both', '両方正しい'), ('undecided', rest)))
-        sections.append(f'<section id="s{n}"><h2>#{n + 1} {html.escape(a)}（{ca}）／{html.escape(b)}（{cb}）'
-                        f'{"【自動】" if decided else ""}</h2><p>YomiTokuと割れた箇所: {len(pairs[key]["yomi"])}。{html.escape(notes.get(key, ""))}</p>'
+                                               ('both', '両方正しい'), ('custom', 'どちらも違う:'),
+                                               ('undecided', rest)))
+        options += f'<input id="c{n}" size="10" placeholder="正しい綴り"> '
+        if agreed:
+            rest_note = f'切り出しとYomiTokuが一致した箇所は {html.escape("・".join(agreed))} に直す。'
+        else:
+            rest_note = ''
+        sections_pairs.append(f'<section id="s{n}"><h2>#{n + 1} {html.escape(a)}（{ca}）／{html.escape(b)}（{cb}）'
+                        f'{"【自動】" if decided else ""}</h2><p>YomiTokuと割れた箇所: {len(pairs[key]["yomi"])}。{html.escape(notes.get(key, ""))}{rest_note}</p>'
                         f'<div class="opts">{options} <a href="#" class="go" data-n="{n}">次の未確認へ ↓</a></div>'
                         f'<div class="ex">{"".join(figures)}</div></section>')
+    data.extend(fix_data)
     auto_count = sum(1 for k in order if auto.get(k))
     summary = (f'{len(order)}組。うちYomiTokuと割れた組 {sum(bool(pairs[k]["yomi"]) for k in order)}。'
                f'自動判定 {auto_count}組、人の選択 {len(human)}組、どちらもない {sum(1 for k in order if not auto.get(k) and k not in human)}組。'
-               f'本文の行 {len(lines)}、YomiTokuのページ {len(yomitoku)}。')
+               f'自動修正 {fix_count}か所（最後に並ぶ）。本文の行 {len(lines)}、YomiTokuのページ {len(yomitoku)}。')
     (args.output / 'index.html').write_text(PAGE.format(
-        title=html.escape(args.title), summary=summary, sections='\n'.join(sections),
+        title=html.escape(args.title), summary=summary, sections='\n'.join(sections_pairs + sections),
         human=html.escape(str(args.human or '人の選択TSV')), pairs=json.dumps(data, ensure_ascii=False)), encoding='utf-8')
     print(summary)
     print(f'{len(order)} pairs, {sum(len(v) for v in examples.values())} examples: {args.output / "index.html"}')

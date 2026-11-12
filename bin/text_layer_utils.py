@@ -131,3 +131,25 @@ def catalog_pages(ocr_dir, ocr_stem, tail=20, min_lines=30, max_average=16):
         if len(texts) >= min_lines and sum(map(len, texts)) / len(texts) < max_average:
             found.add(int(path.stem.rsplit('_', 1)[1]))
     return found
+
+
+def load_corrections(path):
+    """{(page, line_id): [row]} from a corrections TSV (id, page, line_id, left, from, to, right)."""
+    import csv
+    found = {}
+    if path:
+        with path.open(newline='') as handle:
+            for row in csv.DictReader(handle, delimiter='\t'):
+                found.setdefault((int(row['page']), int(row['line_id'])), []).append(row)
+    return found
+
+
+def apply_corrections(text, rows, key):
+    """Replace each row's from with to where its left/right context still matches
+    exactly once, so a stale correction stops the build instead of landing elsewhere."""
+    for row in rows:
+        old = row['left'] + row['from'] + row['right']
+        if text.count(old) != 1:
+            raise ValueError(f'correction does not match line {key}: {row["id"]}')
+        text = text.replace(old, row['left'] + row['to'] + row['right'])
+    return text

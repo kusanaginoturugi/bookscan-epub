@@ -12,8 +12,8 @@ from pathlib import Path
 
 from pypdf import PdfReader
 
-from text_layer_utils import (clean_text, fix_brackets, fix_dashes, fix_quotes, fix_variants,
-                              line_joins, load_glossary)
+from text_layer_utils import (apply_corrections, clean_text, fix_brackets, fix_dashes, fix_quotes,
+                              fix_variants, line_joins, load_corrections, load_glossary)
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -38,6 +38,9 @@ def main():
     parser.add_argument('--corrections', type=Path,
                         help='TSV from judge-ocr-disagreements.py (page, line_id, left, from, to, right); '
                              'applied after the other fixes, before quote pairing')
+    parser.add_argument('--word-corrections', type=Path,
+                        help='TSV like --corrections from build-voicing-review.py --corrections-out; '
+                             'applied after --fix-brackets, before --glossary')
     parser.add_argument('--char-map', type=Path,
                         help='TSV (from, to) of characters this book prints differently from OCR, '
                              'e.g. 掴 -> 摑; applied after --corrections')
@@ -69,6 +72,8 @@ def main():
             for row in csv.DictReader(handle, delimiter='\t'):
                 corrections.setdefault((int(row['page']), int(row['line_id'])), []).append(row)
     applied = 0
+    word_corrections = load_corrections(args.word_corrections)
+    word_applied = 0
     char_map = {}
     if args.char_map:
         with args.char_map.open(newline='') as handle:
@@ -126,6 +131,9 @@ def main():
                     text = fix_dashes(text)
                 if args.fix_brackets and vertical:
                     text = fix_brackets(text)
+                rows = word_corrections.pop(key, [])
+                text = apply_corrections(text, rows, key)
+                word_applied += len(rows)
                 text = clean_text(text, vertical, glossary)
                 if args.fix_variants:
                     text = fix_variants(text, glossary, variants, joins[position])
@@ -174,11 +182,15 @@ def main():
         raise ValueError(f'overrides not found in OCR: {list(overrides)}')
     if corrections:
         raise ValueError(f'corrections for lines not in OCR or overridden: {list(corrections)[:5]}')
+    if word_corrections:
+        raise ValueError(f'word corrections for lines not in OCR or overridden: {list(word_corrections)[:5]}')
     if recognized:
         raise ValueError(f'recognized lines not found in OCR: {list(recognized)[:5]}')
     embed_text_layer_pdf(str(args.sanitized_pdf), str(args.output_pdf), page_results)
     print(f'{args.output_pdf}: {count} pages, {changed_lines} lines normalized, '
           f'{removed_spaces} spaces removed')
+    if args.word_corrections:
+        print(f'{word_applied} word corrections applied from {args.word_corrections}')
     if args.corrections:
         print(f'{applied} corrections applied from {args.corrections}')
     if args.char_map:
