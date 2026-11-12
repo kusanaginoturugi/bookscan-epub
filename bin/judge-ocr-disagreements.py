@@ -156,6 +156,54 @@ def lookalike_choice(text, start, end, kata, other, word_counts, alone_counts):
     return None
 
 
+def full_word(lines, index, start, end, reading):
+    # The katakana word holding text[start:end] read as `reading`, joined with the
+    # katakana that continues on the neighbouring line (モニター・ス|クリーン).
+    line = lines[index]
+    text = line['text']
+    i, j = start, end
+    while i > 0 and is_katakana(text[i - 1]):
+        i -= 1
+    while j < len(text) and is_katakana(text[j]):
+        j += 1
+    word = text[i:start] + reading + text[end:j]
+    if not word or not all(is_katakana(ch) for ch in reading):
+        return ''
+    same_page = lambda k: 0 <= k < len(lines) and lines[k]['page'] == line['page']
+    if j >= len(text.rstrip()) and line['joined'][1] and same_page(index + 1):
+        following = lines[index + 1]['text'].lstrip()
+        k = 0
+        while k < len(following) and is_katakana(following[k]):
+            k += 1
+        word += following[:k]
+    if i <= len(text) - len(text.lstrip()) and line['joined'][0] and same_page(index - 1):
+        preceding = lines[index - 1]['text'].rstrip()
+        k = len(preceding)
+        while k > 0 and is_katakana(preceding[k - 1]):
+            k -= 1
+        word = preceding[k:] + word
+    return word
+
+
+def book_word_choice(lines, index, start, end, ndl, yomi, word_counts):
+    # ('ndl' or 'yomitoku' or None, reason): the reading whose whole katakana word
+    # occurs elsewhere in the book while the other one's does not.
+    a, b = full_word(lines, index, start, end, ndl), full_word(lines, index, start, end, yomi)
+    if len(a) < 2 or len(b) < 2 or a == b:
+        return None, ''
+    text = lines[index]['text']
+    # The NDL word is in the text at this very place unless it runs over a line break.
+    here = 1 if a in re.findall(r'[ァ-ヺー]{2,}', text) else 0
+    ca, cb = word_counts.get(a, 0) - here, word_counts.get(b, 0)
+    # Changing the text needs the word twice: a single other occurrence may be
+    # another misreading (インタヴュウ/インタヴェウ once each).
+    if cb >= 2 and ca <= 0:
+        return 'yomitoku', f'{b}は本の中に{cb}回、{a}は0回'
+    if ca > 0 and cb <= 0:
+        return 'ndl', f'{a}は本の中に{ca}回、{b}は0回'
+    return None, ''
+
+
 def kind(x, y):
     if '"' in x:
         return 'quote'  # paired into 〝〟 per page after corrections
@@ -497,6 +545,15 @@ def main():
             counts[category] += 1
             left, right = text[max(0, start - CONTEXT):start], text[end:end + CONTEXT]
             hunk_id = f'{line["page"]}:{line["line_id"]}:{left}[{frm}→{to}]{right}'
+            if category in ('judge', 'lookalike', 'joined-voicing'):
+                choice, reason = book_word_choice(lines, index, start, end, frm, to, word_counts)
+                if choice:
+                    items.append(dict(id=hunk_id, page=line['page'], line_id=line['line_id'], left=left,
+                                      ndl=frm, yomitoku=to, right=right, line=text, first='rule-word',
+                                      second='rule-word', decision=choice, model='rule:book-word', prompt='',
+                                      date=today, index=index, start=start, end=end, reason=reason))
+                    counts['book-word'] += 1
+                    continue
             if category == 'lookalike':
                 kata, other = (frm, to) if is_katakana(frm) else (to, frm)
                 choice = lookalike_choice(text, start, end, kata, other, word_counts, alone_counts)
@@ -673,6 +730,8 @@ def main():
             llm = '聞いていない（旧字体はYomiTokuを採る規則）'
         elif item['first'] == 'rule-shape':
             llm = '聞いていない（形が同じ文字。前後の文字と、本の中に出てくる語で決めた）'
+        elif item['first'] == 'rule-word':
+            llm = f'聞いていない（本の中の語で決めた: {esc(item.get("reason", ""))}）'
         elif item['first'] == 'skip':
             llm = f'聞いていない（規則でNDLのまま: {esc(item["model"][5:])}）'
         if verdict and verdict.get('propagated'):
@@ -681,6 +740,9 @@ def main():
             now, why = verdict['to'], '人の判定'
         elif item['first'] == 'rule':
             now, why = item['yomitoku'], 'YomiTokuの読み。旧字体の規則'
+        elif item['first'] == 'rule-word':
+            chosen = item['yomitoku'] if item['decision'] == 'yomitoku' else item['ndl']
+            now, why = chosen, f'{"YomiToku" if item["decision"] == "yomitoku" else "NDL"}の読み。本の中の語の規則'
         elif item['first'] == 'rule-shape':
             chosen = item['yomitoku'] if item['decision'] == 'yomitoku' else item['ndl']
             now, why = chosen, f'{"YomiToku" if item["decision"] == "yomitoku" else "NDL"}の読み。形が同じ文字の規則'
