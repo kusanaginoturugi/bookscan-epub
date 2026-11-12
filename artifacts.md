@@ -13,6 +13,16 @@
 | 天の光はすべて星 | 284 | 1 | [PDF](output/searchable/天の光はすべて星%20-%20フレドリック・ブラウン.pdf) | [PDF](output/searchable/天の光はすべて星%20-%20フレドリック・ブラウン%20辞書補正.pdf) | [5語7か所](work/searchable/ten-no-hikari/variant-glossary.tsv) |
 | インフィニティ・リミテッド（下） | 388 | 3 | [PDF](output/searchable/インフィニティ・リミテッド（下）%20-%20ジェイムズ・P・ホーガン.pdf) | [PDF](output/searchable/インフィニティ・リミテッド（下）%20-%20ジェイムズ・P・ホーガン%20辞書補正.pdf) | [20語61か所](work/searchable/infinity-lower/variant-glossary.tsv) |
 
+## 星を継ぐもの（2026-11-12）
+
+`bin/build-searchable-book.sh`（YomiToku、パ／バ、判断モデル込み）で初めて通した本。人のレビュー前。
+
+| 種類 | ファイル | 内容 |
+|---|---|---|
+| 完成品 | [検索可能PDF](output/searchable/星を継ぐもの%20-%20ジェイムズ・P・ホーガン.pdf) | 324ページ。パ／バは自動判定56組、判断モデルの反映103か所（旧字体の規則14を含む） |
+| レビュー | [パ／バ](review/hoshi-wo-tsugu-mono-voicing/index.html)・[判断モデル](review/hoshi-wo-tsugu-mono-judge/index.html) | パ／バは自動判定なしの14組、判断モデルは350か所 |
+| 履歴 | [判断の履歴](work/searchable/hoshi-wo-tsugu-mono/judge/history.tsv)・[適用した差分](work/searchable/hoshi-wo-tsugu-mono/judge/corrections.tsv)・[パ／バの辞書](work/searchable/hoshi-wo-tsugu-mono/voicing-glossary.tsv) | |
+
 ## 濁点・半濁点のレビュー（2026-11-11）
 
 『夏への扉』の [濁点・半濁点レビュー](review/summer-door-voicing/index.html)。濁点・半濁点1字だけが違うカタカナ語52組を、原本の縮小画像・行・3倍拡大で確かめて選ぶ。選んだ結果は画面の下のTSVにまとまり、`--fix-variants` の辞書になる。YomiTokuの全ページの結果は `work/voicing/summer-door/yomitoku/`。

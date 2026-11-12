@@ -38,7 +38,7 @@ printf 'from\tto\n掴\t摑\n' > work/searchable/jikan-dorobou/char-map.tsv
 
 3番目の引数にLLMで作った辞書（`bin/auto-variant-glossary.py`）を渡すと、パ／バと判断モデルの段を飛ばして、その辞書で「辞書補正」版を作る（以前の手順）。
 
-OCRは1ページ約1.2秒、余白つき再認識は約3秒（CPU）。YomiTokuは約0.7秒（GPU）。語の切り出しの読み直しは1冊1分前後。判断モデルは、初回に1冊で200〜300か所を聞いて約10分かかる。聞いた結果は `work/searchable/作業名/judge/history.tsv` に残り、同じ差分は聞き直さない。考え方と検証結果は [docs/progress.md](docs/progress.md) の「傾き補正込みで4冊を作成」と「1冊を通す手順への組み込み」。
+OCRは1ページ約1.2秒、余白つき再認識は約3秒（CPU）。YomiTokuは約0.7秒（GPU）。語の切り出しの読み直しは1冊1分前後。判断モデルは、初回に1冊で200〜350か所を聞く。既定の `JUDGE_PROMPT=v1+v2` では、1行だけで聞く版（v1）と、前後の行を足した版（v2）の両方で聞く。v1がYomiTokuを選び、v2がNDLと答えなかった差分だけを反映する。12Bモデルが読み込まれていれば、1冊5分ほどで終わる。聞いた結果は `work/searchable/作業名/judge/history.tsv` に残り、同じ差分は聞き直さない。考え方と検証結果は [docs/progress.md](docs/progress.md) の「傾き補正込みで4冊を作成」と「1冊を通す手順への組み込み」。
 
 GPUを使う場合は、`.venv-ndl` の `onnxruntime` を `onnxruntime-gpu[cuda,cudnn]` に入れ替え、`NDLOCR_DEVICE=cuda` を付ける。OCRは約0.45秒、余白つき再認識は約0.75秒になる（RTX 3060）。CPUとGPUは約2%の行で読みが変わるが、精度は同等。そのため1冊は同じデバイスで通す。作業ディレクトリの `device` に最初のデバイスを記録し、違うデバイスでの再開は止まる。GPUが使えずCPUに切り替わった場合も止まる。入れ替え後も `NDLOCR_DEVICE=cpu`（既定）なら、結果は `onnxruntime` と同じ。検証は [docs/progress.md](docs/progress.md) の「GPU（CUDA）でのOCRと余白つき再認識」。
 

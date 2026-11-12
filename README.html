@@ -320,7 +320,9 @@ NDLとYomiTokuの残りの食い違いを、ローカルLLMが判断する。 -
 <span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>  work/searchable/jikan-dorobou/angles.tsv work/searchable/jikan-dorobou/text-unfinalized.pdf</span></code></pre></div>
 <p>パ／バのレビューを先に済ませる。パ／バの辞書が変わると、判断モデルの差分の前後4文字も変わる。どの差分にも当たらない人の判定が出ると、判断モデルの段は止まる。</p>
 <p>3番目の引数にLLMで作った辞書（<code>bin/auto-variant-glossary.py</code>）を渡すと、パ／バと判断モデルの段を飛ばして、その辞書で「辞書補正」版を作る（以前の手順）。</p>
-<p>OCRは1ページ約1.2秒、余白つき再認識は約3秒（CPU）。YomiTokuは約0.7秒（GPU）。語の切り出しの読み直しは1冊1分前後。判断モデルは、初回に1冊で200〜300か所を聞いて約10分かかる。聞いた結果は
+<p>OCRは1ページ約1.2秒、余白つき再認識は約3秒（CPU）。YomiTokuは約0.7秒（GPU）。語の切り出しの読み直しは1冊1分前後。判断モデルは、初回に1冊で200〜350か所を聞く。既定の
+<code>JUDGE_PROMPT=v1+v2</code>
+では、1行だけで聞く版（v1）と、前後の行を足した版（v2）の両方で聞く。v1がYomiTokuを選び、v2がNDLと答えなかった差分だけを反映する。12Bモデルが読み込まれていれば、1冊5分ほどで終わる。聞いた結果は
 <code>work/searchable/作業名/judge/history.tsv</code>
 に残り、同じ差分は聞き直さない。考え方と検証結果は <a
 href="docs/progress.html">docs/progress.md</a>

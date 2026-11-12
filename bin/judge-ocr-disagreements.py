@@ -10,7 +10,8 @@ are split into hunks. Hunks that other steps or rules settle are not asked:
 dropped and small kana (NDL was right on every such case in
 work/ocr-engine-check/disagreements-gold.tsv), and text only one engine has.
 A simplified kanji (掴) against YomiToku's traditional form of it (摑) takes
-YomiToku's by rule. Lines with many hunks count as misaligned and are skipped. The rest are
+YomiToku's by rule; a traditional form from NDL against YomiToku's simplified
+one stays (NDL leans to simplified forms, so it saw the old one printed). Lines with many hunks count as misaligned and are skipped. The rest are
 asked in both orders as two versions of the line; YomiToku's reading is
 applied only when both answers pick it.
 
@@ -42,20 +43,32 @@ from text_layer_utils import (clean_text, fix_brackets, fix_dashes, fix_variants
                               load_glossary)
 
 ROOT = Path(__file__).resolve().parent
-PROMPT_VERSION = 'v1'
-PROMPT = """次のA・Bは、小説をOCRで読み取った同じ1行です。数文字だけ読みが違います。
+PROMPTS = {
+    # v1: the one line only.
+    'v1': """次のA・Bは、小説をOCRで読み取った同じ1行です。数文字だけ読みが違います。
 日本語の文章として自然で正しい方を、AかBの1文字だけで答えてください。
 
 A: {a}
 
-B: {b}"""
+B: {b}""",
+    # v2: previous and next lines of the page, the differing part in 【】, and a
+    # warning against preferring today's common words (the Summer Door review
+    # found most v1 errors on rare or old-fashioned words).
+    'v2': """次のA・Bは、小説をOCRで読み取った同じ箇所です。【】の中だけが違います。
+小説には、珍しい漢字、古い言い回し、成句、造語、人名が出てきます。今よく使う語だからという理由では選ばず、
+前後の文脈に合う方を選んでください。原文として正しい方を、AかBの1文字だけで答えてください。
+
+A: {a}
+
+B: {b}""",
+}
 VOICING = str.maketrans('バビブベボパピプペポ', 'パピプペポバビブベボ')
 SMALL = str.maketrans('ァィゥェォッャュョヮヵヶぁぃぅぇぉっゃゅょゎ', 'アイウエオツヤユヨワカケあいうえおつやゆよわ')
 # NDLOCR-Lite answers in the simplified form (掴) even where the page prints
 # the traditional one (摑), and lacks some of these in its character list
 # (頰, 噓, 鷗, 啞, 𠮟, 瘦); YomiToku reads them as printed.
-OLD_FORMS = dict(zip('掴噛頬嘘剥填鴎掻屏祷蝋唖叱痩撹麹鹸繍蒋醤蝉槙溌涜騨顛',
-                     '摑嚙頰噓剝塡鷗搔屛禱蠟啞𠮟瘦攪麴鹼繡蔣醬蟬槇潑瀆驒顚'))
+OLD_FORMS = dict(zip('掴噛頬嘘剥填鴎掻屏祷蝋唖叱痩撹麹鹸繍蒋醤蝉槙溌涜騨顛挟挿',
+                     '摑嚙頰噓剝塡鷗搔屛禱蠟啞𠮟瘦攪麴鹼繡蔣醬蟬槇潑瀆驒顚挾插'))
 LINE_SHAPED = set('一「」『』[]\\|―ー-−—')
 STYLE = {'·': '・', '“': '〝', '”': '〟'}
 DASHES = set('―—–─‐-')
@@ -84,6 +97,9 @@ def kind(x, y):
         return 'quote'  # paired into 〝〟 per page after corrections
     if x != y and len(x) == len(y) and all(OLD_FORMS.get(a, a) == b for a, b in zip(x, y)):
         return 'old-form'
+    if x != y and len(x) == len(y) and all(OLD_FORMS.get(b, b) == a for a, b in zip(x, y)):
+        # NDL leans to the simplified form, so a traditional one from NDL is printed.
+        return 'ndl-old-form'
     if len(x) == len(y) == 1 and x.translate(VOICING) == y:
         return 'voicing'
     if set(x + y) <= set('<>〈〉"〝〟＜＞'):
@@ -298,6 +314,9 @@ def main():
     parser.add_argument('--max-hunks', type=int, default=4)
     parser.add_argument('--url', default='http://127.0.0.1:8080/v1/chat/completions')
     parser.add_argument('--model', default='dahara1/gemma-4-12B-it-qat-UD-japanese-imatrix:Q4_K_XL')
+    parser.add_argument('--prompt', choices=sorted(PROMPTS) + ['v1+v2'], default='v1+v2',
+                        help='prompt version; v1+v2 applies v1 unless v2 answers NDL. '
+                             'Answers are kept per version in history.tsv')
     parser.add_argument('--title', default='LLM判断のレビュー')
     args = parser.parse_args()
 
@@ -343,19 +362,42 @@ def main():
                                   decision='yomitoku', model='rule:old-form', prompt='', date=today,
                                   index=index, start=start, end=end))
                 continue
-            record = done.get((hunk_id, args.model, PROMPT_VERSION))
-            if record is None:
-                alt = text[:start] + to + text[end:]
-                first = ask(args.url, args.model, PROMPT.format(a=text, b=alt))
-                second = ask(args.url, args.model, PROMPT.format(a=alt, b=text))
+            def asked(version):
+                record = done.get((hunk_id, args.model, version))
+                if record is not None:
+                    return record
+                if version == 'v1':
+                    mine, theirs = text, text[:start] + to + text[end:]
+                else:
+                    same_page = lambda i: 0 <= i < len(lines) and lines[i]['page'] == line['page']
+                    before = lines[index - 1]['text'] if same_page(index - 1) else ''
+                    after = lines[index + 1]['text'] if same_page(index + 1) else ''
+                    mine = before + text[:start] + '【' + frm + '】' + text[end:] + after
+                    theirs = before + text[:start] + '【' + to + '】' + text[end:] + after
+                prompt = PROMPTS[version]
+                first = ask(args.url, args.model, prompt.format(a=mine, b=theirs))
+                second = ask(args.url, args.model, prompt.format(a=theirs, b=mine))
                 one = {'A': 'ndl', 'B': 'yomitoku'}.get(first)
                 two = {'A': 'yomitoku', 'B': 'ndl'}.get(second)
                 record = dict(id=hunk_id, page=line['page'], line_id=line['line_id'], left=left, ndl=frm,
                               yomitoku=to, right=right, line=text, first=first, second=second,
                               decision=one if one and one == two else 'split', model=args.model,
-                              prompt=PROMPT_VERSION, date=today)
+                              prompt=version, date=today)
                 new_history.append(record)
-                done[(hunk_id, args.model, PROMPT_VERSION)] = record
+                done[(hunk_id, args.model, version)] = record
+                return record
+
+            if args.prompt == 'v1+v2':
+                # v1 decides; v2 (context and caution) can veto a change to YomiToku.
+                # On the Summer Door review this kept 40 of v1's 41 fixes and cut
+                # its breakages from 6 to 2.
+                one, two = asked('v1'), asked('v2')
+                decision = one['decision']
+                if decision == 'yomitoku' and two['decision'] == 'ndl':
+                    decision = 'split'
+                record = dict(one, decision=decision, prompt='v1+v2', first2=two['first'], second2=two['second'])
+            else:
+                record = asked(args.prompt)
             items.append(dict(record, index=index, start=start, end=end))
 
     # A human verdict that no longer matches a hunk (the text before it changed,
@@ -434,6 +476,11 @@ def main():
         reading = {'NDL': item['ndl'], 'YomiToku': item['yomitoku']}
         llm = (f'1回目: {esc(reading.get(first, ""))}（{first}）／'
                f'2回目（順序を入れ替え）: {esc(reading.get(second, ""))}（{second}）')
+        if 'first2' in item:
+            v2a = said(item['first2'], 'NDL', 'YomiToku')
+            v2b = said(item['second2'], 'YomiToku', 'NDL')
+            llm += (f'<br>第2版（前後の行つき）: {esc(reading.get(v2a, ""))}（{v2a}）／'
+                    f'{esc(reading.get(v2b, ""))}（{v2b}）')
         if item['first'] == 'rule':
             llm = '聞いていない（旧字体はYomiTokuを採る規則）'
         elif item['first'] == 'skip':
@@ -445,7 +492,7 @@ def main():
         elif item['decision'] == 'yomitoku':
             now, why = item['yomitoku'], 'YomiTokuの読み。LLMが2回とも選んだ'
         elif item['decision'] == 'split':
-            now, why = item['ndl'], 'NDLの読み。LLMの答えが割れた'
+            now, why = item['ndl'], 'NDLの読み。LLMの答えが割れた（第2版の反対を含む）'
         else:
             now, why = item['ndl'], 'NDLの読み。LLMが2回とも選んだ'
         current = 'yomitoku' if item['decision'] == 'yomitoku' else 'ndl'

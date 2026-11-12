@@ -23,7 +23,8 @@
 #   NDLOCR_DEVICE  cpu (default) or cuda for OCR, margin re-recognition, YomiToku
 #              and word crops; cuda needs onnxruntime-gpu[cuda,cudnn] in .venv-ndl
 #   YOMITOKU   yomitoku command (default: DATA_ROOT/vendor/.venv-yomitoku/bin/yomitoku)
-#   LLM_URL    OpenAI-compatible server (default http://127.0.0.1:8080/v1), LLM_MODEL
+#   LLM_URL    OpenAI-compatible server (default http://127.0.0.1:8080/v1), LLM_MODEL,
+#              JUDGE_PROMPT (v1+v2 default: v1 decides, v2 with context can veto)
 #   SKIP_YOMITOKU=1, SKIP_JUDGE=1  turn those stages off on purpose; without them
 #              a missing YomiToku or LLM stops the build. YomiToku off also turns
 #              the judge off. A book keeps the stages it was started with.
@@ -142,6 +143,7 @@ fi
 YOMITOKU=${YOMITOKU:-$DATA_ROOT/vendor/.venv-yomitoku/bin/yomitoku}
 LLM_URL=${LLM_URL:-http://127.0.0.1:8080/v1}
 LLM_MODEL=${LLM_MODEL:-dahara1/gemma-4-12B-it-qat-UD-japanese-imatrix:Q4_K_XL}
+JUDGE_PROMPT=${JUDGE_PROMPT:-v1+v2}
 REVIEW=$DATA_ROOT/review/$(basename "$WORK")
 
 if [ "$USE_YOMITOKU" = on ] && [ ! -e "$WORK/yomitoku.done" ]; then
@@ -179,16 +181,17 @@ CORRECTIONS=
 if [ "$USE_JUDGE" = on ] && [ -z "$GLOSSARY" ]; then
   CORRECTIONS=$WORK/judge/corrections.tsv
   KEY=$(inputs_key "$VOICING_GLOSSARY" "$WORK/judge-human.tsv" "$WORK/margin.tsv" "$WORK/stages")
-  if [ ! -e "$CORRECTIONS" ] || [ "$(cat "$WORK/judge.key" 2>/dev/null)" != "$KEY$LLM_MODEL" ]; then
+  if [ ! -e "$CORRECTIONS" ] || [ "$(cat "$WORK/judge.key" 2>/dev/null)" != "$KEY$LLM_MODEL$JUDGE_PROMPT" ]; then
     echo "[$(date +%T)] judge"
     curl -sf -m 10 "$LLM_URL/models" > /dev/null ||
       fail "no LLM server at $LLM_URL (start llama-server, set LLM_URL, or SKIP_JUDGE=1)"
     "$PY" "$BIN/judge-ocr-disagreements.py" "$ORIGINAL" "$WORK/ocr" "$WORK/yomitoku" "$WORK/judge" \
       "$REVIEW-judge" --ocr-stem "$OCR_STEM" --recognized "$WORK/margin.tsv" \
       --glossary "$VOICING_GLOSSARY" --human "$WORK/judge-human.tsv" \
-      --url "$LLM_URL/chat/completions" --model "$LLM_MODEL" --title "$TITLE LLM判断のレビュー" \
+      --url "$LLM_URL/chat/completions" --model "$LLM_MODEL" --prompt "$JUDGE_PROMPT" \
+      --title "$TITLE LLM判断のレビュー" \
       > "$WORK/judge.log" 2>&1 || fail "judge step failed; see $WORK/judge.log"
-    echo "$KEY$LLM_MODEL" > "$WORK/judge.key"
+    echo "$KEY$LLM_MODEL$JUDGE_PROMPT" > "$WORK/judge.key"
   fi
   grep -E '^unreviewed' "$WORK/judge.log" || true
 fi

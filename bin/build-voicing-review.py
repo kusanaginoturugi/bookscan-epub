@@ -94,7 +94,9 @@ def find_pairs(lines, yomitoku, min_length):
     occurrences = defaultdict(list)  # word -> [(line index, start, end)]
     for index, line in enumerate(lines):
         for match in TOKEN.finditer(line['text']):
-            if VOICED & set(match.group()):
+            # A lone kana is usually a word split at the line end (ボ|ストン); as a
+            # glossary term it would rewrite every standalone ボ in the book.
+            if len(match.group()) >= 2 and VOICED & set(match.group()):
                 occurrences[match.group()].append((index, match.start(), match.end()))
     pairs = {}
     for word, places in occurrences.items():
@@ -194,7 +196,8 @@ def glossary_rows(decisions, sources, occurrences):
         winners.setdefault(choice, []).append(f'{loser}({len(occurrences.get(loser, []))}):{sources[key]}')
     losers = {k[0] if c == k[1] else k[1] for k, c in decisions.items() if c != 'both'}
     clash = sorted(set(winners) & losers)
-    rows = {term: [term, len(occurrences.get(term, [])), ' '.join(v), 'yes', ''] for term, v in winners.items()}
+    rows = {term: [term, len(occurrences.get(term, [])), ' '.join(v), 'yes', '']
+            for term, v in winners.items() if len(term) >= 2}
     for key, choice in decisions.items():
         if choice != 'both':
             continue
