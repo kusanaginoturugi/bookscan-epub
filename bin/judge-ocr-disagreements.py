@@ -33,6 +33,7 @@ import difflib
 import html
 import importlib.util
 import json
+import shlex
 import re
 import unicodedata
 from collections import Counter, defaultdict
@@ -437,7 +438,7 @@ textarea{{width:100%;height:10em;font-family:monospace}}
 <code>judge-ocr-disagreements.py --human</code> に渡して作り直す。人の判定は常にLLMより優先する。選択はこのブラウザにだけ一時保存される。</p>
 <p>{summary}</p>
 {sections}
-<div id="out"><button id="prev">↑ 前の未確認（p）</button> <button id="next">次の未確認 ↓（n）</button> <label><input type="checkbox" id="advance" checked>選んだら次の未確認へ進む</label> <button id="copy">TSVをコピー</button> → 保存: <code id="save">wl-paste &gt; {human}</code> <span id="status"></span><textarea id="tsv" readonly></textarea></div>
+<div id="out"><button id="prev">↑ 前の未確認（p）</button> <button id="next">次の未確認 ↓（n）</button> <label><input type="checkbox" id="advance" checked>選んだら次の未確認へ進む</label> <button id="savecmd">保存コマンドをコピー</button>（端末に貼って実行すると {human} に保存） <button id="copy">TSVだけコピー</button> <span id="status"></span><textarea id="tsv" readonly></textarea></div>
 <script>
 const ITEMS = {items};
 const KEY = 'judge-review:' + document.title;
@@ -527,6 +528,17 @@ document.querySelectorAll('button.upto').forEach(b => b.addEventListener('click'
   render();
 }}));
 document.addEventListener('input', render);
+const SAVE_PATH = {save_path};
+document.getElementById('savecmd').addEventListener('click', async () => {{
+  // One click: a shell command with the TSV inside (base64, so tabs and
+  // Japanese survive the terminal paste) that writes the file.
+  const tsv = document.getElementById('tsv').value;
+  const b64 = btoa(String.fromCharCode(...new TextEncoder().encode(tsv)));
+  const cmd = "echo '" + b64 + "' | base64 -d > " + SAVE_PATH;
+  try {{ await navigator.clipboard.writeText(cmd); }}
+  catch (e) {{ const area = document.getElementById('tsv'); area.value = cmd; area.select(); document.execCommand('copy'); render(); }}
+  document.getElementById('status').textContent += '（保存コマンドをコピーした。端末に貼って実行）';
+}});
 document.getElementById('copy').addEventListener('click', async () => {{
   const area = document.getElementById('tsv');
   try {{ await navigator.clipboard.writeText(area.value); }} catch (e) {{ area.select(); document.execCommand('copy'); }}
@@ -889,7 +901,8 @@ def main():
                + '、'.join(f'{k} {v}' for k, v in sorted(counts.items()) if k != 'judge'))
     (args.review / 'index.html').write_text(PAGE.format(
         title=html.escape(args.title), model=html.escape(args.model),
-        human=html.escape(str(args.human.resolve() if args.human else 'work/eval/作業名-judge-human.tsv')), summary=summary,
+        human=html.escape(str(args.human.resolve() if args.human else 'work/eval/作業名-judge-human.tsv')),
+        save_path=json.dumps(shlex.quote(str(args.human.resolve() if args.human else 'human.tsv'))), summary=summary,
         sections=page_sections, items=json.dumps(data, ensure_ascii=False), header='\\t'.join(HUMAN)),
         encoding='utf-8')
     print(summary)

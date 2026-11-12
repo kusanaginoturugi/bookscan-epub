@@ -36,6 +36,7 @@ import csv
 import html
 import importlib.util
 import json
+import shlex
 import re
 import unicodedata
 from collections import Counter, defaultdict
@@ -220,6 +221,24 @@ def load_human(path):
     return decisions
 
 
+def final_winners(decisions):
+    # word -> the words it finally loses to. Chains of half-right choices
+    # (バーセブトロン < パーセブトロン < パーセプトロン) end at a word that never
+    # loses; a loop has no such word and gives an empty set.
+    beaten = defaultdict(set)
+    for k, c in decisions.items():
+        if c != 'both':
+            beaten[k[0] if c == k[1] else k[1]].add(c)
+
+    def final(word, seen=()):
+        if word not in beaten:
+            return {word}
+        if word in seen:
+            return set()
+        return set().union(*(final(w, seen + (word,)) for w in beaten[word]))
+    return {word: final(word) for word in beaten}
+
+
 def glossary_rows(decisions, sources, occurrences):
     winners = {}
     for key, choice in decisions.items():
@@ -227,8 +246,13 @@ def glossary_rows(decisions, sources, occurrences):
             continue
         loser = key[0] if choice == key[1] else key[1]
         winners.setdefault(choice, []).append(f'{loser}({len(occurrences.get(loser, []))}):{sources[key]}')
-    losers = {k[0] if c == k[1] else k[1] for k, c in decisions.items() if c != 'both'}
-    clash = sorted(set(winners) & losers)
+    finals = final_winners(decisions)
+    losers = set(finals)
+    # A word that loses somewhere is not a term, even if it beat a worse reading.
+    # Only loops clash.
+    clash = sorted(w for w in set(winners) & losers if not finals[w])
+    for w in set(winners) & losers:
+        winners.pop(w)
     rows = {term: [term, len(occurrences.get(term, [])), ' '.join(v), 'yes', '']
             for term, v in winners.items() if len(term) >= 2}
     for key, choice in decisions.items():
@@ -293,7 +317,7 @@ figcaption{{font-size:13px;writing-mode:horizontal-tb;max-width:9em}}
 人の選択は常に自動判定より優先する。選択はこのブラウザにも一時保存される。</p>
 <p>{summary}</p>
 {sections}
-<div id="out"><button id="prev">↑ 前の未確認（p）</button> <button id="next">次の未確認 ↓（n）</button> <label><input type="checkbox" id="advance" checked>選んだら次の未確認へ進む</label> <button id="copy">TSVをコピー</button> → 保存: <code id="save">wl-paste &gt; {human}</code> <span id="status"></span>
+<div id="out"><button id="prev">↑ 前の未確認（p）</button> <button id="next">次の未確認 ↓（n）</button> <label><input type="checkbox" id="advance" checked>選んだら次の未確認へ進む</label> <button id="savecmd">保存コマンドをコピー</button>（端末に貼って実行すると {human} に保存） <button id="copy">TSVだけコピー</button> <span id="status"></span>
 <textarea id="tsv" readonly></textarea></div>
 <script>
 const PAIRS = {pairs};
@@ -369,6 +393,17 @@ document.addEventListener('change', e => {{
   if (m && e.target.value !== 'undecided' && document.getElementById('advance').checked) setTimeout(() => jump(Number(m[1]), 1), 150);
 }});
 
+const SAVE_PATH = {save_path};
+document.getElementById('savecmd').addEventListener('click', async () => {{
+  // One click: a shell command with the TSV inside (base64, so tabs and
+  // Japanese survive the terminal paste) that writes the file.
+  const tsv = document.getElementById('tsv').value;
+  const b64 = btoa(String.fromCharCode(...new TextEncoder().encode(tsv)));
+  const cmd = "echo '" + b64 + "' | base64 -d > " + SAVE_PATH;
+  try {{ await navigator.clipboard.writeText(cmd); }}
+  catch (e) {{ const area = document.getElementById('tsv'); area.value = cmd; area.select(); document.execCommand('copy'); render(); }}
+  document.getElementById('status').textContent += '（保存コマンドをコピーした。端末に貼って実行）';
+}});
 document.getElementById('copy').addEventListener('click', async () => {{
   const area = document.getElementById('tsv');
   try {{ await navigator.clipboard.writeText(area.value); }}
@@ -465,6 +500,13 @@ def main():
         for word in key:
             for place in occurrences.get(word, []):
                 fixes[place] = (to, 'human')
+    # The text layer fixes readings one kana away from a term; a reading that
+    # reaches its term only through a chain (バーセブトロン -> パーセプトロン) is
+    # fixed here at each place.
+    for word, final in final_winners(decisions).items():
+        if len(final) == 1 and (to := next(iter(final))) not in variants(word) and len(word) == len(to):
+            for place in occurrences.get(word, []):
+                fixes.setdefault(place, (to, 'chain'))
     if args.corrections_out:
         with args.corrections_out.open('w', newline='') as handle:
             writer = csv.writer(handle, delimiter='\t', lineterminator='\n')
@@ -477,7 +519,7 @@ def main():
                                  line['page'], line['line_id'], left, text[start:end], to, right, source])
     sources_count = Counter(source for _, source in fixes.values())
     print(f'corrections: {sources_count["auto-agree"]} where crop and YomiToku agree, '
-          f'{sources_count["human"]} from "both wrong" choices')
+          f'{sources_count["human"]} from "both wrong" choices, {sources_count["chain"]} through chains of choices')
     if args.glossary_out:
         rows, clash = glossary_rows(decisions, sources, occurrences)
         if clash:
@@ -577,7 +619,8 @@ def main():
                f'自動修正 {sum(len(p) for _, p in fix_items)}か所・{fix_count}語（最後に並ぶ）。本文の行 {len(lines)}、YomiTokuのページ {len(yomitoku)}。')
     (args.output / 'index.html').write_text(PAGE.format(
         title=html.escape(args.title), summary=summary, sections='\n'.join(sections_pairs + sections),
-        human=html.escape(str(args.human.resolve() if args.human else '人の選択TSV')), pairs=json.dumps(data, ensure_ascii=False)), encoding='utf-8')
+        human=html.escape(str(args.human.resolve() if args.human else '人の選択TSV')),
+        save_path=json.dumps(shlex.quote(str(args.human.resolve() if args.human else 'human.tsv'))), pairs=json.dumps(data, ensure_ascii=False)), encoding='utf-8')
     print(summary)
     print(f'{len(order)} pairs, {sum(len(v) for v in examples.values())} examples: {args.output / "index.html"}')
 

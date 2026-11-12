@@ -305,8 +305,7 @@ NDLとYomiTokuの残りの食い違いを、ローカルLLMが判断する。 -
 に <code>312-322</code>
 のように書く。レビュー画面の下の「次の未確認」（キーは
 <code>n</code>、戻るは
-<code>p</code>）で、まだ見ていない箇所へ移れる。選んだら次へ自動で進む。同じシリーズの本は、<code>VOCAB_FROM=前作の作業名</code>
-を付けると、前作の文字層のカタカナ語を「本の中の語」の規則に足せる。前作の
+<code>p</code>）で、まだ見ていない箇所へ移れる。選んだら次へ自動で進む。同じシリーズの本は、<code>VOCAB_FROM=前作の作業名</code>（複数ならコンマ区切り）を付けると、前作の文字層のカタカナ語を「本の中の語」の規則に足せる。前作の
 <code>voicing-human.tsv</code>
 を新しい作業ディレクトリに写しておけば、パ／バの選択も引き継げる（その本に出ない組は警告を出して無視する）。YomiTokuかLLM（llama-server）が見つからないと止まる。使わないなら
 <code>SKIP_YOMITOKU=1</code> や <code>SKIP_JUDGE=1</code>
@@ -316,9 +315,9 @@ NDLとYomiTokuの残りの食い違いを、ローカルLLMが判断する。 -
 <div class="sourceCode" id="cb1"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="va">SOURCE</span><span class="op">=</span>0101-20150604105123153_check.pdf   <span class="co"># data/bookscan-catalog.tsv の source</span></span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="va">NDLOCR_DEVICE</span><span class="op">=</span>cuda <span class="ex">bin/build-searchable-book.sh</span> <span class="st">&quot;</span><span class="va">$SOURCE</span><span class="st">&quot;</span> jikan-dorobou</span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="co"># 最後に、2つのレビュー画面と、まだ人が見ていない判断の数が表示される。</span></span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="co"># 画面で選んだら「TSVをコピー」して保存し、同じコマンドをもう一度実行する（パ／バを先に）。</span></span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="ex">wl-paste</span> <span class="op">&gt;</span> work/searchable/jikan-dorobou/voicing-human.tsv</span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="ex">wl-paste</span> <span class="op">&gt;</span> work/searchable/jikan-dorobou/judge-human.tsv</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="co"># 画面で選んだら「保存コマンドをコピー」を押し、端末に貼って実行する（選択をbase64で埋め込んだ</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="co"># echo &#39;…&#39; | base64 -d &gt; 保存先 の1行）。「TSVだけコピー」なら wl-paste &gt; 保存先 で保存する。</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="co"># 保存したら同じコマンドをもう一度実行する（パ／バを先に）。</span></span>
 <span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="co"># 本全体で原本と違う字を使うなら、対応表を置いてから再実行する（例: 掴を摑に）</span></span>
 <span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="bu">printf</span> <span class="st">&#39;from\tto\n掴\t摑\n&#39;</span> <span class="op">&gt;</span> work/searchable/jikan-dorobou/char-map.tsv</span>
 <span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a></span>
@@ -366,13 +365,14 @@ href="docs/progress.html">docs/progress.md</a>
 <strong>自動判定（<code>--auto-crop</code>）：</strong>
 濁点・半濁点を含むカタカナ語をすべて原本から切り出して読み直し、安全な組だけを確定する。組として決まっていない箇所で、読み直しとYomiTokuがNDLと違う同じ綴りを読んだら、その箇所を直す（自動修正）。
 - <strong>レビュー画面：</strong>
-組ごとに、ページの縮小画像・行・3倍拡大を並べる。選択肢は2つの綴り、「両方正しい」、「どちらも違う」（正しい綴りを書く）。自動修正は最後に並び、「直さない」を選べる。人が選んだものだけが、画面の下のTSV（a、b、choice。自動修正は
-<code>fix:ID</code>）にまとまる。それを <code>--human</code>
+組ごとに、ページの縮小画像・行・3倍拡大を並べる。選択肢は2つの綴り、「両方正しい」、「どちらも違う」（正しい綴りを書く）。自動修正は最後に並び、同じ語の修正は1項目にまとまる（1回の選択でその語の全箇所に当たる）。「直さない」を選べる。人が選んだものだけが、画面の下のTSV（a、b、choice。自動修正は
+<code>fix:元の綴り→直した綴り</code>。以前の箇所ごとの
+<code>fix:ID</code> も読む）にまとまる。それを <code>--human</code>
 に渡すと、自動判定より優先される。 - <strong>辞書と修正：</strong>
 <code>--glossary-out</code>
 が、人の選択、次に自動判定から、<code>--fix-variants</code>
-用の辞書を書き出す。<code>--corrections-out</code>
-は、自動修正と「どちらも違う」の箇所ごとの修正を書き出す。これは
+用の辞書を書き出す。人の選択が連鎖するとき（バーセブトロン＜パーセブトロン＜パーセプトロン）は、最後に勝つ語だけを辞書に入れる。負けた語が勝った語を負かしていても、その語は辞書に入れない。選択が輪になったときだけ止まる。<code>--corrections-out</code>
+は、自動修正と「どちらも違う」の箇所ごとの修正を書き出す。連鎖の先の語と2文字以上違う読み（辞書の1文字違いの読み替えでは届かない）も、ここで箇所ごとに直す。これは
 <code>rebuild-text-layer.py --word-corrections</code>
 が、括弧の補正のあと、辞書の前に当てる。行をまたぐカタカナ語の片割れ（パター｜ン）は組に入れない。</p>
 <div class="sourceCode" id="cb3"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="ex">.venv-ndl/bin/python</span> bin/build-voicing-review.py input/bookscan-downloads/<span class="va">$SOURCE</span> <span class="dt">\</span></span>

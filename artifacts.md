@@ -15,12 +15,12 @@
 
 ## 巨人たちの星（2026-11-12）
 
-前の2冊の語彙とパ／バの選択を引き継いで、`bin/build-searchable-book.sh` で通した。人のレビュー前。
+前の2冊の語彙とパ／バの選択を引き継いで、`bin/build-searchable-book.sh` で通した。パ／バと判断モデルの割れた箇所は、ユーザーがすべてレビューした。
 
 | 種類 | ファイル | 内容 |
 |---|---|---|
 | 完成品 | [検索可能PDF](output/searchable/巨人たちの星%20-%20ジェイムズ・P・ホーガン.pdf) | 484ページ。巻末目録（475〜482ページ）はレビューの対象外 |
-| レビュー | [パ／バ](review/kyojin-tachi-no-hoshi-voicing/index.html)・[判断モデル](review/kyojin-tachi-no-hoshi-judge/index.html) | パ／バは29組と自動修正7語（プローヒリオ→ブローヒリオ76か所など）、判断モデルは割れた37か所 |
+| レビュー | [パ／バ](review/kyojin-tachi-no-hoshi-voicing/index.html)・[判断モデル](review/kyojin-tachi-no-hoshi-judge/index.html) | パ／バ29組と自動修正7語（プローヒリオ→ブローヒリオ76か所など）、判断モデルの割れた37か所をすべて確認済み |
 
 ## ガニメデの優しい巨人（2026-11-12）
 
