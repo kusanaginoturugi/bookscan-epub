@@ -33,8 +33,9 @@ import difflib
 import html
 import importlib.util
 import json
+import re
 import unicodedata
-from collections import defaultdict
+from collections import Counter, defaultdict
 from pathlib import Path
 
 import pypdfium2
@@ -92,6 +93,69 @@ def norm_char(ch):
     return '―' if out in DASHES else out
 
 
+# Katakana and a hiragana or kanji of (almost) the same printed shape: an image
+# cannot tell them apart, the neighbouring characters can.
+LOOKALIKE = {'ヘ': 'へ', 'ベ': 'べ', 'ペ': 'ぺ', 'ロ': '口', 'ニ': '二', 'エ': '工', 'カ': '力', 'ハ': '八',
+             'ト': '卜', 'タ': '夕'}
+SAME_SHAPE = {'ヘ', 'ベ', 'ペ'}  # identical glyphs; the others differ slightly
+
+
+def is_katakana(ch):
+    return bool(ch) and ('ァ' <= ch <= 'ヺ' or ch == 'ー')
+
+
+def script(ch):
+    if is_katakana(ch):
+        return 'カタカナ'
+    if 'ぁ' <= ch <= 'ゖ':
+        return 'ひらがな'
+    if '一' <= ch <= '鿿':
+        return '漢字'
+    return ''
+
+
+def standalone_counts(lines):
+    """Katakana words not touching a look-alike character nor split over a line
+    break, so リッキイ counts but the ラス of a misread へラス or of ガ|ラス does not."""
+    shapes = set(LOOKALIKE) | set(LOOKALIKE.values())
+    found = Counter()
+    for line in lines:
+        text = line['text']
+        lo, hi = len(text) - len(text.lstrip()), len(text.rstrip())
+        for match in re.finditer(r'[ァ-ヺー]{2,}', text):
+            before = text[match.start() - 1] if match.start() else ''
+            after = text[match.end()] if match.end() < len(text) else ''
+            if before in shapes or after in shapes:
+                continue
+            if (line['joined'][0] and match.start() == lo) or (line['joined'][1] and match.end() == hi):
+                continue
+            found[match.group()] += 1
+    return found
+
+
+def lookalike_choice(text, start, end, kata, other, word_counts, alone_counts):
+    """'kata', 'other' or None for a look-alike pair at text[start:end]."""
+    left_ch = text[start - 1] if start > 0 else ''
+    right_ch = text[end] if end < len(text) else ''
+    if is_katakana(left_ch) and is_katakana(right_ch):
+        return 'kata'
+    i, j = start, end
+    while i > 0 and is_katakana(text[i - 1]):
+        i -= 1
+    while j < len(text) and is_katakana(text[j]):
+        j += 1
+    word = text[i:start] + kata + text[end:j]
+    seen = word_counts.get(word, 0) - (text[start:end] == kata)  # not counting this place
+    if len(word) >= 2 and seen > 0:
+        return 'kata'  # ヘルメット elsewhere in the book
+    rest_left, rest_right = text[i:start], text[end:j]
+    if (len(rest_right) >= 2 and alone_counts.get(rest_right, 0)) or (len(rest_left) >= 2 and alone_counts.get(rest_left, 0)):
+        return 'other'  # そこへリッキイ: リッキイ is a word of its own
+    if kata in SAME_SHAPE and not is_katakana(left_ch) and not is_katakana(right_ch):
+        return 'other'
+    return None
+
+
 def kind(x, y):
     if '"' in x:
         return 'quote'  # paired into 〝〟 per page after corrections
@@ -110,6 +174,8 @@ def kind(x, y):
         return 'diacritic'
     if len(x) == len(y) and x.translate(SMALL) == y.translate(SMALL):
         return 'small-kana'
+    if len(x) == len(y) == 1 and (LOOKALIKE.get(x) == y or LOOKALIKE.get(y) == x):
+        return 'lookalike'
     if not x or not y:
         return 'one-sided'
     return 'judge'
@@ -208,6 +274,13 @@ def resolve(verdict, item, text):
         if (left and to.startswith(left)) or (right and to.endswith(right)):
             return (to,) + wide
     return to, start, end
+
+
+def kinds(mine, theirs):
+    # Name the script when one character differs only in it (ヘ/へ look the same).
+    if len(mine) == len(theirs) == 1 and script(mine) != script(theirs) and script(mine):
+        return f'　（{mine}は{script(mine)}）'
+    return ''
 
 
 def line_shaped(item):
@@ -389,6 +462,8 @@ def main():
     today = datetime.date.today().isoformat()
 
     items, counts = [], defaultdict(int)
+    word_counts = Counter(w for line in lines for w in re.findall(r'[ァ-ヺー]{2,}', line['text']))
+    alone_counts = standalone_counts(lines)
     new_history = []
     for index, line in enumerate(lines):
         words = [text for box, text in yomitoku.get(line['page'], []) if iou(line['box'], box) > 0.5]
@@ -408,6 +483,21 @@ def main():
             counts[category] += 1
             left, right = text[max(0, start - CONTEXT):start], text[end:end + CONTEXT]
             hunk_id = f'{line["page"]}:{line["line_id"]}:{left}[{frm}→{to}]{right}'
+            if category == 'lookalike':
+                kata, other = (frm, to) if is_katakana(frm) else (to, frm)
+                choice = lookalike_choice(text, start, end, kata, other, word_counts, alone_counts)
+                if choice:
+                    pick = kata if choice == 'kata' else other
+                    items.append(dict(id=hunk_id, page=line['page'], line_id=line['line_id'], left=left,
+                                      ndl=frm, yomitoku=to, right=right, line=text, first='rule-shape',
+                                      second='rule-shape', decision='ndl' if pick == frm else 'yomitoku',
+                                      model='rule:lookalike', prompt='', date=today,
+                                      index=index, start=start, end=end))
+                    continue
+                if kata in SAME_SHAPE:
+                    category = 'lookalike-undecided'  # the LLM only guesses here; keep NDL
+                else:
+                    category = 'judge'  # ロ/口, カ/力: context can decide
             if category not in ('judge', 'old-form', 'joined-voicing'):
                 # Rules keep NDL here, but a human verdict on the hunk still wins.
                 if hunk_id in human:
@@ -549,12 +639,17 @@ def main():
                     f'{esc(reading.get(v2b, ""))}（{v2b}）')
         if item['first'] == 'rule':
             llm = '聞いていない（旧字体はYomiTokuを採る規則）'
+        elif item['first'] == 'rule-shape':
+            llm = '聞いていない（形が同じ文字。前後の文字と、本の中に出てくる語で決めた）'
         elif item['first'] == 'skip':
             llm = f'聞いていない（規則でNDLのまま: {esc(item["model"][5:])}）'
         if verdict:
             now, why = verdict['to'], '人の判定'
         elif item['first'] == 'rule':
             now, why = item['yomitoku'], 'YomiTokuの読み。旧字体の規則'
+        elif item['first'] == 'rule-shape':
+            chosen = item['yomitoku'] if item['decision'] == 'yomitoku' else item['ndl']
+            now, why = chosen, f'{"YomiToku" if item["decision"] == "yomitoku" else "NDL"}の読み。形が同じ文字の規則'
         elif item['decision'] == 'yomitoku':
             now, why = item['yomitoku'], 'YomiTokuの読み。LLMが2回とも選んだ'
         elif item['decision'] == 'split':
@@ -572,8 +667,8 @@ def main():
             f'<section id="s{n}" class="{"human" if verdict else labels[item["decision"]]}"><h2>#{n + 1} {item["page"]}ページ・行{item["line_id"]}'
             f'{"【線・記号：6倍で表示】" if line_shaped(item) else ""}</h2>'
             f'<table><tr class="now"><td>文字層の今の読み</td><td>{esc(item["left"])}{esc(now)}{esc(item["right"])}（{why}）</td></tr>'
-            f'<tr><td>NDL</td><td>{esc(item["left"])}<b>{esc(item["ndl"])}</b>{esc(item["right"])}</td></tr>'
-            f'<tr><td>YomiToku</td><td>{esc(item["left"])}<b>{esc(item["yomitoku"])}</b>{esc(item["right"])}</td></tr>'
+            f'<tr><td>NDL</td><td>{esc(item["left"])}<b>{esc(item["ndl"])}</b>{esc(item["right"])}{kinds(item["ndl"], item["yomitoku"])}</td></tr>'
+            f'<tr><td>YomiToku</td><td>{esc(item["left"])}<b>{esc(item["yomitoku"])}</b>{esc(item["right"])}{kinds(item["yomitoku"], item["ndl"])}</td></tr>'
             f'<tr><td>LLM</td><td>{llm}</td></tr></table>'
             f'<div class="ex"><img src="img/{n}-thumb.jpg"><img src="img/{n}-line.jpg"><img src="img/{n}-zoom.jpg"></div>'
             f'<div class="opts">{options} <input id="c{n}" size="24" value="{esc(item["left"] + item["ndl"] + item["right"])}" '
