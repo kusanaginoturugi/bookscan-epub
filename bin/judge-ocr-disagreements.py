@@ -407,6 +407,40 @@ def at_join(line, start, end):
     return (line['joined'][1] and j == hi) or (line['joined'][0] and i == lo)
 
 
+WORD_CHARS = r'[ァ-ヺー・＝=―‐\-]'
+
+
+def word_key(text, start, end, ndl, yomitoku):
+    # A hunk inside a katakana word (シンゲン[ー→―]フー) is keyed by the whole
+    # word, so a verdict holds wherever the word recurs, whatever follows it.
+    if not (re.fullmatch(WORD_CHARS + '+', ndl) and re.fullmatch(WORD_CHARS + '*', yomitoku)):
+        return None
+    left = re.search(WORD_CHARS + '*$', text[:start]).group()
+    right = re.match(WORD_CHARS + '*', text[end:]).group()
+    if not (re.search('[ァ-ヺ]', left) and re.search('[ァ-ヺ]', right)):
+        return None
+    return left, ndl, yomitoku, right
+
+
+def series_verdicts(dirs):
+    # Word verdicts (word_key -> chosen readings) a person made in other books of the series.
+    found = defaultdict(set)
+    for directory in dirs:
+        lines = {r['id']: r for r in read_tsv(directory / 'judge' / 'history.tsv')}
+        for row in read_tsv(directory / 'judge-human.tsv'):
+            seen = lines.get(row['id'])
+            if row['verdict'] not in ('ndl', 'yomitoku') or not seen:
+                continue
+            context = seen['left'] + seen['ndl'] + seen['right']
+            if seen['line'].count(context) != 1:
+                continue
+            start = seen['line'].find(context) + len(seen['left'])
+            key = word_key(seen['line'], start, start + len(seen['ndl']), seen['ndl'], seen['yomitoku'])
+            if key:
+                found[key].add(row['to'])
+    return found
+
+
 def read_tsv(path):
     if not path or not path.exists():
         return []
@@ -568,6 +602,9 @@ def main():
                         help='TSV (word, count) of katakana words from finished books of the same series; '
                              'added to the book-word rule')
     parser.add_argument('--human', type=Path, help='TSV saved from the review page')
+    parser.add_argument('--series', type=Path, action='append', default=[],
+                        help="work directory of a reviewed book of the same series; its person's verdicts "
+                             'on hunks inside katakana words apply here too (repeatable)')
     parser.add_argument('--max-hunks', type=int, default=4)
     parser.add_argument('--skip-pages', help="pages not judged, e.g. '312-322'")
     parser.add_argument('--skip-catalog', action='store_true',
@@ -739,6 +776,27 @@ def main():
             v, to, frm, left, right = next(iter(found))
             propagated[item['id']] = dict(id=item['id'], page=item['page'], line_id=item['line_id'], left=left,
                                           to=to, right=right, verdict=v, propagated='yes', **{'from': frm})
+    # A verdict on a hunk inside a katakana word applies wherever the word recurs
+    # (シンゲン[ー→―]フー before は, の, や ...), here or in reviewed books of the series.
+    by_word = series_verdicts(args.series)
+    for item in items:
+        verdict = human.get(item['id'])
+        if verdict and verdict['verdict'] in ('ndl', 'yomitoku'):
+            key = word_key(lines[item['index']]['text'], item['start'], item['end'], item['ndl'], item['yomitoku'])
+            if key:
+                by_word[key].add(verdict['to'])
+    words_applied = 0
+    for item in items:
+        if item['id'] in human or item['id'] in propagated:
+            continue
+        found = by_word.get(word_key(lines[item['index']]['text'], item['start'], item['end'],
+                                     item['ndl'], item['yomitoku']))
+        if found and len(found) == 1 and (to := next(iter(found))) in (item['ndl'], item['yomitoku']):
+            propagated[item['id']] = dict(id=item['id'], page=item['page'], line_id=item['line_id'],
+                                          left=item['left'], to=to, right=item['right'], propagated='word',
+                                          verdict='ndl' if to == item['ndl'] else 'yomitoku', **{'from': item['ndl']})
+            words_applied += 1
+    print(f'verdicts applied by word: {words_applied}')
     # A book sets one bracket style (its log entries in 【】, not 『』): a swap
     # decided by a person applies to the other swaps of the same two marks.
     by_marks = defaultdict(set)
@@ -847,7 +905,9 @@ def main():
             llm = '聞いていない（括弧の種類だけが違う。縦書きでは『と【が似ていて、文脈では決まらない）'
         elif item['first'] == 'skip':
             llm = f'聞いていない（規則でNDLのまま: {esc(item["model"][5:])}）'
-        if verdict and verdict.get('propagated'):
+        if verdict and verdict.get('propagated') == 'word':
+            now, why = verdict['to'], '人の判定（同じ語の別の箇所か、シリーズの前の本での判定を当てた）'
+        elif verdict and verdict.get('propagated'):
             now, why = verdict['to'], '人の判定（同じ形の箇所の判定を当てた）'
         elif verdict:
             now, why = verdict['to'], '人の判定'
