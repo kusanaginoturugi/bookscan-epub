@@ -68,8 +68,8 @@ SMALL = str.maketrans('ァィゥェォッャュョヮヵヶぁぃぅぇぉっゃ
 # NDLOCR-Lite answers in the simplified form (掴) even where the page prints
 # the traditional one (摑), and lacks some of these in its character list
 # (頰, 噓, 鷗, 啞, 𠮟, 瘦); YomiToku reads them as printed.
-OLD_FORMS = dict(zip('掴噛頬嘘剥填鴎掻屏祷蝋唖叱痩撹麹鹸繍蒋醤蝉槙溌涜騨顛挟挿',
-                     '摑嚙頰噓剝塡鷗搔屛禱蠟啞𠮟瘦攪麴鹼繡蔣醬蟬槇潑瀆驒顚挾插'))
+OLD_FORMS = dict(zip('掴噛頬嘘剥填鴎掻屏祷蝋唖叱痩撹麹鹸繍蒋醤蝉槙溌涜騨顛挟挿繋侠頚麺屡蛍渇祢迩箪',
+                     '摑嚙頰噓剝塡鷗搔屛禱蠟啞𠮟瘦攪麴鹼繡蔣醬蟬槇潑瀆驒顚挾插繫俠頸麵屢螢渴禰邇簞'))
 LINE_SHAPED = set('一「」『』[]\\|―ー-−—')
 STYLE = {'·': '・', '“': '〝', '”': '〟'}
 DASHES = set('―—–─‐-')
@@ -223,6 +223,9 @@ def paired_bracket(lines, index, start, ndl):
     return bool(opening) and opening in before
 
 
+BRACKET_MARKS = set('「」『』【】〔〕（）()《》〈〉［］[]')
+
+
 def kind(x, y):
     if '"' in x:
         return 'quote'  # paired into 〝〟 per page after corrections
@@ -235,6 +238,8 @@ def kind(x, y):
         return 'voicing'
     if set(x + y) <= set('<>〈〉"〝〟＜＞'):
         return 'bracket'
+    if len(x) == len(y) == 1 and x in BRACKET_MARKS and y in BRACKET_MARKS:
+        return 'bracket-swap'  # 『 and 【 look alike in vertical print; a person decides
     if x and set(x) <= {'―'} and (not y or set(y) <= set('ーし|!」')):
         return 'dash'
     if len(x) == len(y) == 1 and unicodedata.normalize('NFKD', x)[0] == unicodedata.normalize('NFKD', y)[0]:
@@ -343,15 +348,47 @@ def resolve(verdict, item, text):
     return to, start, end
 
 
+def flow(lines, item):
+    # The end of the previous line | this line (hunk in bold) | the start of the next.
+    esc = html.escape
+    prev, nxt = neighbours(lines, item['index'])
+    text = item['line']
+    return (f'<span class="dim">{esc(prev[-12:])}</span>｜{esc(text[:item["start"]])}'
+            f'<b>{esc(item["ndl"])}</b>{esc(text[item["end"]:])}｜<span class="dim">{esc(nxt[:12])}</span>')
+
+
 def kinds(mine, theirs):
-    # Name the script when one character differs only in it (ヘ/へ look the same).
+    # Name the script when one character differs only in it (ヘ/へ look the same),
+    # and the form and code point of look-alike kanji (繋 U+7E4B / 繫 U+7E6B).
     if len(mine) == len(theirs) == 1 and script(mine) != script(theirs) and script(mine):
         return f'　（{mine}は{script(mine)}）'
+    if len(mine) == len(theirs) == 1 and script(mine) == script(theirs) == '漢字':
+        form = '旧字体' if mine in OLD_FORMS.values() else '新字体' if mine in OLD_FORMS else ''
+        return f'　（{mine}は{form + "、" if form else ""}U+{ord(mine):04X}）'
     return ''
 
 
 def line_shaped(item):
     return bool(set(item['ndl']) <= LINE_SHAPED and item['ndl']) or bool(set(item['yomitoku']) <= LINE_SHAPED and item['yomitoku'])
+
+
+def neighbours(lines, index):
+    # Text of the previous and next line on the same page ('' at page edges).
+    page = lines[index]['page']
+    prev = lines[index - 1]['text'] if index > 0 and lines[index - 1]['page'] == page else ''
+    nxt = lines[index + 1]['text'] if index + 1 < len(lines) and lines[index + 1]['page'] == page else ''
+    return prev, nxt
+
+
+def at_edge(text, start, end):
+    # 'start' or 'end' when the hunk is within two characters of a line edge,
+    # where the sentence continues on the neighbouring line.
+    lo, hi = len(text) - len(text.lstrip()), len(text.rstrip())
+    if start - lo <= 1:
+        return 'start'
+    if hi - end <= 1:
+        return 'end'
+    return None
 
 
 def at_join(line, start, end):
@@ -388,6 +425,7 @@ section.human h2::after{{content:"（確認済み）";color:#070}}
 .ex{{display:flex;gap:10px;align-items:flex-start;margin:.5em 0}} .opts label{{margin-right:1em}}
 table{{border-collapse:collapse}} td{{padding:2px 8px;border:1px solid #ccc;font-size:16px}}
 tr.now td{{background:#e3f4e3;font-weight:bold}}
+td.flow{{font-size:14px}} .dim{{color:#777}}
 .done h2{{color:#777}} #out{{position:sticky;bottom:0;background:#f4f4f4;padding:.6em;border-top:2px solid #999}}
 textarea{{width:100%;height:10em;font-family:monospace}}
 </style>
@@ -599,6 +637,12 @@ def main():
                     category = 'lookalike-undecided'  # the LLM only guesses here; keep NDL
                 else:
                     category = 'judge'  # ロ/口, カ/力: context can decide
+            if category == 'bracket-swap':
+                items.append(dict(id=hunk_id, page=line['page'], line_id=line['line_id'], left=left,
+                                  ndl=frm, yomitoku=to, right=right, line=text, first='review',
+                                  second='review', decision='split', model='rule:bracket-swap', prompt='',
+                                  date=today, index=index, start=start, end=end))
+                continue
             if category not in ('judge', 'old-form', 'joined-voicing'):
                 # Rules keep NDL here, but a human verdict on the hunk still wins.
                 if hunk_id in human:
@@ -613,19 +657,30 @@ def main():
                                   decision='yomitoku', model='rule:old-form', prompt='', date=today,
                                   index=index, start=start, end=end))
                 continue
+            edge = at_edge(text, start, end)
+
             def asked(version):
+                # At a line edge v1 also sees the line the sentence continues on.
+                if version == 'v1' and edge:
+                    version = 'v1-edge'
                 record = done.get((hunk_id, args.model, version))
                 if record is not None:
                     return record
                 if version == 'v1':
                     mine, theirs = text, text[:start] + to + text[end:]
+                elif version == 'v1-edge':
+                    prev, nxt = neighbours(lines, index)
+                    before = prev if edge == 'start' else ''
+                    after = nxt if edge == 'end' else ''
+                    mine = before + text + after
+                    theirs = before + text[:start] + to + text[end:] + after
                 else:
                     same_page = lambda i: 0 <= i < len(lines) and lines[i]['page'] == line['page']
                     before = lines[index - 1]['text'] if same_page(index - 1) else ''
                     after = lines[index + 1]['text'] if same_page(index + 1) else ''
                     mine = before + text[:start] + '【' + frm + '】' + text[end:] + after
                     theirs = before + text[:start] + '【' + to + '】' + text[end:] + after
-                prompt = PROMPTS[version]
+                prompt = PROMPTS['v1' if version == 'v1-edge' else version]
                 first = ask(args.url, args.model, prompt.format(a=mine, b=theirs))
                 second = ask(args.url, args.model, prompt.format(a=theirs, b=mine))
                 one = {'A': 'ndl', 'B': 'yomitoku'}.get(first)
@@ -672,6 +727,20 @@ def main():
             v, to, frm, left, right = next(iter(found))
             propagated[item['id']] = dict(id=item['id'], page=item['page'], line_id=item['line_id'], left=left,
                                           to=to, right=right, verdict=v, propagated='yes', **{'from': frm})
+    # A book sets one bracket style (its log entries in 【】, not 『』): a swap
+    # decided by a person applies to the other swaps of the same two marks.
+    by_marks = defaultdict(set)
+    for item in items:
+        verdict = human.get(item['id'])
+        if verdict and item.get('model') == 'rule:bracket-swap' and verdict['verdict'] in ('ndl', 'yomitoku', 'ok'):
+            by_marks[(item['ndl'], item['yomitoku'])].add(verdict['to'])
+    for item in items:
+        found = by_marks.get((item['ndl'], item['yomitoku']))
+        if (item.get('model') == 'rule:bracket-swap' and item['id'] not in human
+                and item['id'] not in propagated and found and len(found) == 1):
+            propagated[item['id']] = dict(id=item['id'], page=item['page'], line_id=item['line_id'],
+                                          left=item['left'], to=next(iter(found)), right=item['right'],
+                                          verdict='ok', propagated='yes', **{'from': item['ndl']})
     if orphans:
         raise SystemExit(f'{len(orphans)} human verdicts match no hunk (text changed?): {orphans[:5]}')
     human.update(propagated)
@@ -762,6 +831,8 @@ def main():
             llm = '聞いていない（形が同じ文字。前後の文字と、本の中に出てくる語で決めた）'
         elif item['first'] == 'rule-word':
             llm = f'聞いていない（本の中の語で決めた: {esc(item.get("reason", ""))}）'
+        elif item['first'] == 'review':
+            llm = '聞いていない（括弧の種類だけが違う。縦書きでは『と【が似ていて、文脈では決まらない）'
         elif item['first'] == 'skip':
             llm = f'聞いていない（規則でNDLのまま: {esc(item["model"][5:])}）'
         if verdict and verdict.get('propagated'):
@@ -795,7 +866,8 @@ def main():
             f'<table><tr class="now"><td>文字層の今の読み</td><td>{esc(item["left"])}{esc(now)}{esc(item["right"])}（{why}）</td></tr>'
             f'<tr><td>NDL</td><td>{esc(item["left"])}<b>{esc(item["ndl"])}</b>{esc(item["right"])}{kinds(item["ndl"], item["yomitoku"])}</td></tr>'
             f'<tr><td>YomiToku</td><td>{esc(item["left"])}<b>{esc(item["yomitoku"])}</b>{esc(item["right"])}{kinds(item["yomitoku"], item["ndl"])}</td></tr>'
-            f'<tr><td>LLM</td><td>{llm}</td></tr></table>'
+            f'<tr><td>LLM</td><td>{llm}</td></tr>'
+            f'<tr><td>前後の行</td><td class="flow">{flow(lines, item)}</td></tr></table>'
             f'<div class="ex"><img src="img/{n}-thumb.jpg"><img src="img/{n}-line.jpg"><img src="img/{n}-zoom.jpg"></div>'
             f'<div class="opts">{options} <input id="c{n}" size="24" value="{esc(item["left"] + item["ndl"] + item["right"])}" '
             f'title="前後の文字も含めて、正しい文字列に書き直す"> '
