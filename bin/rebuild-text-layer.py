@@ -48,6 +48,9 @@ def main():
                         help='replace dakuten/handakuten misreadings of --glossary terms')
     parser.add_argument('--ndl-src', type=Path,
                         default=Path(os.environ.get('NDLOCR_SRC', Path(__file__).resolve().parents[1] / 'vendor/ndlocr-lite/src')))
+    parser.add_argument('--dump-lines', type=Path,
+                        help='write a TSV of every line at each stage (raw OCR, margin re-read, rules, '
+                             'corrections, final) for proofreading samples')
     parser.add_argument('--angles', type=Path,
                         help='TSV from prepare-trial-pdf.py --angles; move OCR boxes from the '
                              'unrotated original with each deskewed page image')
@@ -100,6 +103,7 @@ def main():
     if any(page > count for page in angles):
         raise ValueError('angles TSV has pages beyond the PDF')
     page_results = []
+    dumped = []
     changed_lines = removed_spaces = quotes = 0
     unpaired_pages = []
     for page in range(1, count + 1):
@@ -121,11 +125,13 @@ def main():
                     raise ValueError(f'recognized TSV does not match OCR: {key}')
                 if int(row['height']) >= args.min_height:
                     text = row[args.column]
+            stages = {'raw': original, 'margin': text}
             if key in overrides:
                 override = overrides.pop(key)
                 if override['ocr_text'] != original:
                     raise ValueError(f'OCR changed for override: {key}')
                 text = override['corrected_text']
+                stages['rules'] = stages['judged'] = text
             else:
                 if args.fix_dashes and vertical:
                     text = fix_dashes(text)
@@ -137,6 +143,7 @@ def main():
                 text = clean_text(text, vertical, glossary)
                 if args.fix_variants:
                     text = fix_variants(text, glossary, variants, joins[position])
+                stages['rules'] = text
                 for row in corrections.pop(key, []):
                     # The surrounding characters must still be there, so a stale
                     # correction stops the build instead of landing elsewhere.
@@ -145,6 +152,7 @@ def main():
                         raise ValueError(f'correction does not match line {key}: {row["id"]}')
                     text = text.replace(old, row['left'] + row['to'] + row['right'])
                     applied += 1
+                stages['judged'] = text
                 if char_map:
                     before = text
                     text = text.translate(char_map)
@@ -163,8 +171,12 @@ def main():
                 dx = math.cos(angle) * ox + math.sin(angle) * oy - ox
                 dy = -math.sin(angle) * ox + math.cos(angle) * oy - oy
                 x0, x1, y0, y1 = x0 + dx, x1 + dx, y0 + dy, y1 + dy
+            box = (min(p[0] for p in item['boundingBox']), min(p[1] for p in item['boundingBox']),
+                   max(p[0] for p in item['boundingBox']), max(p[1] for p in item['boundingBox']))
             lines.append({'x': x0, 'y': y0, 'width': x1 - x0, 'height': y1 - y0,
-                          'text': text, 'is_vertical': vertical, 'original': original})
+                          'text': text, 'is_vertical': vertical, 'original': original,
+                          'dump': dict(stages, page=page, line_id=key[1], vertical=int(vertical),
+                                       box=','.join(map(str, box)))})
         if args.fix_brackets:
             vertical_lines = [line for line in lines if line['is_vertical']]
             texts, replaced = fix_quotes([line['text'] for line in vertical_lines])
@@ -176,6 +188,7 @@ def main():
                     line['text'] = text
         for line in lines:
             changed_lines += line.pop('original') != line['text']
+            dumped.append(dict(line.pop('dump'), final=line['text']))
         page_results.append({'text_layer_lines': lines, 'img_width': info['img_width'],
                              'img_height': info['img_height']})
     if overrides:
@@ -187,6 +200,12 @@ def main():
     if recognized:
         raise ValueError(f'recognized lines not found in OCR: {list(recognized)[:5]}')
     embed_text_layer_pdf(str(args.sanitized_pdf), str(args.output_pdf), page_results)
+    if args.dump_lines:
+        with args.dump_lines.open('w', newline='') as handle:
+            writer = csv.DictWriter(handle, ['page', 'line_id', 'vertical', 'box', 'raw', 'margin', 'rules',
+                                             'judged', 'final'], delimiter='\t', lineterminator='\n')
+            writer.writeheader()
+            writer.writerows(dumped)
     print(f'{args.output_pdf}: {count} pages, {changed_lines} lines normalized, '
           f'{removed_spaces} spaces removed')
     if args.word_corrections:

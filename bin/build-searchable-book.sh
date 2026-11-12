@@ -247,13 +247,14 @@ set -- --glossary "$VOICING_GLOSSARY" --fix-variants
 [ -z "$WORD_ARGS" ] || set -- "$@" $WORD_ARGS
 [ -z "$CORRECTIONS" ] || set -- "$@" --corrections "$CORRECTIONS"
 [ ! -e "$WORK/char-map.tsv" ] || set -- "$@" --char-map "$WORK/char-map.tsv"
-KEY=$(inputs_key "$VOICING_GLOSSARY" ${WORD_ARGS:+"$WORK/voicing-corrections.tsv"} ${CORRECTIONS:+"$CORRECTIONS"} "$WORK/char-map.tsv" "$WORK/margin.tsv" "$WORK/angles.tsv")line-joins
+KEY=$(inputs_key "$VOICING_GLOSSARY" ${WORD_ARGS:+"$WORK/voicing-corrections.tsv"} ${CORRECTIONS:+"$CORRECTIONS"} "$WORK/char-map.tsv" "$WORK/margin.tsv" "$WORK/angles.tsv")line-joins,dump-lines
 echo "[$(date +%T)] text layer"
 if [ ! -e "$TEXT" ] || [ "$(cat "$WORK/text.key" 2>/dev/null)" != "$KEY" ]; then
   [ ! -e "$TEXT" ] || mv -f "$TEXT" "$TEXT.prev"
   "$PY" "$BIN/rebuild-text-layer.py" "$SANITIZED" "$WORK/ocr" "$TEXT" \
     --ocr-stem "$OCR_STEM" --recognized "$WORK/margin.tsv" --column margin30 \
-    --min-height 400 --fix-dashes --fix-brackets --angles "$WORK/angles.tsv" "$@" > "$LOG"
+    --min-height 400 --fix-dashes --fix-brackets --angles "$WORK/angles.tsv" \
+    --dump-lines "$WORK/lines.tsv" "$@" > "$LOG"
   cat "$LOG"
   echo "$KEY" > "$WORK/text.key"
 fi

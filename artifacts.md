@@ -49,6 +49,7 @@
 |---|---|---|
 | 完成品 | [検索可能PDF](output/searchable/星を継ぐもの%20-%20ジェイムズ・P・ホーガン.pdf) | 324ページ。巻末目録（312〜322ページ）はレビューの対象外。パ／バは自動判定51組、判断モデルの反映107か所（旧字体の規則14、行をまたぐパ／バを含む） |
 | レビュー | [パ／バ](review/hoshi-wo-tsugu-mono-voicing/index.html)・[判断モデル](review/hoshi-wo-tsugu-mono-judge/index.html) | パ／バは自動判定なしの11組、判断モデルは352か所。画面下の「次の未確認」（n／p）で移動できる |
+| 抜き取り検査 | [画面](review/hoshi-wo-tsugu-mono-proofread/index.html) | 本文から無作為に選んだ200行。人が正解を選ぶと、段階ごとの誤り率が出る |
 | 履歴 | [判断の履歴](work/searchable/hoshi-wo-tsugu-mono/judge/history.tsv)・[適用した差分](work/searchable/hoshi-wo-tsugu-mono/judge/corrections.tsv)・[パ／バの辞書](work/searchable/hoshi-wo-tsugu-mono/voicing-glossary.tsv) | |
 
 ## 濁点・半濁点のレビュー（2026-11-11）

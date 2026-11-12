@@ -158,6 +158,20 @@ ruby bin/build-review.rb --ignore-leaders \
 
 設計と進捗は [docs/progress.md](docs/progress.md) に記録する。[data/epub-candidates.tsv](data/epub-candidates.tsv) は旧EPUB方針での一次選別結果であり、検索可能PDFの対象を絞る根拠には使わない。
 
+### 抜き取り検査（成功率の見積もり）
+
+本全体の正解テキストはないので、本文の行を無作為に選んで人が正解を決め、その行で段階ごとの字の誤り率を出す。`build-searchable-book.sh` は、文字層を作るときに `rebuild-text-layer.py --dump-lines` で、行ごとの各段階の読み（NDLの生の読み、余白つき再認識、規則での補正、判断モデルと人の判定、完成）を `work/searchable/作業名/lines.tsv` に書き出す。
+
+```sh
+W=work/searchable/hoshi-wo-tsugu-mono
+bin/build-proofread-sample.py input/bookscan-downloads/0101-20150604111029956_check.pdf $W/lines.tsv $W/yomitoku \
+  review/hoshi-wo-tsugu-mono-proofread --human $W/proofread-human.tsv \
+  --ocr-dir $W/ocr --ocr-stem 0101-20150604111029956_check --title "星を継ぐもの 抜き取り検査"
+# 画面で選んで「保存コマンドをコピー」を端末に貼ったら、同じコマンドに --score を付けて採点する
+```
+
+本文の縦書きの行（4字以上、ルビより幅のある行、巻末目録を除く）から、乱数の種（`--seed`、既定1）で `--count` 行（既定200）を選ぶ。選んだ行と各段階の読み（YomiTokuは座標で対応させた行）は `sample.tsv` に残る。画面では、原本の行の画像の横に、候補（完成、YomiToku、NDLの再認識、NDLの生の読みのうち違うもの）を同じ字の大きさで縦書きに並べる。原本と同じ候補をクリックすれば次へ進み、どれも違えば書き、行の切り出しがおかしければ除外する。`--score` は、空白を除いた編集距離で、段階ごとの1万字あたりの誤り数と、行の再標本化による95%区間を出し、完成版がまだ間違えている行を並べる。候補から選ぶ方式なので、どの候補も同じ字を間違えていると見落としやすい（誤り率は低めに出うる）。
+
 ## 成果物の保管（Google Drive）
 
 `output/` と `work/` はGitに入らない。そのため、完成品はGoogle Driveの `bookscan-epub/` に、このリポジトリと同じフォルダ構成で置く。Driveには `rclone` のリモート `gdrive:` で接続する。リモートは自分で作ったOAuthクライアントIDを使い、scope は `drive.file`（rcloneが置いたファイルとフォルダにだけ触れる）。ブラウザから入れたファイルは、rcloneからは見えない。OAuthアプリは本番に公開してあるので、許可は期限切れにならない。ホームページとプライバシーポリシーは https://kusanaginoturugi.github.io/rclone/ に置いてある。別のマシンでは `~/.config/rclone/rclone.conf` の `[gdrive]` をコピーするか、同じクライアントIDで `rclone config` する。
