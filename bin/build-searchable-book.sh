@@ -28,6 +28,8 @@
 #   SKIP_YOMITOKU=1, SKIP_JUDGE=1  turn those stages off on purpose; without them
 #              a missing YomiToku or LLM stops the build. YomiToku off also turns
 #              the judge off. A book keeps the stages it was started with.
+#   VOCAB_FROM  comma-separated SLUGs of finished books of the same series: their
+#              katakana words (3+ characters, 2+ times) help the judge's book-word rule
 #   WORK/char-map.tsv  (from, to) characters this book prints differently, e.g. 掴 摑
 #   WORK/skip-pages.txt  pages left out of both reviews, e.g. 312-322 (back-matter
 #              catalogs are found automatically; the text layer keeps all pages)
@@ -194,6 +196,23 @@ if [ -z "$GLOSSARY" ]; then
   grep -E '^[0-9]+組|^corrections:|^warning:' "$WORK/voicing.log" || true
 fi
 
+if [ -n "${VOCAB_FROM:-}" ]; then
+  # Katakana words of reviewed books in the series, from their text layers.
+  echo "$VOCAB_FROM" | tr ',' '\n' | while read -r slug; do
+    echo "$DATA_ROOT/work/searchable/$slug/text-unfinalized.pdf"
+  done | "$PY" -c 'import re, sys, collections
+from pypdf import PdfReader
+counts = collections.Counter()
+for path in sys.stdin.read().split():
+    for page in PdfReader(path).pages:
+        counts.update(re.findall(r"[ァ-ヺー]{3,}", page.extract_text() or ""))
+print("word\tcount")
+for word, n in counts.most_common():
+    if n >= 2:
+        print(f"{word}\t{n}")' > "$WORK/vocabulary.tsv" || fail "could not read VOCAB_FROM books"
+fi
+VOCAB_ARGS=
+[ ! -e "$WORK/vocabulary.tsv" ] || VOCAB_ARGS="--vocabulary $WORK/vocabulary.tsv"
 WORD_ARGS=
 [ ! -e "$WORK/voicing-corrections.tsv" ] || [ -n "$GLOSSARY" ] || WORD_ARGS="--word-corrections $WORK/voicing-corrections.tsv"
 
@@ -201,14 +220,14 @@ WORD_ARGS=
 CORRECTIONS=
 if [ "$USE_JUDGE" = on ] && [ -z "$GLOSSARY" ]; then
   CORRECTIONS=$WORK/judge/corrections.tsv
-  KEY=$(inputs_key "$VOICING_GLOSSARY" "$WORK/voicing-corrections.tsv" "$WORK/judge-human.tsv" "$WORK/margin.tsv" "$WORK/stages" "$WORK/skip-pages.txt")skip-catalog,line-joins,joined-voicing,lookalike,propagate,book-word,save-path
+  KEY=$(inputs_key "$VOICING_GLOSSARY" "$WORK/voicing-corrections.tsv" "$WORK/vocabulary.tsv" "$WORK/judge-human.tsv" "$WORK/margin.tsv" "$WORK/stages" "$WORK/skip-pages.txt")skip-catalog,line-joins,joined-voicing,lookalike,propagate,book-word,save-path,paired-bracket
   if [ ! -e "$CORRECTIONS" ] || [ "$(cat "$WORK/judge.key" 2>/dev/null)" != "$KEY$LLM_MODEL$JUDGE_PROMPT" ]; then
     echo "[$(date +%T)] judge"
     curl -sf -m 10 "$LLM_URL/models" > /dev/null ||
       fail "no LLM server at $LLM_URL (start llama-server, set LLM_URL, or SKIP_JUDGE=1)"
     "$PY" "$BIN/judge-ocr-disagreements.py" "$ORIGINAL" "$WORK/ocr" "$WORK/yomitoku" "$WORK/judge" \
       "$REVIEW-judge" --ocr-stem "$OCR_STEM" --recognized "$WORK/margin.tsv" \
-      --glossary "$VOICING_GLOSSARY" --human "$WORK/judge-human.tsv" $SKIP_ARGS $WORD_ARGS \
+      --glossary "$VOICING_GLOSSARY" --human "$WORK/judge-human.tsv" $SKIP_ARGS $WORD_ARGS $VOCAB_ARGS \
       --url "$LLM_URL/chat/completions" --model "$LLM_MODEL" --prompt "$JUDGE_PROMPT" \
       --title "$TITLE LLM判断のレビュー" \
       > "$WORK/judge.log" 2>&1 || fail "judge step failed; see $WORK/judge.log"

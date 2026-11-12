@@ -305,7 +305,10 @@ NDLとYomiTokuの残りの食い違いを、ローカルLLMが判断する。 -
 に <code>312-322</code>
 のように書く。レビュー画面の下の「次の未確認」（キーは
 <code>n</code>、戻るは
-<code>p</code>）で、まだ見ていない箇所へ移れる。選んだら次へ自動で進む。YomiTokuかLLM（llama-server）が見つからないと止まる。使わないなら
+<code>p</code>）で、まだ見ていない箇所へ移れる。選んだら次へ自動で進む。同じシリーズの本は、<code>VOCAB_FROM=前作の作業名</code>
+を付けると、前作の文字層のカタカナ語を「本の中の語」の規則に足せる。前作の
+<code>voicing-human.tsv</code>
+を新しい作業ディレクトリに写しておけば、パ／バの選択も引き継げる（その本に出ない組は警告を出して無視する）。YomiTokuかLLM（llama-server）が見つからないと止まる。使わないなら
 <code>SKIP_YOMITOKU=1</code> や <code>SKIP_JUDGE=1</code>
 を付ける。1冊の中で、段の有無とデバイスは最初の実行のまま変えられない（<code>stages</code>・<code>device</code>
 に記録）。これらの段より前に作った作業ディレクトリは、<code>UPGRADE=1</code>

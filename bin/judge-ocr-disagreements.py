@@ -204,6 +204,25 @@ def book_word_choice(lines, index, start, end, ndl, yomi, word_counts):
     return None, ''
 
 
+PARTNERS = {'〈': '〉', '《': '》', '「': '」', '『': '』', '（': '）', '(': ')', '【': '】', '〔': '〕'}
+
+
+def paired_bracket(lines, index, start, ndl):
+    # NDL read a single bracket whose partner follows (or precedes) it on the
+    # same line or the next (previous) line of the page: 〈シャ|ピアロン〉号.
+    if len(ndl) != 1:
+        return False
+    line = lines[index]
+    text = line['text']
+    same_page = lambda k: 0 <= k < len(lines) and lines[k]['page'] == line['page']
+    if ndl in PARTNERS:
+        after = text[start + 1:] + (lines[index + 1]['text'] if same_page(index + 1) else '')
+        return PARTNERS[ndl] in after
+    opening = {v: k for k, v in PARTNERS.items()}.get(ndl)
+    before = (lines[index - 1]['text'] if same_page(index - 1) else '') + text[:start]
+    return bool(opening) and opening in before
+
+
 def kind(x, y):
     if '"' in x:
         return 'quote'  # paired into 〝〟 per page after corrections
@@ -495,6 +514,9 @@ def main():
     parser.add_argument('--glossary', type=Path, help='glossary used with --fix-variants for the book')
     parser.add_argument('--overrides', type=Path, help='lines replaced by hand are not judged')
     parser.add_argument('--word-corrections', type=Path, help='voicing corrections, as given to rebuild-text-layer.py')
+    parser.add_argument('--vocabulary', type=Path,
+                        help='TSV (word, count) of katakana words from finished books of the same series; '
+                             'added to the book-word rule')
     parser.add_argument('--human', type=Path, help='TSV saved from the review page')
     parser.add_argument('--max-hunks', type=int, default=4)
     parser.add_argument('--skip-pages', help="pages not judged, e.g. '312-322'")
@@ -526,6 +548,10 @@ def main():
     items, counts = [], defaultdict(int)
     word_counts = Counter(w for line in lines for w in re.findall(r'[ァ-ヺー]{2,}', line['text']))
     alone_counts = standalone_counts(lines)
+    if args.vocabulary:
+        # Words from reviewed books of the series count as seen in this book.
+        for row in read_tsv(args.vocabulary):
+            word_counts[row['word']] += int(row['count'])
     new_history = []
     for index, line in enumerate(lines):
         words = [text for box, text in yomitoku.get(line['page'], []) if iou(line['box'], box) > 0.5]
@@ -545,6 +571,10 @@ def main():
             counts[category] += 1
             left, right = text[max(0, start - CONTEXT):start], text[end:end + CONTEXT]
             hunk_id = f'{line["page"]}:{line["line_id"]}:{left}[{frm}→{to}]{right}'
+            if category == 'judge' and paired_bracket(lines, index, start, frm):
+                # 〈シャピアロン〉号: YomiToku read 〉 as ソ and the LLM liked the
+                # result; a bracket whose partner is on the line is printed.
+                category = 'paired-bracket'
             if category in ('judge', 'lookalike', 'joined-voicing'):
                 choice, reason = book_word_choice(lines, index, start, end, frm, to, word_counts)
                 if choice:

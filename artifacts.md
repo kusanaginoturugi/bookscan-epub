@@ -13,6 +13,15 @@
 | 天の光はすべて星 | 284 | 1 | [PDF](output/searchable/天の光はすべて星%20-%20フレドリック・ブラウン.pdf) | [PDF](output/searchable/天の光はすべて星%20-%20フレドリック・ブラウン%20辞書補正.pdf) | [5語7か所](work/searchable/ten-no-hikari/variant-glossary.tsv) |
 | インフィニティ・リミテッド（下） | 388 | 3 | [PDF](output/searchable/インフィニティ・リミテッド（下）%20-%20ジェイムズ・P・ホーガン.pdf) | [PDF](output/searchable/インフィニティ・リミテッド（下）%20-%20ジェイムズ・P・ホーガン%20辞書補正.pdf) | [20語61か所](work/searchable/infinity-lower/variant-glossary.tsv) |
 
+## ガニメデの優しい巨人（2026-11-12）
+
+前作の語彙とパ／バの選択を引き継いで、`bin/build-searchable-book.sh` で通した。人のレビュー前。
+
+| 種類 | ファイル | 内容 |
+|---|---|---|
+| 完成品 | [検索可能PDF](output/searchable/ガニメデの優しい巨人%20-%20ジェイムズ・P・ホーガン.pdf) | 340ページ。巻末目録（326〜335ページ）はレビューの対象外 |
+| レビュー | [パ／バ](review/ganymede-no-yasashii-kyojin-voicing/index.html)・[判断モデル](review/ganymede-no-yasashii-kyojin-judge/index.html) | パ／バは4組と自動修正1か所、判断モデルは割れた38か所 |
+
 ## 星を継ぐもの（2026-11-12）
 
 `bin/build-searchable-book.sh`（YomiToku、パ／バ、判断モデル込み）で初めて通した本。人のレビュー前。
