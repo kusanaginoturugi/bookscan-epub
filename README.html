@@ -245,6 +245,8 @@
 <ul>
 <li><a href="#現在の段階" id="toc-現在の段階">現在の段階</a>
 <ul>
+<li><a href="#現時点の成果星を継ぐものの抜き取り検査2026-11-13"
+id="toc-現時点の成果星を継ぐものの抜き取り検査2026-11-13">現時点の成果（『星を継ぐもの』の抜き取り検査、2026-11-13）</a></li>
 <li><a href="#現在の1冊分の手順"
 id="toc-現在の1冊分の手順">現在の1冊分の手順</a></li>
 <li><a href="#抜き取り検査成功率の見積もり"
@@ -278,11 +280,109 @@ id="toc-ocr文字層の評価">OCR文字層の評価</a></li>
 <code>~/src/bookscan/</code>
 が担当する。リポジトリ名は旧EPUB方針の名残。</p>
 <h2 id="現在の段階">現在の段階</h2>
-<p>『虎よ、虎よ！』『インフィニティ・リミテッド（上）』『夏への扉』の検索可能PDFを作成した。続けて傾き補正込みの手順で『時間泥棒』『暗黒星雲突破！』『天の光はすべて星』『インフィニティ・リミテッド（下）』を作り、ローカルLLMで作った濁点・半濁点の辞書で補正した版も作った。<a
+<p>『虎よ、虎よ！』『インフィニティ・リミテッド（上）』『夏への扉』の検索可能PDFを作成した。続けて傾き補正込みの手順で『時間泥棒』『暗黒星雲突破！』『天の光はすべて星』『インフィニティ・リミテッド（下）』を作り、ローカルLLMで作った濁点・半濁点の辞書で補正した版も作った。YomiToku、パ／バの読み直し、判断モデル、人のレビューまでを通す
+<code>bin/build-searchable-book.sh</code>
+で、ホーガンの『星を継ぐもの』『ガニメデの優しい巨人』『巨人たちの星』『内なる宇宙（上・下）』を作り、レビューを済ませた。<a
 href="artifacts.html">成果物の目次</a>から完成PDF、辞書、レビューを開ける。目次の原稿は
 <code>artifacts.md</code> で、<code>bin/build-docs-html.sh</code>
 がこのREADMEや作業記録と一緒にHTMLにする（mdへのリンクはhtmlへのリンクになる）。原本・抽出画像・OCR結果は
 <code>.gitignore</code> で管理対象から外す。</p>
+<h3
+id="現時点の成果星を継ぐものの抜き取り検査2026-11-13">現時点の成果（『星を継ぐもの』の抜き取り検査、2026-11-13）</h3>
+<p>本全体の正解テキストはないので、本文から無作為に選んだ200行（7501字）を人が原本と照らして正解を決め、その行で数えた（手順は「抜き取り検査」の節）。空白と、英数・記号の全角／半角の違いは数えない。</p>
+<table>
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+</colgroup>
+<thead>
+<tr>
+<th>処理</th>
+<th>字の正解率</th>
+<th>行の正解率</th>
+<th>1万字あたりの誤り（95%区間）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>OCRのみ（NDLOCR-Liteの生の読み）</td>
+<td>98.89%</td>
+<td>91.5%（183/200）</td>
+<td>110.7（40.2〜211.0）</td>
+</tr>
+<tr>
+<td>機械処理のみ（スクリプトとローカルLLMによる補正。人の判定なし）</td>
+<td>99.99%</td>
+<td>99.5%（199/200）</td>
+<td>1.3（0〜4.1）</td>
+</tr>
+<tr>
+<td>人の補助のあと（レビュー画面で判定した完成版）</td>
+<td>100%</td>
+<td>100%（200/200）</td>
+<td>0（上限4.0）</td>
+</tr>
+</tbody>
+</table>
+<p>機械処理のみで残った1字は、縦書きで形の似た『と【の取り違え（205ページ、閉じ括弧の』→】）で、判断モデルに聞かずに人に回す種類の差分だった。人の補助は、パ／バの組14組と判断モデルの差分91件の判定（この本のレビューの全件）。誤りが0の段の上限は3の法則（3÷字数、行では3÷行数）による。候補から正解を選ぶ方式なので、どの段も同じ字を間違えた箇所は見落としうる。</p>
+<p>段階ごとの内訳（同じ200行）:</p>
+<table>
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+</colgroup>
+<thead>
+<tr>
+<th>段階</th>
+<th>誤り（字）</th>
+<th>字の正解率</th>
+<th>1万字あたり（95%区間）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>NDLの生の読み</td>
+<td>83</td>
+<td>98.89%</td>
+<td>110.7（40.2〜211.0）</td>
+</tr>
+<tr>
+<td>NDL（余白つき再認識）</td>
+<td>18</td>
+<td>99.76%</td>
+<td>24.0（9.6〜42.1）</td>
+</tr>
+<tr>
+<td>YomiToku</td>
+<td>30</td>
+<td>99.60%</td>
+<td>40.0（21.9〜59.9）</td>
+</tr>
+<tr>
+<td>規則で補正（括弧、ダッシュ、パ／バ）</td>
+<td>8</td>
+<td>99.89%</td>
+<td>10.7（2.6〜21.6）</td>
+</tr>
+<tr>
+<td>判断モデル・人の判定</td>
+<td>6</td>
+<td>99.92%</td>
+<td>8.0（0〜18.6）</td>
+</tr>
+<tr>
+<td>完成（引用符を〝〟に組み直す）</td>
+<td>0</td>
+<td>100%</td>
+<td>0（上限4.0）</td>
+</tr>
+</tbody>
+</table>
+<p>NDLの生の読みの誤り83字のうち43字は、長い行の後半を丸ごと落とした2行で、余白つき再認識で直る。人の判定なしで作り直した版でも、規則の段までは同じ8字で、判断モデルの段で7字、完成で1字になる。</p>
 <h3 id="現在の1冊分の手順">現在の1冊分の手順</h3>
 <p>原本は <code>input/bookscan-downloads/</code>、Pythonは
 <code>.venv-ndl</code>、NDLOCR-Liteは
@@ -497,7 +597,9 @@ id="抜き取り検査成功率の見積もり">抜き取り検査（成功率�
 <span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="ex">bin/build-proofread-sample.py</span> input/bookscan-downloads/0101-20150604111029956_check.pdf <span class="va">$W</span>/lines.tsv <span class="va">$W</span>/yomitoku <span class="dt">\</span></span>
 <span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>  review/hoshi-wo-tsugu-mono-proofread <span class="at">--human</span> <span class="va">$W</span>/proofread-human.tsv <span class="dt">\</span></span>
 <span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">--ocr-dir</span> <span class="va">$W</span>/ocr <span class="at">--ocr-stem</span> 0101-20150604111029956_check <span class="at">--title</span> <span class="st">&quot;星を継ぐもの 抜き取り検査&quot;</span></span>
-<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a><span class="co"># 画面で選んで「保存コマンドをコピー」を端末に貼ったら、同じコマンドに --score を付けて採点する</span></span></code></pre></div>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a><span class="co"># 画面で選んで「保存コマンドをコピー」を端末に貼ったら、同じコマンドに --score を付けて採点する</span></span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a><span class="co"># 人の判定なしの成績は、判定ファイルを除いた作業ディレクトリのコピーを DATA_ROOT に置いて</span></span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a><span class="co"># build-searchable-book.sh で作り直し、その lines.tsv を --machine-lines に渡す</span></span></code></pre></div>
 <p>本文の縦書きの行（4字以上、ルビより幅のある行、巻末目録を除く）から、乱数の種（<code>--seed</code>、既定1）で
 <code>--count</code>
 行（既定200）を選ぶ。選んだ行と各段階の読み（YomiTokuは座標で対応させた行）は

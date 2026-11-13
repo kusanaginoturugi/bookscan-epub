@@ -162,11 +162,18 @@ def score(args):
     skipped = sum(r['choice'] == 'skip' for r in read_tsv(args.human))
     print(f'{len(truth)} proofread lines ({sum(len(t) for t in truth.values())} characters), '
           f'{skipped} excluded, {len(rows) - len(truth) - skipped} not yet proofread')
-    rng = random.Random(0)
     ids = sorted(truth)
-    print('stage\tlines\terrors\tchars\tper 10,000 chars (95%)')
-    for stage, label in STAGES:
-        per_line = [(distance(bare(rows[i][stage]), truth[i]), len(truth[i])) for i in ids if rows[i][stage]]
+    series = [(label, {i: rows[i][stage] for i in ids}) for stage, label in STAGES]
+    if args.machine_lines:
+        # The same pipeline rebuilt without any human verdict or choice.
+        machine = {f'{r["page"]}:{r["line_id"]}': r for r in read_tsv(args.machine_lines)}
+        for stage, label in STAGES:
+            if stage in ('rules', 'judged', 'final'):
+                series.append((f'人の判定なし: {label}', {i: machine[i][stage] for i in ids}))
+    rng = random.Random(0)
+    print('stage\tlines\terrors\tchars\tcharacters right\tlines right\tper 10,000 chars (95%)')
+    for label, texts in series:
+        per_line = [(distance(bare(texts[i]), truth[i]), len(truth[i])) for i in ids if texts[i]]
         if not per_line:
             continue
         errors, chars = sum(e for e, _ in per_line), sum(c for _, c in per_line)
@@ -179,12 +186,15 @@ def score(args):
         # upper bound (95%: fewer than 3 / n) instead.
         interval = (f'{rates[50]:.1f}–{rates[1949]:.1f}' if errors else
                     f'0–{3 / chars * 10000:.1f}、行では{len(per_line)}行中0で上限{3 / len(per_line):.1%}')
-        print(f'{label}\t{len(per_line)}\t{errors}\t{chars}\t{errors / chars * 10000:.1f} ({interval})')
-    print('\nlines the final text still gets wrong:')
-    for i in ids:
-        final = bare(rows[i]['final'])
-        if final != truth[i]:
-            print(f'  {i}\t{final}\n  {"":{len(i)}}\t{truth[i]}')
+        right = sum(e == 0 for e, _ in per_line)
+        print(f'{label}\t{len(per_line)}\t{errors}\t{chars}\t{1 - errors / chars:.2%}\t'
+              f'{right}/{len(per_line)} ({right / len(per_line):.1%})\t{errors / chars * 10000:.1f} ({interval})')
+    for label, texts in [s for s in series if s[0].endswith(STAGES[-1][1])]:
+        wrong = [i for i in ids if bare(texts[i]) != truth[i]]
+        if wrong:
+            print(f'\nlines {label} still gets wrong:')
+            for i in wrong:
+                print(f'  {i}\t{bare(texts[i])}\n  {"":{len(i)}}\t{truth[i]}')
 
 
 PAGE = """<!doctype html>
@@ -307,6 +317,9 @@ def main():
     parser.add_argument('--ocr-dir', type=Path, help='with --ocr-stem, leave out back-matter catalog pages')
     parser.add_argument('--ocr-stem')
     parser.add_argument('--skip-pages', help="pages left out, e.g. '1-6,312-322'")
+    parser.add_argument('--machine-lines', type=Path,
+                        help='with --score, also score a --dump-lines TSV of the same book rebuilt without '
+                             'human verdicts (machine processing only)')
     parser.add_argument('--score', action='store_true', help='score the stages against --human instead of building')
     parser.add_argument('--title', default='抜き取り検査')
     args = parser.parse_args()
