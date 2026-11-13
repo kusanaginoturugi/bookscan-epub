@@ -615,6 +615,11 @@ def main():
                         help='prompt version; v1+v2 applies v1 unless v2 answers NDL. '
                              'Answers are kept per version in history.tsv')
     parser.add_argument('--title', default='LLM判断のレビュー')
+    parser.add_argument('--history', type=Path,
+                        help='history TSV of LLM answers to read and append to (default: OUTPUT/history.tsv); '
+                             'a machine-only run shares the book\'s history so nothing is asked twice')
+    parser.add_argument('--no-review', action='store_true',
+                        help='write corrections.tsv only, without the review page (machine-only runs)')
     args = parser.parse_args()
 
     ask = load_module('auto_variant_glossary', ROOT / 'auto-variant-glossary.py').ask
@@ -626,7 +631,7 @@ def main():
         print(f'pages not judged: {",".join(map(str, sorted(skip)))}')
     yomitoku = load_yomitoku(args.yomitoku_dir)
     args.output.mkdir(parents=True, exist_ok=True)
-    history_path = args.output / 'history.tsv'
+    history_path = args.history or args.output / 'history.tsv'
     done = {(r['id'], r['model'], r['prompt']): dict(r, page=int(r['page']), line_id=int(r['line_id']))
             for r in read_tsv(history_path)}
     human = {r['id']: r for r in read_tsv(args.human)}
@@ -850,6 +855,9 @@ def main():
             text = lines[c['index']]['text']
             writer.writerow([c['id'], c['page'], c['line_id'], text[max(0, c['start'] - CONTEXT):c['start']],
                              text[c['start']:c['end']], c['to'], text[c['end']:c['end'] + CONTEXT], c['source']])
+    if args.no_review:
+        print(f'{len(new_history)} hunks asked now, {len(merged)} corrections: {args.output / "corrections.tsv"}')
+        return
 
     # Split answers need a person; answers the LLM gave twice alike (and rule
     # decisions) are mostly right and go to a folded section; human-decided last.

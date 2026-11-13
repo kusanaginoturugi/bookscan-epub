@@ -13,6 +13,15 @@
 | 天の光はすべて星 | 284 | 1 | [PDF](output/searchable/天の光はすべて星%20-%20フレドリック・ブラウン.pdf) | [PDF](output/searchable/天の光はすべて星%20-%20フレドリック・ブラウン%20辞書補正.pdf) | [5語7か所](work/searchable/ten-no-hikari/variant-glossary.tsv) |
 | インフィニティ・リミテッド（下） | 388 | 3 | [PDF](output/searchable/インフィニティ・リミテッド（下）%20-%20ジェイムズ・P・ホーガン.pdf) | [PDF](output/searchable/インフィニティ・リミテッド（下）%20-%20ジェイムズ・P・ホーガン%20辞書補正.pdf) | [20語61か所](work/searchable/infinity-lower/variant-glossary.tsv) |
 
+## 造物主の掟（2026-11-13）
+
+前の5冊のパ／バの選択を引き継いで、`bin/build-searchable-book.sh` で通した（翻訳者が違うので語彙は引き継いでいない）。人のレビュー前。
+
+| 種類 | ファイル | 内容 |
+|---|---|---|
+| 完成品 | [検索可能PDF](output/searchable/造物主の掟%20-%20ジェイムズ・P・ホーガン.pdf) | 580ページ。巻末目録（561〜577ページ）はレビューの対象外 |
+| レビュー | [パ／バ](review/zoubutsushu-no-okite-voicing/index.html)・[判断モデル](review/zoubutsushu-no-okite-judge/index.html)・[抜き取り検査](review/zoubutsushu-no-okite-proofread/index.html) | パ／バは25組と自動修正8語、判断モデルは割れた58か所、抜き取り検査は200行 |
+
 ## 内なる宇宙（上・下）（2026-11-12）
 
 前の3冊の語彙とパ／バの選択を引き継いで、`bin/build-searchable-book.sh` で通した。パ／バと判断モデルの割れた箇所は、ユーザーがすべてレビューした。

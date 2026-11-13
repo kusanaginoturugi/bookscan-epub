@@ -6,7 +6,10 @@
 # NDLOCR-Lite/YomiToku disagreements judged by a local LLM and the human
 # verdicts (review page) -> text layer rotated with each deskewed page
 # (margin30, --min-height 400, --fix-dashes, --fix-brackets, voicing glossary,
-# LLM/human corrections, optional char map) -> finalize.
+# LLM/human corrections, optional char map) -> finalize -> the same voicing,
+# judge and text layer steps without any human input (WORK/machine/, to score
+# machine processing alone) -> a proofreading sample of 200 body lines (review
+# page; with WORK/proofread-human.tsv every stage is scored).
 #
 # OCR, margin and YomiToku are skipped when done. The voicing, judge and text
 # layer steps rerun when their inputs change (content hash, not file times);
@@ -181,14 +184,15 @@ SKIP_ARGS=--skip-catalog
 # バ/パ: word-crop re-reads decide safe pairs; human choices win.
 VOICING_GLOSSARY=${GLOSSARY:-$WORK/voicing-glossary.tsv}
 if [ -z "$GLOSSARY" ]; then
-  KEY=$(inputs_key "$WORK/voicing-human.tsv" "$WORK/margin.tsv" "$WORK/stages" "$WORK/skip-pages.txt")skip-catalog,line-joins,reread-all,fix-review,save-path,fix-group,save-cmd,chains
-  if [ ! -e "$VOICING_GLOSSARY" ] || [ "$(cat "$WORK/voicing.key" 2>/dev/null)" != "$KEY" ]; then
+  KEY=$(inputs_key "$WORK/voicing-human.tsv" "$WORK/margin.tsv" "$WORK/stages" "$WORK/skip-pages.txt")skip-catalog,line-joins,reread-all,fix-review,save-path,fix-group,save-cmd,chains,machine
+  if [ ! -e "$VOICING_GLOSSARY" ] || [ ! -e "$WORK/machine/voicing-glossary.tsv" ] ||
+     [ "$(cat "$WORK/voicing.key" 2>/dev/null)" != "$KEY" ]; then
     echo "[$(date +%T)] voicing"
     # shellcheck disable=SC2086
     "$PY" "$BIN/build-voicing-review.py" "$ORIGINAL" "$WORK/ocr" "$REVIEW-voicing" --ocr-stem "$OCR_STEM" \
       --recognized "$WORK/margin.tsv" $YOMI_ARGS $SKIP_ARGS --auto-crop --device "$DEVICE" \
       --human "$WORK/voicing-human.tsv" --glossary-out "$VOICING_GLOSSARY" \
-      --corrections-out "$WORK/voicing-corrections.tsv" \
+      --corrections-out "$WORK/voicing-corrections.tsv" --machine-out "$WORK/machine" \
       --title "$TITLE 濁点・半濁点レビュー" > "$WORK/voicing.log" 2>&1 ||
       fail "voicing step failed; see $WORK/voicing.log"
     echo "$KEY" > "$WORK/voicing.key"
@@ -273,6 +277,61 @@ if [ ! -e "$FINAL" ]; then
   "$PY" "$BIN/finalize-trial-pdf.py" "$SANITIZED" "$TEXT" "$FINAL" --catalog-source "$SOURCE"
   echo "$KEY" > "$WORK/final.key"
 fi
+# Machine processing only: the voicing step's choices without the person's,
+# the judge without verdicts (its LLM answers come from the same history) and
+# the text layer without the char map, the series data or WORK/skip-pages.txt.
+# Only the per-line readings are kept, to score them on the proofread lines.
+M=$WORK/machine
+if [ -z "$GLOSSARY" ] && [ -e "$M/voicing-glossary.tsv" ]; then
+  set -- --glossary "$M/voicing-glossary.tsv" --fix-variants --word-corrections "$M/voicing-corrections.tsv"
+  if [ "$USE_JUDGE" = on ]; then
+    KEY=$(inputs_key "$M/voicing-glossary.tsv" "$M/voicing-corrections.tsv" "$WORK/margin.tsv" "$WORK/stages")$LLM_MODEL$JUDGE_PROMPT
+    if [ ! -e "$M/judge/corrections.tsv" ] || [ "$(cat "$M/judge.key" 2>/dev/null)" != "$KEY" ]; then
+      echo "[$(date +%T)] judge (machine only)"
+      "$PY" "$BIN/judge-ocr-disagreements.py" "$ORIGINAL" "$WORK/ocr" "$WORK/yomitoku" "$M/judge" "$M/judge-review" \
+        --ocr-stem "$OCR_STEM" --recognized "$WORK/margin.tsv" --glossary "$M/voicing-glossary.tsv" \
+        --word-corrections "$M/voicing-corrections.tsv" --skip-catalog --history "$WORK/judge/history.tsv" \
+        --no-review --url "$LLM_URL/chat/completions" --model "$LLM_MODEL" --prompt "$JUDGE_PROMPT" \
+        > "$M/judge.log" 2>&1 || fail "machine-only judge failed; see $M/judge.log"
+      echo "$KEY" > "$M/judge.key"
+    fi
+    set -- "$@" --corrections "$M/judge/corrections.tsv"
+  fi
+  KEY=$(inputs_key "$M/voicing-glossary.tsv" "$M/voicing-corrections.tsv" "$M/judge/corrections.tsv" "$WORK/margin.tsv" "$WORK/angles.tsv")dump-lines
+  if [ ! -e "$M/lines.tsv" ] || [ "$(cat "$M/text.key" 2>/dev/null)" != "$KEY" ]; then
+    echo "[$(date +%T)] text layer (machine only)"
+    rm -f "$M/text.pdf"
+    "$PY" "$BIN/rebuild-text-layer.py" "$SANITIZED" "$WORK/ocr" "$M/text.pdf" \
+      --ocr-stem "$OCR_STEM" --recognized "$WORK/margin.tsv" --column margin30 \
+      --min-height 400 --fix-dashes --fix-brackets --angles "$WORK/angles.tsv" \
+      --dump-lines "$M/lines.tsv" "$@" > "$M/text.log" || fail "machine-only text layer failed; see $M/text.log"
+    rm -f "$M/text.pdf"
+    echo "$KEY" > "$M/text.key"
+  fi
+fi
+
+# Proofreading sample: 200 random body lines, drawn once and kept (sample.tsv);
+# the page is redrawn when the text changes. A saved WORK/proofread-human.tsv
+# is scored for every stage, with and without human input.
+PROOF=$REVIEW-proofread
+KEY=$(inputs_key "$WORK/lines.tsv" "$WORK/proofread-human.tsv" "$M/lines.tsv")proofread
+if [ -z "$GLOSSARY" ] && { [ ! -e "$PROOF/index.html" ] || [ "$(cat "$WORK/proofread.key" 2>/dev/null)" != "$KEY" ]; }; then
+  echo "[$(date +%T)] proofreading sample"
+  set -- --human "$WORK/proofread-human.tsv" --ocr-dir "$WORK/ocr" --ocr-stem "$OCR_STEM"
+  [ ! -e "$WORK/skip-pages.txt" ] || set -- "$@" --skip-pages "$(tr -d ' \n' < "$WORK/skip-pages.txt")"
+  "$PY" "$BIN/build-proofread-sample.py" "$ORIGINAL" "$WORK/lines.tsv" "$WORK/yomitoku" "$PROOF" "$@" \
+    --title "$TITLE 抜き取り検査" > "$WORK/proofread.log" 2>&1 || fail "proofreading sample failed; see $WORK/proofread.log"
+  if [ -e "$WORK/proofread-human.tsv" ]; then
+    MACHINE_ARGS=
+    [ ! -e "$M/lines.tsv" ] || MACHINE_ARGS="--machine-lines $M/lines.tsv"
+    # shellcheck disable=SC2086
+    "$PY" "$BIN/build-proofread-sample.py" "$ORIGINAL" "$WORK/lines.tsv" "$WORK/yomitoku" "$PROOF" "$@" \
+      --score $MACHINE_ARGS > "$WORK/proofread-score.txt" 2>&1 || fail "scoring failed; see $WORK/proofread-score.txt"
+  fi
+  echo "$KEY" > "$WORK/proofread.key"
+fi
+[ ! -e "$WORK/proofread-score.txt" ] || sed -n '1,/^$/p' "$WORK/proofread-score.txt" | sed '/^$/d'
 [ -n "$GLOSSARY" ] || echo "review: $REVIEW-voicing/index.html -> save as $WORK/voicing-human.tsv"
 [ "$USE_JUDGE" = off ] || [ -n "$GLOSSARY" ] || echo "review: $REVIEW-judge/index.html -> save as $WORK/judge-human.tsv"
+[ -n "$GLOSSARY" ] || echo "review: $PROOF/index.html -> save as $WORK/proofread-human.tsv"
 echo "[$(date +%T)] done: $FINAL"

@@ -434,6 +434,9 @@ def main():
     parser.add_argument('--device', choices=['cpu', 'cuda'], default='cpu')
     parser.add_argument('--human', type=Path, help='pair choices saved from the page (a, b, choice)')
     parser.add_argument('--glossary-out', type=Path, help='glossary TSV for --glossary --fix-variants')
+    parser.add_argument('--machine-out', type=Path,
+                        help='directory for voicing-glossary.tsv and voicing-corrections.tsv made without '
+                             'any human choice (machine processing only, for scoring)')
     parser.add_argument('--corrections-out', type=Path,
                         help='per-place corrections (crop and YomiToku agree; "both wrong" choices) '
                              'for rebuild-text-layer.py --word-corrections')
@@ -462,21 +465,6 @@ def main():
     for key in unknown:
         print(f'warning: human choice for a pair that is no longer a candidate: {"/".join(key)} -> {human.pop(key)}')
     auto, notes, fixes = {}, {}, {}
-    if args.auto_crop:
-        # Every katakana word with dakuten/handakuten is re-read from a full-size
-        # crop: the line-wide read shrinks the marks away.
-        places = {place for word in occurrences for place in occurrences[word]}
-        readings = crop_readings(lines, places, args.pdf, args.device)
-        for key in pairs:
-            auto[key], notes[key] = auto_decide(key, occurrences, readings, yomi_read)
-    custom = {k: c for k, c in human.items() if c != 'both' and c not in k}
-    decisions = {k: c for k, c in auto.items() if c}
-    sources = {k: 'auto' for k in decisions}
-    decisions.update({k: c for k, c in human.items() if k not in custom})
-    sources.update({k: 'human' for k in human if k not in custom})
-    for key in custom:
-        decisions.pop(key, None)
-    settled = {place for key in list(decisions) + list(custom) for word in key for place in occurrences.get(word, [])}
     def fix_id(place, to):
         index, start, end = place
         line = lines[index]
@@ -488,27 +476,38 @@ def main():
         index, start, end = place
         return f'{lines[index]["text"][start:end]}→{to}'
 
-    agreed = {}
-    if args.auto_crop:
-        agreed = agreed_fixes(occurrences, readings, yomitoku, lines, settled)
-        fixes = {place: (to, 'auto-agree') for place, to in agreed.items()
-                 if 'reject' not in (fix_verdicts.get(fix_id(place, to)), fix_verdicts.get(fix_word(place, to)))}
-    proposed = {fix_id(p, to) for p, to in agreed.items()} | {fix_word(p, to) for p, to in agreed.items()}
-    for gone in set(fix_verdicts) - proposed:
-        print(f'warning: human verdict for an automatic fix that is no longer proposed: {gone}')
-    for key, to in custom.items():
-        for word in key:
-            for place in occurrences.get(word, []):
-                fixes[place] = (to, 'human')
-    # The text layer fixes readings one kana away from a term; a reading that
-    # reaches its term only through a chain (バーセブトロン -> パーセプトロン) is
-    # fixed here at each place.
-    for word, final in final_winners(decisions).items():
-        if len(final) == 1 and (to := next(iter(final))) not in variants(word) and len(word) == len(to):
-            for place in occurrences.get(word, []):
-                fixes.setdefault(place, (to, 'chain'))
-    if args.corrections_out:
-        with args.corrections_out.open('w', newline='') as handle:
+    def choose(human, fix_verdicts):
+        """Decisions, glossary sources and per-place fixes from the automatic
+        judgements and the person's choices (empty for machine processing only)."""
+        custom = {k: c for k, c in human.items() if c != 'both' and c not in k}
+        decisions = {k: c for k, c in auto.items() if c}
+        sources = {k: 'auto' for k in decisions}
+        decisions.update({k: c for k, c in human.items() if k not in custom})
+        sources.update({k: 'human' for k in human if k not in custom})
+        for key in custom:
+            decisions.pop(key, None)
+        settled = {place for key in list(decisions) + list(custom) for word in key
+                   for place in occurrences.get(word, [])}
+        agreed, fixes = {}, {}
+        if args.auto_crop:
+            agreed = agreed_fixes(occurrences, readings, yomitoku, lines, settled)
+            fixes = {place: (to, 'auto-agree') for place, to in agreed.items()
+                     if 'reject' not in (fix_verdicts.get(fix_id(place, to)), fix_verdicts.get(fix_word(place, to)))}
+        for key, to in custom.items():
+            for word in key:
+                for place in occurrences.get(word, []):
+                    fixes[place] = (to, 'human')
+        # The text layer fixes readings one kana away from a term; a reading that
+        # reaches its term only through a chain (バーセブトロン -> パーセプトロン) is
+        # fixed here at each place.
+        for word, final in final_winners(decisions).items():
+            if len(final) == 1 and (to := next(iter(final))) not in variants(word) and len(word) == len(to):
+                for place in occurrences.get(word, []):
+                    fixes.setdefault(place, (to, 'chain'))
+        return decisions, sources, custom, agreed, fixes
+
+    def write_corrections(path, fixes):
+        with path.open('w', newline='') as handle:
             writer = csv.writer(handle, delimiter='\t', lineterminator='\n')
             writer.writerow(['id', 'page', 'line_id', 'left', 'from', 'to', 'right', 'source'])
             for (index, start, end), (to, source) in sorted(fixes.items()):
@@ -517,17 +516,41 @@ def main():
                 left, right = text[max(0, start - 4):start], text[end:end + 4]
                 writer.writerow([fix_id((index, start, end), to),
                                  line['page'], line['line_id'], left, text[start:end], to, right, source])
+
+    def write_glossary(path, decisions, sources):
+        rows, clash = glossary_rows(decisions, sources, occurrences)
+        if clash:
+            raise SystemExit(f'a word is both chosen and rejected: {clash}')
+        with path.open('w', newline='') as handle:
+            writer = csv.writer(handle, delimiter='\t', lineterminator='\n')
+            writer.writerow(['term', 'occurrences', 'variants', 'verified', 'note'])
+            writer.writerows(rows)
+
+    readings = None
+    if args.auto_crop:
+        # Every katakana word with dakuten/handakuten is re-read from a full-size
+        # crop: the line-wide read shrinks the marks away.
+        places = {place for word in occurrences for place in occurrences[word]}
+        readings = crop_readings(lines, places, args.pdf, args.device)
+        for key in pairs:
+            auto[key], notes[key] = auto_decide(key, occurrences, readings, yomi_read)
+    decisions, sources, custom, agreed, fixes = choose(human, fix_verdicts)
+    proposed = {fix_id(p, to) for p, to in agreed.items()} | {fix_word(p, to) for p, to in agreed.items()}
+    for gone in set(fix_verdicts) - proposed:
+        print(f'warning: human verdict for an automatic fix that is no longer proposed: {gone}')
+    if args.corrections_out:
+        write_corrections(args.corrections_out, fixes)
     sources_count = Counter(source for _, source in fixes.values())
     print(f'corrections: {sources_count["auto-agree"]} where crop and YomiToku agree, '
           f'{sources_count["human"]} from "both wrong" choices, {sources_count["chain"]} through chains of choices')
     if args.glossary_out:
-        rows, clash = glossary_rows(decisions, sources, occurrences)
-        if clash:
-            raise SystemExit(f'a word is both chosen and rejected: {clash}')
-        with args.glossary_out.open('w', newline='') as handle:
-            writer = csv.writer(handle, delimiter='\t', lineterminator='\n')
-            writer.writerow(['term', 'occurrences', 'variants', 'verified', 'note'])
-            writer.writerows(rows)
+        write_glossary(args.glossary_out, decisions, sources)
+    if args.machine_out:
+        # The same outputs without any human choice, to measure machine processing alone.
+        args.machine_out.mkdir(parents=True, exist_ok=True)
+        m_decisions, m_sources, _, _, m_fixes = choose({}, {})
+        write_corrections(args.machine_out / 'voicing-corrections.tsv', m_fixes)
+        write_glossary(args.machine_out / 'voicing-glossary.tsv', m_decisions, m_sources)
     order = sorted(pairs, key=lambda k: (-len(pairs[k]['yomi']),
                                          -sum(len(occurrences.get(w, [])) for w in k), k))
     examples = {key: pick_examples(key, pairs[key], occurrences, args.examples) for key in order}

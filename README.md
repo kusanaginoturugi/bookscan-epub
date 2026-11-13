@@ -187,19 +187,23 @@ ruby bin/build-review.rb --ignore-leaders \
 
 ### 抜き取り検査（成功率の見積もり）
 
-本全体の正解テキストはないので、本文の行を無作為に選んで人が正解を決め、その行で段階ごとの字の誤り率を出す。`build-searchable-book.sh` は、文字層を作るときに `rebuild-text-layer.py --dump-lines` で、行ごとの各段階の読み（NDLの生の読み、余白つき再認識、規則での補正、判断モデルと人の判定、完成）を `work/searchable/作業名/lines.tsv` に書き出す。
+本全体の正解テキストはないので、本文の行を無作為に選んで人が正解を決め、その行で段階ごとの字の誤り率を出す。`build-searchable-book.sh` が1冊を通すたびに、そのためのデータを作る。
+
+- 文字層を作るときに、`rebuild-text-layer.py --dump-lines` で、行ごとの各段階の読み（NDLの生の読み、余白つき再認識、規則での補正、判断モデルと人の判定、完成）を `work/searchable/作業名/lines.tsv` に書き出す。
+- 人の入力を一切使わない版（機械処理のみ）も作る。パ／バの段は、同じ実行で人の選択を除いた辞書と修正を `--machine-out` で `work/searchable/作業名/machine/` に書く。判断モデルの段は、その辞書で `--no-review`（修正だけ書く）で回し直す。LLMの回答は本の履歴を `--history` で共有するので、聞き直さない。文字層の段は、`char-map.tsv`、`skip-pages.txt`、`VOCAB_FROM` の語彙と判定も除いて作り直し、`machine/lines.tsv` だけを残す。
+- 抜き取り検査の画面 `review/作業名-proofread/index.html` を作る。保存先は `work/searchable/作業名/proofread-human.tsv`。保存してからもう一度実行すると、段階ごとの採点（機械処理のみの版も含む）が `proofread-score.txt` に書かれ、表が表示される。
+
+`bin/build-proofread-sample.py` を直接使う場合:
 
 ```sh
 W=work/searchable/hoshi-wo-tsugu-mono
 bin/build-proofread-sample.py input/bookscan-downloads/0101-20150604111029956_check.pdf $W/lines.tsv $W/yomitoku \
   review/hoshi-wo-tsugu-mono-proofread --human $W/proofread-human.tsv \
   --ocr-dir $W/ocr --ocr-stem 0101-20150604111029956_check --title "星を継ぐもの 抜き取り検査"
-# 画面で選んで「保存コマンドをコピー」を端末に貼ったら、同じコマンドに --score を付けて採点する
-# 人の判定なしの成績は、判定ファイルを除いた作業ディレクトリのコピーを DATA_ROOT に置いて
-# build-searchable-book.sh で作り直し、その lines.tsv を --machine-lines に渡す
+# 保存したら、同じコマンドに --score --machine-lines $W/machine/lines.tsv を付けて採点する
 ```
 
-本文の縦書きの行（4字以上、ルビより幅のある行、巻末目録を除く）から、乱数の種（`--seed`、既定1）で `--count` 行（既定200）を選ぶ。選んだ行と各段階の読み（YomiTokuは座標で対応させた行）は `sample.tsv` に残る。画面では、原本の行の画像の横に、候補（完成、YomiToku、NDLの再認識、NDLの生の読みのうち違うもの）を同じ字の大きさで縦書きに並べる。原本と同じ候補をクリックすれば次へ進み、どれも違えば書き、行の切り出しがおかしければ除外する。`--score` は、空白を除き、全角の英数・記号（？、Ａ）を半角とみなした編集距離で、段階ごとの1万字あたりの誤り数と、行の再標本化による95%区間（誤りが0なら3の法則の上限）を出し、完成版がまだ間違えている行を並べる。候補から選ぶ方式なので、どの候補も同じ字を間違えていると見落としやすい（誤り率は低めに出うる）。
+本文の縦書きの行（4字以上、ルビより幅のある行、巻末目録と `skip-pages.txt` を除く）から、乱数の種（`--seed`、既定1）で `--count` 行（既定200）を選ぶ。選んだ行は `sample.tsv` に残り、作り直しても同じ行を使う（判定が増えて文字が変わっても、検査済みの正解がずれない）。選び直すのは `--resample` のときだけ。各段階の読み（YomiTokuは座標で対応させた行）は作り直すたびに更新する。画面では、原本の行の画像の横に、候補（完成、YomiToku、NDLの再認識、NDLの生の読みのうち違うもの）を同じ字の大きさで縦書きに並べる。原本と同じ候補をクリックすれば次へ進み、どれも違えば書き、行の切り出しがおかしければ除外する。`--score` は、空白を除き、全角の英数・記号（？、Ａ）を半角とみなした編集距離で、段階ごとの字と行の正解率、1万字あたりの誤り数と、行の再標本化による95%区間（誤りが0なら3の法則の上限）を出し、完成版がまだ間違えている行を並べる。候補から選ぶ方式なので、どの候補も同じ字を間違えていると見落としやすい（誤り率は低めに出うる）。
 
 ## 成果物の保管（Google Drive）
 

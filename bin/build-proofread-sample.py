@@ -86,8 +86,18 @@ def sample(args):
     # Body lines only: ruby is narrow, and very short lines say little.
     eligible = [r for r in rows if int(r['page']) not in skip and len(bare(r['final'])) >= 4
                 and r['box'][2] - r['box'][0] >= 0.6 * widths]
-    picked = sorted(random.Random(args.seed).sample(eligible, min(args.count, len(eligible))),
-                    key=lambda r: (int(r['page']), int(r['line_id'])))
+    kept = [r['id'] for r in read_tsv(args.output / 'sample.tsv')]
+    if kept and not args.resample:
+        # A sample once drawn stays, so proofread lines keep their truth when the
+        # text changes after more verdicts; only the stage readings are refreshed.
+        by_id = {f'{r["page"]}:{r["line_id"]}': r for r in rows}
+        missing = [i for i in kept if i not in by_id]
+        if missing:
+            raise SystemExit(f'sampled lines not in {args.lines}: {missing[:5]} (OCR changed? use --resample)')
+        picked = [by_id[i] for i in kept]
+    else:
+        picked = sorted(random.Random(args.seed).sample(eligible, min(args.count, len(eligible))),
+                        key=lambda r: (int(r['page']), int(r['line_id'])))
     yomitoku = judge.load_yomitoku(args.yomitoku_dir)
     for row in picked:
         words = [text for box, text in yomitoku.get(int(row['page']), []) if judge.iou(row['box'], box) > 0.5]
@@ -314,6 +324,8 @@ def main():
     parser.add_argument('--human', type=Path, help='TSV saved from the page (id, page, line_id, choice, truth)')
     parser.add_argument('--count', type=int, default=200)
     parser.add_argument('--seed', type=int, default=1)
+    parser.add_argument('--resample', action='store_true',
+                        help='draw a new sample even if OUTPUT/sample.tsv exists (proofread lines are lost)')
     parser.add_argument('--ocr-dir', type=Path, help='with --ocr-stem, leave out back-matter catalog pages')
     parser.add_argument('--ocr-stem')
     parser.add_argument('--skip-pages', help="pages left out, e.g. '1-6,312-322'")
