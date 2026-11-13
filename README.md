@@ -181,7 +181,7 @@ ruby bin/build-review.rb --ignore-leaders \
   review/page-004.html
 ```
 
-設計と進捗は [docs/progress.md](docs/progress.md) に記録する。[data/epub-candidates.tsv](data/epub-candidates.tsv) は旧EPUB方針での一次選別結果であり、検索可能PDFの対象を絞る根拠には使わない。
+設計と進捗は [docs/progress.md](docs/progress.md) に記録する。ePub化の方針（青空文庫形式で書き出して AozoraEpub3 で変換する案）と調査結果は [docs/epub-plan.md](docs/epub-plan.md)。[data/epub-candidates.tsv](data/epub-candidates.tsv) は旧EPUB方針での一次選別結果であり、検索可能PDFの対象を絞る根拠には使わない。
 
 ### 抜き取り検査（成功率の見積もり）
 
