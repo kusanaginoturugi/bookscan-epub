@@ -170,8 +170,11 @@ def score(args):
             pick = [per_line[rng.randrange(len(per_line))] for _ in per_line]
             rates.append(sum(e for e, _ in pick) / max(sum(c for _, c in pick), 1) * 10000)
         rates.sort()
-        print(f'{label}\t{len(per_line)}\t{errors}\t{chars}\t{errors / chars * 10000:.1f} '
-              f'({rates[50]:.1f}–{rates[1949]:.1f})')
+        # With no errors the resampled interval collapses to 0; give the rule-of-three
+        # upper bound (95%: fewer than 3 / n) instead.
+        interval = (f'{rates[50]:.1f}–{rates[1949]:.1f}' if errors else
+                    f'0–{3 / chars * 10000:.1f}、行では{len(per_line)}行中0で上限{3 / len(per_line):.1%}')
+        print(f'{label}\t{len(per_line)}\t{errors}\t{chars}\t{errors / chars * 10000:.1f} ({interval})')
     print('\nlines the final text still gets wrong:')
     for i in ids:
         final = bare(rows[i]['final'])
