@@ -41,8 +41,13 @@ def load_module(name, path):
     return module
 
 
+WIDTH = {code: code - 0xFEE0 for code in range(0xFF01, 0xFF5F)}
+
+
 def bare(text):
-    return re.sub(r'\s', '', text)
+    # Spaces are not counted, and full-width ASCII (？, Ａ) counts as half-width:
+    # the width is a mechanical choice for the ePub stage, not an OCR error.
+    return re.sub(r'\s', '', text).translate(WIDTH)
 
 
 def read_tsv(path):
