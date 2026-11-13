@@ -13,7 +13,7 @@
 #
 # OCR, margin and YomiToku are skipped when done. The voicing, judge and text
 # layer steps rerun when their inputs change (content hash, not file times);
-# a finished PDF that would change is moved to OUT/old/ with the date.
+# a finished PDF that would change is overwritten.
 # After reviewing, save the page TSVs as WORK/voicing-human.tsv and
 # WORK/judge-human.tsv and run again. Review voicing before judge: a new
 # glossary changes the text the judge's verdicts were made on.
@@ -264,14 +264,9 @@ if [ ! -e "$TEXT" ] || [ "$(cat "$WORK/text.key" 2>/dev/null)" != "$KEY" ]; then
 fi
 
 if [ -e "$FINAL" ] && [ "$(cat "$WORK/final.key" 2>/dev/null)" != "$KEY" ]; then
-  # Never drop a finished PDF: keep the previous one under old/ with the date.
-  OLD_DIR=$(dirname "$FINAL")/old
-  mkdir -p "$OLD_DIR"
-  BASE=$(basename "${FINAL%.pdf}")
-  KEEP="$OLD_DIR/$BASE $(date +%F).pdf"
-  [ ! -e "$KEEP" ] || KEEP="$OLD_DIR/$BASE $(date +%F-%H%M%S).pdf"
-  mv -n "$FINAL" "$KEEP"
-  echo "[$(date +%T)] previous final kept as $KEEP"
+  # Overwrite: the work dir and the commit history are the record.
+  rm -f "$FINAL"
+  echo "[$(date +%T)] previous final replaced"
 fi
 if [ ! -e "$FINAL" ]; then
   "$PY" "$BIN/finalize-trial-pdf.py" "$SANITIZED" "$TEXT" "$FINAL" --catalog-source "$SOURCE"
