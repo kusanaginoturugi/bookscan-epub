@@ -1,0 +1,94 @@
+{
+  "replication": {
+    "original": {
+      "lines": 104,
+      "matches_saved_ocr": 104
+    },
+    "reencoded": {
+      "lines": 104,
+      "matches_saved_ocr": 104
+    },
+    "rotated": {
+      "lines": 104,
+      "matches_saved_ocr": 104
+    }
+  },
+  "gold_lines": 13,
+  "gold_chars": 488,
+  "geometry": {
+    "original/baseline": 30,
+    "reencoded/baseline": 22,
+    "rotated/baseline": 31,
+    "rotated/pad_background": 4,
+    "rotated/wide_real": 4,
+    "original/narrow": 19
+  },
+  "perturbations": {
+    "original": {
+      "gold_edits": {
+        "baseline": 30,
+        "jitter0": 39,
+        "jitter1": 23,
+        "jitter2": 33,
+        "jitter3": 39,
+        "jitter4": 14,
+        "jitter5": 23,
+        "jitter6": 33,
+        "jitter7": 17,
+        "jitter8": 23,
+        "jitter9": 20,
+        "jpeg80": 30,
+        "jpeg90": 28,
+        "jpeg95": 31,
+        "shift_x0.5": 27,
+        "shift_y0.5": 27,
+        "rotate+0.1": 17,
+        "rotate-0.1": 28,
+        "noise1": 30,
+        "noise2": 30
+      },
+      "min": 14,
+      "median": 28.0,
+      "max": 39,
+      "unstable_lines": 51,
+      "lines": 104,
+      "unstable_gold_lines": 9,
+      "unstable_gold_wrong_at_baseline": 6,
+      "stable_gold_lines": 4,
+      "stable_gold_wrong_at_baseline": 0
+    },
+    "rotated": {
+      "gold_edits": {
+        "baseline": 31,
+        "jitter0": 29,
+        "jitter1": 24,
+        "jitter2": 4,
+        "jitter3": 14,
+        "jitter4": 15,
+        "jitter5": 26,
+        "jitter6": 17,
+        "jitter7": 2,
+        "jitter8": 4,
+        "jitter9": 14,
+        "jpeg80": 31,
+        "jpeg90": 33,
+        "jpeg95": 31,
+        "shift_x0.5": 18,
+        "shift_y0.5": 16,
+        "rotate+0.1": 33,
+        "rotate-0.1": 33,
+        "noise1": 31,
+        "noise2": 31
+      },
+      "min": 2,
+      "median": 25.0,
+      "max": 33,
+      "unstable_lines": 56,
+      "lines": 104,
+      "unstable_gold_lines": 8,
+      "unstable_gold_wrong_at_baseline": 3,
+      "stable_gold_lines": 5,
+      "stable_gold_wrong_at_baseline": 0
+    }
+  }
+}

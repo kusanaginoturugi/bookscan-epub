@@ -1,6 +1,6 @@
 # 検索可能PDFとレビューの目次
 
-このページは、このリポジトリで作った成果物への入口。PDF、OCR結果、レビューの一部はGit管理外のローカルファイルなので、同じ作業ディレクトリで開く。`output/` のPDFはGoogle Driveの `bookscan-epub/output/` にも置いてある。リンクが切れていたら、[README](README.md)の「成果物の保管」の手順で `rclone copy` して戻す。完成品と試験版のPDFは、ページ単位の奇数ページ見開き（`/PageLayout /TwoPageLeft`）で、1ページ目をページ全体に合わせて開く（`/OpenAction` の `/Fit`）設定を持つ。Firefoxでの効き方は[作業記録](docs/progress.md)のPDFの初期表示設定を参照。
+このページは、このリポジトリで作った成果物への入口。本のページ画像や本文を含むもの（`output/` のPDF、`review/` のレビュー画面、OCRの全文、判断モデルの回答の履歴、正解サンプル、抜き取り検査の正解など）は著作物を含むのでGitに入れていない。これらのリンクは、手元の作業ディレクトリ（とGoogle Drive）でだけ開ける。本文を含まない作業ファイル（辞書・語彙、人の判定と補正のTSV、検索語、集計の一部）はGitに入れてあり、GitHubでも開ける（対象は `.gitignore` に名前で列挙）。『時間泥棒』など傾き補正込みの4冊の成果物は、別のマシン（自宅）で作ったもので、このマシンにはない。`output/` のPDFはGoogle Driveの `bookscan-epub/output/` にも置いてある。リンクが切れていたら、[README](README.md)の「成果物の保管」の手順で `rclone copy` して戻す。完成品と試験版のPDFは、ページ単位の奇数ページ見開き（`/PageLayout /TwoPageLeft`）で、1ページ目をページ全体に合わせて開く（`/OpenAction` の `/Fit`）設定を持つ。Firefoxでの効き方は[作業記録](docs/progress.md)のPDFの初期表示設定を参照。
 
 ## 傾き補正込みの4冊（2026-11-10）
 

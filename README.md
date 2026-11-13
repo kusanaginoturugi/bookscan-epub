@@ -203,7 +203,7 @@ bin/build-proofread-sample.py input/bookscan-downloads/0101-20150604111029956_ch
 
 ## 成果物の保管（Google Drive）
 
-`output/` と `work/` はGitに入らない。そのため、完成品はGoogle Driveの `bookscan-epub/` に、このリポジトリと同じフォルダ構成で置く。Driveには `rclone` のリモート `gdrive:` で接続する。リモートは自分で作ったOAuthクライアントIDを使い、scope は `drive.file`（rcloneが置いたファイルとフォルダにだけ触れる）。ブラウザから入れたファイルは、rcloneからは見えない。OAuthアプリは本番に公開してあるので、許可は期限切れにならない。ホームページとプライバシーポリシーは https://kusanaginoturugi.github.io/rclone/ に置いてある。別のマシンでは `~/.config/rclone/rclone.conf` の `[gdrive]` をコピーするか、同じクライアントIDで `rclone config` する。
+`output/` と `work/` はGitに入らない（`work/` のうち、本文を含まない辞書・語彙、人の判定と補正のTSV、集計の一部だけは `.gitignore` で名前を挙げて入れている）。そのため、完成品はGoogle Driveの `bookscan-epub/` に、このリポジトリと同じフォルダ構成で置く。Driveには `rclone` のリモート `gdrive:` で接続する。リモートは自分で作ったOAuthクライアントIDを使い、scope は `drive.file`（rcloneが置いたファイルとフォルダにだけ触れる）。ブラウザから入れたファイルは、rcloneからは見えない。OAuthアプリは本番に公開してあるので、許可は期限切れにならない。ホームページとプライバシーポリシーは https://kusanaginoturugi.github.io/rclone/ に置いてある。別のマシンでは `~/.config/rclone/rclone.conf` の `[gdrive]` をコピーするか、同じクライアントIDで `rclone config` する。
 
 ```sh
 # このマシンからDriveへ（既存のファイルは消さない）

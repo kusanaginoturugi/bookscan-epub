@@ -1,6 +1,28 @@
 /input/
 /output/
-/work/
+# work/ holds OCR text and page images of copyrighted books: everything is
+# ignored except files that carry no book prose (word lists, human verdicts
+# with a few characters of context, summaries). History of LLM answers, OCR
+# text, gold lines and proofread truths contain whole lines and stay out.
+/work/**
+!/work/**/
+!/work/searchable/*/voicing-glossary.tsv
+!/work/searchable/*/voicing-human.tsv
+!/work/searchable/*/voicing-corrections.tsv
+!/work/searchable/*/judge-human.tsv
+!/work/searchable/*/judge/corrections.tsv
+!/work/searchable/*/vocabulary.tsv
+!/work/searchable/*/char-map.tsv
+!/work/searchable/*/skip-pages.txt
+!/work/eval/*-glossary.tsv
+!/work/eval/*-glossary-candidates.tsv
+!/work/eval/*-voicing-glossary.tsv
+!/work/eval/*-queries.tsv
+!/work/eval/*-char-map.tsv
+!/work/deskew-study/pages.tsv
+!/work/ocr-sensitivity/pad-sweep.tsv
+!/work/ocr-sensitivity/summary.json
+!/work/margin/summer-door.log
 /review/
 /vendor/
 /.venv-*/

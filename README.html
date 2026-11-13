@@ -614,7 +614,10 @@ id="抜き取り検査成功率の見積もり">抜き取り検査（成功率�
 は、空白を除き、全角の英数・記号（？、Ａ）を半角とみなした編集距離で、段階ごとの1万字あたりの誤り数と、行の再標本化による95%区間（誤りが0なら3の法則の上限）を出し、完成版がまだ間違えている行を並べる。候補から選ぶ方式なので、どの候補も同じ字を間違えていると見落としやすい（誤り率は低めに出うる）。</p>
 <h2 id="成果物の保管google-drive">成果物の保管（Google Drive）</h2>
 <p><code>output/</code> と <code>work/</code>
-はGitに入らない。そのため、完成品はGoogle Driveの
+はGitに入らない（<code>work/</code>
+のうち、本文を含まない辞書・語彙、人の判定と補正のTSV、集計の一部だけは
+<code>.gitignore</code>
+で名前を挙げて入れている）。そのため、完成品はGoogle Driveの
 <code>bookscan-epub/</code>
 に、このリポジトリと同じフォルダ構成で置く。Driveには
 <code>rclone</code> のリモート <code>gdrive:</code>
