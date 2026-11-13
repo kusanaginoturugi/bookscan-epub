@@ -17,6 +17,9 @@ from pathlib import Path
 import pypdfium2
 from pypdf import PdfReader
 
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # bin/, for text_layer_utils
 from text_layer_utils import load_glossary
 
 

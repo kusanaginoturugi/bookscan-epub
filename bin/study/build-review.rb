@@ -154,7 +154,7 @@ image_data = Base64.strict_encode64(File.binread(image_path))
 image_width = ndl_data.fetch('imginfo').fetch('img_width')
 image_height = ndl_data.fetch('imginfo').fetch('img_height')
 total_edits = rows.sum { |row| row.fetch(:distance) }
-template = File.read(File.expand_path('../templates/review.html.erb', __dir__))
+template = File.read(File.expand_path('../../templates/review.html.erb', __dir__))
 FileUtils.mkdir_p(File.dirname(output_path))
 File.write(output_path, ERB.new(template).result(binding))
 puts "wrote #{output_path}: #{rows.length} columns, #{total_edits} OCR differences, #{extras.length} other regions, #{excluded_folios.length} folios excluded"

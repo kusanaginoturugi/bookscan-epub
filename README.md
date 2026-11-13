@@ -33,6 +33,12 @@
 
 NDLの生の読みの誤り83字のうち43字は、長い行の後半を丸ごと落とした2行で、余白つき再認識で直る。人の判定なしで作り直した版でも、規則の段までは同じ8字で、判断モデルの段で7字、完成で1字になる。
 
+### スクリプトの置き場所
+
+- `bin/`：今の本作りで使うもの。入口は `build-searchable-book.sh` で、そこから `prepare-trial-pdf.py`、`margin-recognize.py`、`build-voicing-review.py`、`judge-ocr-disagreements.py`、`rebuild-text-layer.py`、`finalize-trial-pdf.py`、`build-proofread-sample.py` を呼ぶ。`text_layer_utils.py`、`ocr-sensitivity.py`、`deskew-study.py`、`auto-variant-glossary.py` は、これらが読み込む部品（`deskew-study.py` は試験用でもある）。ほかに、閲覧用コピーを作る `prepare-books.py` と、文書をHTMLにする `build-docs-html.sh`（`md-links-to-html.lua`）。
+- `bin/study/`：OCRエンジンや設定を比べた試験と評価のスクリプト（`ocr-sample-pages.py`、`score-ocr-engines.py`、`check-voicing-judges.py` など）。作業記録の数字を出し直すときに使う。
+- `bin/annotate/`：『夏への扉』の読書注釈の試作（`generate-summer-door-glossary.py`、`build-summer-door-annotated-pdf.py` など）。
+
 ### 現在の1冊分の手順
 
 原本は `input/bookscan-downloads/`、Pythonは `.venv-ndl`、NDLOCR-Liteは `vendor/ndlocr-lite/src`、YomiTokuは `vendor/.venv-yomitoku/bin/yomitoku`。作業は `work/searchable/作業名/`、レビュー画面は `review/作業名-voicing/` と `review/作業名-judge/`、完成品は `output/searchable/書名 - 著者.pdf`。`MAX_PAGES=8` を付けると、先頭8ページだけの試運転（作業ディレクトリは別名）になる。
@@ -57,7 +63,7 @@ NDLOCR_DEVICE=cuda bin/build-searchable-book.sh "$SOURCE" jikan-dorobou
 printf 'from\tto\n掴\t摑\n' > work/searchable/jikan-dorobou/char-map.tsv
 
 # 傾き補正したページの文字層の位置を確認（列の縦ずれの傾きが0付近ならよい）
-.venv-ndl/bin/python bin/check-deskew-text.py \
+.venv-ndl/bin/python bin/study/check-deskew-text.py \
   work/searchable/jikan-dorobou/angles.tsv work/searchable/jikan-dorobou/text-unfinalized.pdf
 ```
 
@@ -75,9 +81,9 @@ GPUを使う場合は、`.venv-ndl` の `onnxruntime` を `onnxruntime-gpu[cuda,
 NDLOCR_DEVICE=cuda bin/build-searchable-book.sh "$SOURCE" jikan-dorobou
 
 # OCRの比較用標本（3冊141ページ）と、実行結果の比較
-.venv-ndl/bin/python bin/ocr-sample-pages.py work/ocr-engine-check
-.venv-ndl/bin/python bin/compare-ocr-runs.py work/ocr-engine-check cpu saved cuda
-.venv-ndl/bin/python bin/score-margin-runs.py work/ocr-engine-check ocrcpu-reccpu ocrcuda-reccuda
+.venv-ndl/bin/python bin/study/ocr-sample-pages.py work/ocr-engine-check
+.venv-ndl/bin/python bin/study/compare-ocr-runs.py work/ocr-engine-check cpu saved cuda
+.venv-ndl/bin/python bin/study/score-margin-runs.py work/ocr-engine-check ocrcpu-reccpu ocrcuda-reccuda
 ```
 
 `compare-ocr-runs.py` は `work/ocr-engine-check/書籍/実行名/` にある `ocr.py --output` の結果を読む（`saved` は全冊OCRの保存分）。`score-margin-runs.py` は `書籍/margin-実行名.tsv`（`margin-recognize.py` の出力）を読む。
@@ -95,7 +101,7 @@ NDLOCR_DEVICE=cuda bin/build-searchable-book.sh "$SOURCE" jikan-dorobou
   --human $WORK/voicing-human.tsv --glossary-out $WORK/voicing-glossary.tsv
 ```
 
-`--yomitoku-dir` は省略できる（本の中で両方の表記が出る組だけになる）。`--human` には、以前の辞書形式のファイル（`term`・`variants`・`note`）も渡せる。確定した辞書を正解として自動判定を採点するには、`bin/check-voicing-judges.py 原本PDF OCRディレクトリ 辞書TSV 出力TSV --ocr-stem STEM --recognized margin.tsv --yomitoku-dir DIR --device cuda` を使う。語を原本から切り出して読み直す判定と、`--llm-sample N` を付けたときのLLMの判定（llama-server）を出現箇所ごとに比べる。`build-searchable-book.sh` が受け取る辞書は1つなので、LLMで作った `variant-glossary.tsv` とは別の版になる。
+`--yomitoku-dir` は省略できる（本の中で両方の表記が出る組だけになる）。`--human` には、以前の辞書形式のファイル（`term`・`variants`・`note`）も渡せる。確定した辞書を正解として自動判定を採点するには、`bin/study/check-voicing-judges.py 原本PDF OCRディレクトリ 辞書TSV 出力TSV --ocr-stem STEM --recognized margin.tsv --yomitoku-dir DIR --device cuda` を使う。語を原本から切り出して読み直す判定と、`--llm-sample N` を付けたときのLLMの判定（llama-server）を出現箇所ごとに比べる。`build-searchable-book.sh` が受け取る辞書は1つなので、LLMで作った `variant-glossary.tsv` とは別の版になる。
 
 規則と画像で直せなかった、NDLとYomiTokuの読みの食い違い（漢字の取り違えなど）は、`bin/judge-ocr-disagreements.py` でローカルLLMに判断させる。2つのOCRの行を座標で対応させて、差分ごとに分ける。パ／バ、括弧、`"`（あとで〝〟に組み直す）、ダッシュ、濁点の付け外し、小書きの仮名、片方にしかない文字は聞かない。残りを、行の2通りの表記で順序を入れ替えて2回聞き、2回ともYomiTokuを選んだ差分だけを `corrections.tsv` に書き出す。聞いた結果は `history.tsv` に追記され、同じ差分は聞き直さない。レビュー画面では、LLMの答えが割れた差分だけを本体に並べる。2回とも同じ答えだった差分と規則で決めた差分は、折りたたみの別枠に入れる（だいたい当たっている）。画面で選んだ結果をTSVで保存して `--human` に渡すと、人の判定が常に優先される。1か所で選ぶと、前後4文字と2つの読みが同じ箇所にも同じ判定が入る（画面でも作り直しでも）。カタカナ語の中の差分（シンゲン［ー／―］フー）は、前後4文字ではなく語全体で同じ箇所に入る。`--series 作業ディレクトリ`（`build-searchable-book.sh` では `VOCAB_FROM` の本）を渡すと、その本で人が選んだカタカナ語の中の判定も当てる。差分は `rebuild-text-layer.py --corrections` が、ほかの補正のあと、引用符を組み直す前に当てる。前後4文字が一致しないと、適用せずに止まる。NDLの字が新字体で、YomiTokuの字がその旧字体（掴／摑、顛／顚など）の差分は、聞かずにYomiTokuを採る。規則で聞かなかった差分も、人の判定があればそれを使う。線や記号（一・―・ー・「」など）の差分は、レビュー画面で6倍に拡大して印を付ける。本全体で原本と違う字を使い分けている場合（この本はすべて摑なのに、OCRは掴と読む箇所が残るなど）は、`rebuild-text-layer.py --char-map 対応表TSV`（列は `from`・`to`）で、差分を当てたあとに1文字ずつ置き換える。
 
@@ -107,19 +113,19 @@ NDLOCR_DEVICE=cuda bin/build-searchable-book.sh "$SOURCE" jikan-dorobou
 # rebuild-text-layer.py に --corrections work/judge/$SLUG/corrections.tsv を足して文字層を作る
 ```
 
-ほかのOCRとは `bin/score-ocr-engines.py` で比べる。エンジンは `ndl:実行名`・`margin:実行名`・`yomitoku:実行名` で指定する。行の区切りや記号の表記に左右されない採点で、`--diff A B` を付けると、無作為ページでAとBが食い違った行を出す。YomiTokuは別の環境で動かす。
+ほかのOCRとは `bin/study/score-ocr-engines.py` で比べる。エンジンは `ndl:実行名`・`margin:実行名`・`yomitoku:実行名` で指定する。行の区切りや記号の表記に左右されない採点で、`--diff A B` を付けると、無作為ページでAとBが食い違った行を出す。YomiTokuは別の環境で動かす。
 
 ```sh
 ../bookscan/vendor/.venv-yomitoku/bin/yomitoku work/ocr-engine-check/tiger/subset.pdf \
   -f json -o work/ocr-engine-check/tiger/yomitoku -d cuda --dpi 300 --ignore_ruby
-.venv-ndl/bin/python bin/score-ocr-engines.py work/ocr-engine-check \
+.venv-ndl/bin/python bin/study/score-ocr-engines.py work/ocr-engine-check \
   ndl:cpu margin:ocrcpu-reccpu yomitoku:yomitoku --diff margin:ocrcpu-reccpu yomitoku:yomitoku
 ```
 
 以下は以前のOCR比較で使ったコマンド。このチェックアウトには当時の `.venv-ndl/` と作業データがなく、原本は隣の `bookscan/pdf/` にある。原本と生成物はGitに含めない。
 
 ```sh
-bin/extract-page.sh ../bookscan/pdf/0101-20150604103726242_check.pdf 12
+bin/study/extract-page.sh ../bookscan/pdf/0101-20150604103726242_check.pdf 12
 
 mkdir -p work/ndl/page-012 work/paddle/page-012
 .venv-ndl/bin/ndlocr-lite \
@@ -134,21 +140,21 @@ PADDLE_PDX_CACHE_HOME="$PWD/.paddlex" .venv-paddle/bin/paddleocr ocr \
   --use_textline_orientation False \
   --save_path work/paddle/page-012
 
-ruby bin/compare-ocr.rb \
+ruby bin/study/compare-ocr.rb \
   work/ndl/page-012/page-012-000.json \
   work/paddle/page-012/page-012-000_res.json
 
 # 差がある文字位置も表示
-ruby bin/compare-ocr.rb --details \
+ruby bin/study/compare-ocr.rb --details \
   work/ndl/page-012/page-012-000.json \
   work/paddle/page-012/page-012-000_res.json
 
 # 原本画像と2つのOCRを1画面でレビュー（Firefoxで直接開ける）
-.venv-ndl/bin/python bin/recognize-ruby.py \
+.venv-ndl/bin/python bin/study/recognize-ruby.py \
   work/sample/page-012-000.jpg \
   work/ndl/page-012/page-012-000.xml \
   work/ruby/page-012.json
-ruby bin/build-review.rb \
+ruby bin/study/build-review.rb \
   work/sample/page-012-000.jpg \
   work/ndl/page-012/page-012-000.json \
   work/paddle/page-012/page-012-000_res.json \
@@ -165,18 +171,18 @@ NDLOCR-LiteのJSONと同じ場所にXMLがあれば、比較スクリプトは�
 
 追加評価の [PDF 4ページ](review/page-004.html)、[PDF 19ページ](review/page-019.html)、[PDF 20ページ](review/page-020.html) もローカルに生成済み。ルビの原本確認にはページを開いてルビの行を選ぶ。未分類のPaddleOCR候補には認識スコアを表示し、低スコアは「未分類・低信頼」と区別する。
 
-原本画像で確認した3か所のルビは `eval/ruby-gold.tsv` に記録した。`ruby bin/score-ruby.rb` で保存済みOCR結果との完全一致を再計算できる。判読がまだ曖昧な箇所は採点対象に入れない。
+原本画像で確認した3か所のルビは `eval/ruby-gold.tsv` に記録した。`ruby bin/study/score-ruby.rb` で保存済みOCR結果との完全一致を再計算できる。判読がまだ曖昧な箇所は採点対象に入れない。
 
 PDF 4ページの登場人物一覧から作った辞書候補は `data/cast-seed.tsv`。`confirmed` は画像で表記を確認済み、`needs_review` はOCR間の不一致などが残っている。未確認候補は本文の自動修正に使わない。
 
 登場人物一覧のように点線リーダーがあるページは、比較時に `--ignore-leaders` を付けると繰り返しの `……` / `...` だけ無視できる。名前中の `・` と `ー` は差分として残す。例えば:
 
 ```sh
-ruby bin/compare-ocr.rb --details --ignore-leaders \
+ruby bin/study/compare-ocr.rb --details --ignore-leaders \
   work/ndl/page-004/page-004-000.json \
   work/paddle/page-004/page-004-000_res.json
 
-ruby bin/build-review.rb --ignore-leaders \
+ruby bin/study/build-review.rb --ignore-leaders \
   work/sample/page-004-000.jpg \
   work/ndl/page-004/page-004-000.json \
   work/paddle/page-004/page-004-000_res.json \
@@ -271,23 +277,23 @@ $PY bin/finalize-trial-pdf.py \
   --catalog-source "${STEM}.pdf"
 ```
 
-OCRは約7分、余白つき再認識は約17分（CPUのみ）。`--min-height` より低い行は `--recognized` の列を使わず保存済みOCRの読みを残す。`--fix-variants` は辞書の確認済みの語について、バ行とパ行の1文字だけが違う読みを辞書の表記に置き換え、置き換えた件数を表示する。長いカタカナ語の一部（ペルシャのペルなど）や、辞書に載っている別の語は置き換えない。行をまたいで分かれた語は対象外。辞書候補は `bin/extract-glossary-candidates.py` で抜き出し、`work/eval/summer-door-glossary-candidates.tsv` に置いた。
+OCRは約7分、余白つき再認識は約17分（CPUのみ）。`--min-height` より低い行は `--recognized` の列を使わず保存済みOCRの読みを残す。`--fix-variants` は辞書の確認済みの語について、バ行とパ行の1文字だけが違う読みを辞書の表記に置き換え、置き換えた件数を表示する。長いカタカナ語の一部（ペルシャのペルなど）や、辞書に載っている別の語は置き換えない。行をまたいで分かれた語は対象外。辞書候補は `bin/study/extract-glossary-candidates.py` で抜き出し、`work/eval/summer-door-glossary-candidates.tsv` に置いた。
 
 ### 『夏への扉』の読書用注釈試作
 
 `data/summer-door-reading-notes.json` の2項目を、完成PDFのページ21・23・24にPDF標準のメモ注釈として埋め込んだ。注釈はページ上部の余白に置き、本文画像と文字層は変更しない。完成品は残し、別ファイル `output/trial/夏への扉 - ロバート・A・ハインライン 注釈試作 Firefox版 薄色右開き.pdf`（Git管理外）を作る。Firefoxの黄色い注釈アイコンを隠し、淡い灰色の吹き出しをページに描いた。吹き出しはマウスオーバーで説明を表示し、クリックで固定する。隣の「↗」は出典ページへのリンクで、Firefox内蔵PDFビューアが新しいタブで開く指定を付けた。本文の偶数ページ176枚の左端に残ったスキャン線を、白い細帯で覆った。Readest向けにPDFの `/ViewerPreferences /Direction /R2L` を設定し、見開きを右開きとして自動判定できるようにした。追加候補は [`data/summer-door-note-candidates.md`](data/summer-door-note-candidates.md) に、1956年以前の現実の情報だけを使って選定した。
 
 ```sh
-../bookscan/vendor/.venv-ndlocr/bin/python bin/embed-reading-notes.py \
+../bookscan/vendor/.venv-ndlocr/bin/python bin/annotate/embed-reading-notes.py \
   'output/trial/夏への扉 - ロバート・A・ハインライン.pdf' \
   data/summer-door-reading-notes.json work/trial/summer-door-ocr \
   0101-20150604095752068_check \
   '/tmp/bookscan-summer-door-pale-notes.pdf'
-../bookscan/vendor/.venv-ndlocr/bin/python bin/mask-scan-edge.py \
+../bookscan/vendor/.venv-ndlocr/bin/python bin/annotate/mask-scan-edge.py \
   '/tmp/bookscan-summer-door-pale-notes.pdf' \
   '/tmp/bookscan-summer-door-pale-edge.pdf' \
   --even-pages 4-354 --side left --pixels 8
-../bookscan/vendor/.venv-ndlocr/bin/python bin/set-pdf-direction.py \
+../bookscan/vendor/.venv-ndlocr/bin/python bin/annotate/set-pdf-direction.py \
   '/tmp/bookscan-summer-door-pale-edge.pdf' \
   'output/trial/夏への扉 - ロバート・A・ハインライン 注釈試作 Firefox版 薄色右開き.pdf' \
   --direction rtl
@@ -387,11 +393,11 @@ $PY bin/finalize-trial-pdf.py \
 
 ### OCR文字層の評価
 
-`bin/evaluate-trial-pdf.py` は通常ページ10件を固定シードで選び、例外ページと抽出が空のページも画像でレビューできるHTMLを作る。画像と照合した正解行を `work/eval/tiger-gold.tsv` に、検索したい語を `work/eval/tiger-queries.tsv` に保存する。これらの本文データはGit管理外。
+`bin/study/evaluate-trial-pdf.py` は通常ページ10件を固定シードで選び、例外ページと抽出が空のページも画像でレビューできるHTMLを作る。画像と照合した正解行を `work/eval/tiger-gold.tsv` に、検索したい語を `work/eval/tiger-queries.tsv` に保存する。これらの本文データはGit管理外。
 
 ```sh
 PY=../bookscan/vendor/.venv-ndlocr/bin/python
-$PY bin/evaluate-trial-pdf.py \
+$PY bin/study/evaluate-trial-pdf.py \
   'output/trial/虎よ、虎よ！ - アルフレッド・ベスター 空白修正.pdf' \
   work/trial/tiger-full review/tiger-eval \
   --gold work/eval/tiger-gold.tsv \
@@ -407,7 +413,7 @@ $PY bin/evaluate-trial-pdf.py \
 ```sh
 PY=../bookscan/vendor/.venv-ndlocr/bin/python
 STEM=0101-20150604103726242_check
-$PY bin/evaluate-trial-pdf.py \
+$PY bin/study/evaluate-trial-pdf.py \
   'output/trial/インフィニティ・リミテッド（上） - ジェイムズ・P・ホーガン.pdf' \
   work/trial/infinity-upper-ocr review/infinity-upper-eval --ocr-stem "$STEM" \
   --queries work/eval/infinity-upper-queries.tsv --normalized-text-layer \
@@ -416,6 +422,6 @@ $PY bin/evaluate-trial-pdf.py \
   --special-pages 4,12,19,20,49,100,113,285,311,367,376
 ```
 
-`bin/extract-glossary-candidates.py` はPDF全文から繰り返し現れるカタカナ語を集める。今回の候補100件は `work/eval/tiger-glossary-candidates.tsv`（Git管理外）に保存した。原本画像で確認した語だけを `work/eval/tiger-glossary.tsv` の `verified=yes` として使う。語中の空白だけをつなぎ、話者名とセリフの区切りなどは残す。
+`bin/study/extract-glossary-candidates.py` はPDF全文から繰り返し現れるカタカナ語を集める。今回の候補100件は `work/eval/tiger-glossary-candidates.tsv`（Git管理外）に保存した。原本画像で確認した語だけを `work/eval/tiger-glossary.tsv` の `verified=yes` として使う。語中の空白だけをつなぎ、話者名とセリフの区切りなどは残す。
 
-ルビ近傍の空白などを優先してローカルLLMに文章の違和感を採点させる場合は、OpenAI互換のローカルサーバーを起動してから `bin/rank-ocr-lines.py` を使う。`--url` でサーバーを、`--glossary` で確認済み辞書を指定できる。今回の20行の結果は `review/tiger-llm/index.html` と `ranked.tsv`（Git管理外）。レビューには元OCRと修正版PDFの文字層を両方表示する。高スコアにも詩や意図的な反復が混じるため、原本画像で確認してから修正する。画像で確認した個別補正は `work/eval/tiger-overrides.tsv`（Git管理外）に記録する。
+ルビ近傍の空白などを優先してローカルLLMに文章の違和感を採点させる場合は、OpenAI互換のローカルサーバーを起動してから `bin/study/rank-ocr-lines.py` を使う。`--url` でサーバーを、`--glossary` で確認済み辞書を指定できる。今回の20行の結果は `review/tiger-llm/index.html` と `ranked.tsv`（Git管理外）。レビューには元OCRと修正版PDFの文字層を両方表示する。高スコアにも詩や意図的な反復が混じるため、原本画像で確認してから修正する。画像で確認した個別補正は `work/eval/tiger-overrides.tsv`（Git管理外）に記録する。

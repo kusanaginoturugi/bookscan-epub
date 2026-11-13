@@ -290,6 +290,8 @@ id="toc-epub化の下調べ2026-11-13">ePub化の下調べ（2026-11-13）</a></
 id="toc-公開を前提にした見直し2026-11-13">公開を前提にした見直し（2026-11-13）</a></li>
 <li><a href="#正解率のデータを毎回取る造物主の掟2026-11-13"
 id="toc-正解率のデータを毎回取る造物主の掟2026-11-13">正解率のデータを毎回取る、『造物主の掟』（2026-11-13）</a></li>
+<li><a href="#スクリプトの整理2026-11-13"
+id="toc-スクリプトの整理2026-11-13">スクリプトの整理（2026-11-13）</a></li>
 <li><a href="#次の作業" id="toc-次の作業">次の作業</a></li>
 </ul></li>
 </ul>
@@ -318,12 +320,13 @@ id="toc-正解率のデータを毎回取る造物主の掟2026-11-13">正解率
 <code>ruby_prediction</code>
 工程がある。今回の欠落はLite版の処理経路によるもので、認識モデル自体のルビ精度は未評価。</li>
 <li>PaddleOCRはこの2ページで句読点・括弧の脱落が多い。NDLOCR-Liteも数字・記号で誤認識が見える。モデルの確信度だけで自動採用しない。</li>
-<li><code>bin/compare-ocr.rb</code>
+<li><code>bin/study/compare-ocr.rb</code>
 で縦列を座標で対応付け、文字単位の差分位置を表示できるようにした。NDLOCR-LiteのXMLがあれば、未対応のPaddleOCR領域をルビ・ノンブルに分類する。ページ12の「きぜん」「10」、ページ35の「33」を正しく分類した。</li>
-<li><code>bin/build-review.rb</code>
+<li><code>bin/study/build-review.rb</code>
 で原本画像、両OCRの列ごとの比較、ルビ・ノンブルを1枚のローカルHTMLにまとめる。差分の強調と原本位置の選択・拡大に対応。</li>
 <li>NDLOCR-Liteのルビ領域を切り出し、付属のPARSeq
-30/50/100文字モデルで直接認識する <code>bin/recognize-ruby.py</code>
+30/50/100文字モデルで直接認識する
+<code>bin/study/recognize-ruby.py</code>
 を追加。ノンブルに重なるPaddleOCR結果は、本文の照合前に除外する。</li>
 <li>PDFページ12の「きぜん」は3モデルとも一致。PDFページ19では2領域を検出。1つ目は「・フール」と読んだが、原本を見ると隣の句点が切り出し枠に混入した可能性が高い。PaddleOCRは未検出。2つ目は両OCRとも「プラデイ」で、先頭のプ／ブは原本で要確認。</li>
 <li>PDFページ20では「滞」に付くルビをNDL切り出しが3モデルとも「とどこお」と認識。PaddleOCRは「とんこお」。原本画像で「とどこお」と読める。本文の不一致はページ19が33/687文字、ページ20が34/578文字。これも正解率ではない。</li>
@@ -333,7 +336,8 @@ id="toc-正解率のデータを毎回取る造物主の掟2026-11-13">正解率
 y=1076、認識スコア約0.24)は、原本の余白にある小さな紙の汚れの誤検出と確認。レビューでは「未分類・低信頼」と認識スコアを表示する。</li>
 <li>ユーザーの目視評価では、比較した範囲にPaddleOCRが本文の正答を補った箇所は見つかっていない。現段階ではPaddleOCRを本文の対等な投票者から外し、84冊の一括処理にも入れず、検証用の参考表示とする。NDLOCR-Lite本文と切り出しルビを主候補にする。</li>
 <li>原本画像で読みを確認できたルビ3か所を
-<code>eval/ruby-gold.tsv</code> に記録し、<code>bin/score-ruby.rb</code>
+<code>eval/ruby-gold.tsv</code>
+に記録し、<code>bin/study/score-ruby.rb</code>
 で採点。完全一致はNDL切り出しの30/50/100モデルが各2/3、PaddleOCRが1/3。ページ19の「フール」はNDLが先頭に「・」を混入させ、PaddleOCRは未検出。ページ19のもう1か所はプ／ブが曖昧なため採点から外した。この小標本を全体精度とは扱わない。</li>
 </ul>
 <h2 id="旧方針2026-11-04に変更">旧方針（2026-11-04に変更）</h2>
@@ -446,7 +450,7 @@ id="冊目の検索可能pdf試験2026-11-04">1冊目の検索可能PDF試験（
 <h2
 id="検索可能pdfの初回評価2026-11-04">検索可能PDFの初回評価（2026-11-04）</h2>
 <ul>
-<li><code>bin/evaluate-trial-pdf.py</code>
+<li><code>bin/study/evaluate-trial-pdf.py</code>
 を追加し、PDFページごとの抽出文字数・OCRの低信頼行・OCR結果とPDF文字層の一致を調べた。固定シードで通常本文10ページを選び、各ページの長い1行と例外ページを画像でレビューできるHTMLを
 <code>review/tiger-eval/index.html</code> に生成した。結果は
 <code>review/tiger-eval/report.json</code>。PDFから抽出した文字とNDLOCR-Liteのページ別TXTは全364ページで一致した。</li>
@@ -477,17 +481,17 @@ JSONから透明テキスト層を再生成する。当初は縦書き和文の�
 中田耕治」と確認し、<code>work/eval/tiger-overrides.tsv</code>
 に補正を記録した。<code>bin/finalize-trial-pdf.py</code>
 によるページ枠・画像の照合も通過した。</li>
-<li><code>bin/rank-ocr-lines.py</code>
+<li><code>bin/study/rank-ocr-lines.py</code>
 は空白・低信頼度・行高に対する字数不足からレビュー候補を選び、隣接するルビ領域を記録する。ローカルの文章LLMに0〜5の違和感スコアを付けさせ、画像付きHTMLとTSVにする。スコアはOCRの正誤でも確率でもない。Jevは絶対スコアで正誤を分けられないという別プロジェクトの実測があるため、この文章評価には使用しない。</li>
 <li>今回はローカルGemma-4-12BのCPU実行で優先候補20行を採点した。出力は
 <code>review/tiger-llm/index.html</code> と
 <code>ranked.tsv</code>。スコア5のPDFページ15・行9は同じ句をOCRが二重に出しており、画像では一度だけだった。スコア3の254ページ・行4も「みんみんな」が画像と合わない。スコア5の71ページ・行1では閉じカギ括弧、スコア4の12ページ・行10では語句を囲うカギ括弧がOCRから抜けていた。ただしLLMが挙げた理由は別の誤推測だった。スコア5の156ページの詩と310ページの反復は画像どおりで誤警報。11ページの「辺
 境」の空白はスコア0で見逃した。20行は候補279行の一部で、全本文の評価ではない。文章スコアで並べても、文字の正誤は画像で判定する。</li>
 <li>修正版PDFを
-<code>bin/evaluate-trial-pdf.py --normalized-text-layer</code>
+<code>bin/study/evaluate-trial-pdf.py --normalized-text-layer</code>
 で再評価し、全364ページで保存済みOCRを同じ空白規則で正規化した文字列とPDF抽出文字列が一致した。通常10行・例外5行の正解付き標本の編集差、および画像確認済み検索語7/12の結果は変わらなかった。</li>
 <li>PDF全文から繰り返し現れるカタカナ語を
-<code>bin/extract-glossary-candidates.py</code>
+<code>bin/study/extract-glossary-candidates.py</code>
 で抽出。出現2回以上は378語、上位100語を
 <code>work/eval/tiger-glossary-candidates.tsv</code>
 に保存した。頻出の「ジョウント」「フォイル」「プレスタイン」などが見えるが、候補にはOCR誤字や一般語も混じる。画像で確認した6語だけを現時点の辞書
@@ -703,7 +707,7 @@ id="夏への扉の読書用注釈試作2026-11-05">『夏への扉』の読書�
 <li>読書中に引っかかった「修正第四条」と、ホイスラーの『母の肖像』の説明・出典URLを
 <code>data/summer-door-reading-notes.json</code>
 に保存。前者はPDFページ21・23、後者は24に対応付けた。</li>
-<li><code>bin/embed-reading-notes.py</code>
+<li><code>bin/annotate/embed-reading-notes.py</code>
 で完成PDFを複製し、PDF標準のText注釈を各ページの上余白に追加。PDFビューアが注釈アイコンを指定矩形より大きく描画するため、本文横ではなく上余白に置いた。</li>
 <li>注釈入りPDFは
 <code>output/trial/夏への扉 - ロバート・A・ハインライン 注釈試作.pdf</code>（Git管理外）。ページ数356、書誌タイトル、見開き設定、対象ページの本文抽出と画像数が元PDFと一致した。Popplerでページ21・23・24を描画し、アイコンが本文にかからないことを確認した。ユーザーの閲覧環境ではマウスオーバーで表示、クリックで固定できたが、出典URLはクリックできなかった。</li>
@@ -720,10 +724,10 @@ id="夏への扉の読書用注釈試作2026-11-05">『夏への扉』の読書�
 のHTMLリンクに警告を出すため、このリンクの新規タブ動作はFirefox向け。実際のFirefox画面でのクリック確認はまだ。</li>
 <li>見開きの中央に見える細い線は、原本画像の左端約6pxにあるスキャン線。10ページだけでなく本文の偶数ページ178枚中164枚に明瞭な端線があり、奇数ページにはほぼない。紙色が白いページは
 <code>prepare-trial-pdf.py</code>
-の背景補正対象にならず、10ページ目の画像は原本・サニタイズ版・完成版で同一バイトだった。<code>bin/mask-scan-edge.py</code>
+の背景補正対象にならず、10ページ目の画像は原本・サニタイズ版・完成版で同一バイトだった。<code>bin/annotate/mask-scan-edge.py</code>
 で本文の偶数ページ4〜354の176枚について左端8px相当を白く覆い、<code>output/trial/夏への扉 - ロバート・A・ハインライン 注釈試作 Firefox版 全ページ端線修正.pdf</code>
 を作成。表紙・裏表紙は対象外。OCR文字層とページ画像はそのまま。</li>
-<li>Readestでは開くたびに見開きが左右逆になるため、<code>bin/set-pdf-direction.py</code>
+<li>Readestでは開くたびに見開きが左右逆になるため、<code>bin/annotate/set-pdf-direction.py</code>
 でPDFカタログの <code>/ViewerPreferences /Direction /R2L</code>
 を追加。成果物は
 <code>output/trial/夏への扉 - ロバート・A・ハインライン 注釈試作 Firefox版 右開き.pdf</code>。Readestの右開きPDF自動判定に対応する設定で、Firefox同梱PDF.jsからも
@@ -744,7 +748,7 @@ id="夏への扉の用語注釈版2026-11-05">『夏への扉』の用語注釈�
 E4Bで説明の下書きを生成。既存の出典付き説明13語と、本文・資料に基づく補正95語を優先し、残る126語はLLMの説明を使用した。1956年以前の語かどうかは全件確認していない。説明の由来と出典URLは
 <code>data/summer-door-reading-glossary.tsv</code>、補正内容は
 <code>data/summer-door-glossary-corrections.tsv</code> に保存した。</li>
-<li><code>bin/build-summer-door-annotated-pdf.py</code>
+<li><code>bin/annotate/build-summer-door-annotated-pdf.py</code>
 で3分割の薄色右開きPDFを結合し、初出ページ132か所に231語の説明を追加。残る3語は既存の注釈を維持した。成果物は
 <code>output/夏への扉 - 用語注釈版.pdf</code>（356ページ、約69MB、Git管理外）。</li>
 <li>完成PDFは全356ページで元PDFと抽出文字・画像数が一致した。元の21・23・24ページの注釈も残っており、右開き設定を確認。24ページをPopplerで描画して上余白の注釈マークが本文に重ならないことを確認した。Firefoxでのポップアップ動作は未確認。</li>
@@ -766,7 +770,7 @@ id="傾き補正込みで4冊を作成2026-11-10">傾き補正込みで4冊を�
 <code>NDLOCR_SRC</code> で上書きでき、既定値を現在の配置へ変えた。</li>
 <li>傾き補正ページの文字層:
 補正前OCRの行枠の中心だけを画像の回転（ページ中心まわり）に合わせて移し、文字は縦にまっすぐ並べる。文字層ごと回転すると、傾いた列の外接枠の中心線（すでに補正後の列にほぼ一致する）を逆に傾けてしまう。補正後画像を再OCRした行と文字層の縦ずれを列の横位置に対して回帰する
-<code>bin/check-deskew-text.py</code>
+<code>bin/study/check-deskew-text.py</code>
 で確認した。インフィニティ上巻35ページ（−0.75°）では、移動なし0.0154（sin
 0.75° =
 0.0131）、移動あり0.0024。天の光250ページ（−0.75°）−0.0007、インフィニティ下巻11ページ（−1.0°）+0.0003、72・232ページ（+0.75°）+0.0037・+0.0020。</li>
@@ -800,7 +804,8 @@ id="gpucudaでのocrと余白つき再認識2026-11-11">GPU（CUDA）でのOCR�
 12GB、<code>onnxruntime-gpu[cuda,cudnn]==1.31.1</code> で検証した。CPUは
 <code>../bookscan/vendor/.venv-ndlocr</code>、GPUは同じ場所に作った
 <code>.venv-ndlocr-gpu</code>。</li>
-<li>標本は <code>bin/ocr-sample-pages.py work/ocr-engine-check</code>
+<li>標本は
+<code>bin/study/ocr-sample-pages.py work/ocr-engine-check</code>
 で作る。虎よ・インフィニティ上巻・夏への扉から、正解行のあるページすべてと、固定シードで選んだ本文20ページずつ、計141ページ。正解行は93行・3300文字。正解行の多くは余白つき再認識で読みが変わった行（<code>group=changed</code>）から選んだもので、誤りやすい行に偏る。誤り率の絶対値は本全体の精度ではない。</li>
 <li><code>ocr.py</code> 単体（300dpi）:
 今のCPU実行は、保存済みの全冊OCRと141ページすべてで一致した。CUDAは2回実行して完全一致。CPUとCUDAは行数が同じで、行枠は34行が1px程度ずれ、文字列は2471行中43行（約8万文字中177文字分）が違った。正解行の誤りはCPU
@@ -829,8 +834,8 @@ id="gpucudaでのocrと余白つき再認識2026-11-11">GPU（CUDA）でのOCR�
 がなく <code>ocr.done</code> がある既存の作業はCPUとみなす。</li>
 <li>結論（GPU）:
 GPUでも精度は下がらない。作成済みの本はCPUの読みのまま残し、作り直さない。これから作る本は、1冊を通して同じデバイスで処理する。比較の結果は
-<code>work/ocr-engine-check/report-ocr.txt</code>（<code>bin/compare-ocr-runs.py</code>）と
-<code>report-margin.txt</code>（<code>bin/score-margin-runs.py</code>）。</li>
+<code>work/ocr-engine-check/report-ocr.txt</code>（<code>bin/study/compare-ocr-runs.py</code>）と
+<code>report-margin.txt</code>（<code>bin/study/score-margin-runs.py</code>）。</li>
 </ul>
 <h2 id="yomitokuとの比較2026-11-11">YomiTokuとの比較（2026-11-11）</h2>
 <ul>
@@ -840,7 +845,7 @@ GPUでも精度は下がらない。作成済みの本はCPUの読みのまま�
 <code>yomitoku subset.pdf -f json -d cuda --dpi 300 --ignore_ruby</code>
 を実行した。処理は0.65〜0.7秒/ページ（初回はモデル取得が加わる）。出力は行ごとの4点座標（傾いた四角形）と読み、段落の読み順。</li>
 <li>採点は
-<code>bin/score-ocr-engines.py</code>。行の切り方がエンジンで違うため、正解行はページ全文のうち最も近い部分文字列との編集距離で測る。全エンジンと正解に同じ正規化（NFKC、ダッシュ類の統一、空白除去、U+00B7→・、“”→〝〟）をかける。正規化のぶん文字数は3374になる。</li>
+<code>bin/study/score-ocr-engines.py</code>。行の切り方がエンジンで違うため、正解行はページ全文のうち最も近い部分文字列との編集距離で測る。全エンジンと正解に同じ正規化（NFKC、ダッシュ類の統一、空白除去、U+00B7→・、“”→〝〟）をかける。正規化のぶん文字数は3374になる。</li>
 <li>正解行の誤り: NDLOCR-Lite単体 211、YomiToku
 94、本番のNDL（余白つき再認識、CPU 15・CUDA
 14）。YomiTokuの94のうち約65は、インフィニティ上巻4ページ（登場人物一覧）の2行。YomiTokuは名前と役職を別の段落に分け、点線を落とす。正解行の群別では、<code>changed</code>（NDL単体が誤りやすい行）でYomiToku
@@ -876,7 +881,7 @@ id="山括弧と二重引用符の補正2026-11-11">山括弧と二重引用符�
 はこのオプションを常に付ける。</li>
 <li>余白つき再認識の読みに当てると、夏への扉は184個を置き換え、15・16ページが残った。インフィニティ上巻は134個（残りなし）、虎よ（保存済みOCRのみ）は21個（残りなし）。置き換えたページから固定シードで14ページを選び、〝〟を含む27行をClaudeが原本画像で確認した（ユーザー確認ではない）。開き・閉じはすべて原本と一致した。インフィニティ上巻348ページは、保存済みOCRでは記号の数が奇数だったが、余白30pxの読みでは偶数になり、正しく組になった。</li>
 <li>標本141ページの正解行では、本番の文字列の誤りがCPU 15→9、CUDA
-14→8（<code>bin/score-ocr-engines.py</code>
+14→8（<code>bin/study/score-ocr-engines.py</code>
 の正規化あり、3374文字）。正規化なしの <code>report-margin.txt</code>
 では、20→14、19→13。無作為ページでYomiTokuと食い違う行は130→124行に減った。結果は
 <code>work/ocr-engine-check/report-engines-brackets.txt</code>。<code>report-margin.txt</code>
@@ -947,7 +952,7 @@ Pages（<code>kusanaginoturugi.github.io</code> リポジトリの
 <h2
 id="濁点半濁点の自動判定2026-11-11">濁点・半濁点の自動判定（2026-11-11）</h2>
 <ul>
-<li><code>bin/check-voicing-judges.py</code>
+<li><code>bin/study/check-voicing-judges.py</code>
 で、ユーザーが確定した52組（<code>work/eval/summer-door-voicing-glossary.tsv</code>）を正解として、『夏への扉』の本文の出現800か所を自動判定と比べた。NDLの読みは731か所が正しく、69か所が誤り。結果は
 <code>work/voicing/summer-door/judges-llm.tsv</code>。</li>
 <li>語の切り出し:
@@ -1348,6 +1353,22 @@ id="正解率のデータを毎回取る造物主の掟2026-11-13">正解率の�
 <li>『造物主の掟』（小隅黎訳、創元推理文庫、<code>0101-20150604094608801_check.pdf</code>、580ページ）を通した。翻訳者が違うので
 <code>VOCAB_FROM</code>
 は使わず、パ／バの選択だけ5冊分（59組、食い違いなし）を引き継いだ。パ／バは115組中87組を自動判定し、引き継いだ選択が4組に効き、人の確認待ちは25組。自動修正は8語20か所で、「パドヴァ→バドヴァ」と「バドヴァ→パドヴァ」が両方出ているほか、「ポンド→ボンド」も人の確認が要る。判断モデルは377か所を判断し、割れた箇所は58か所。巻末目録は561〜577ページ。抜き取り検査は本文の9403行から200行を選んだ。</li>
+</ul>
+<h2 id="スクリプトの整理2026-11-13">スクリプトの整理（2026-11-13）</h2>
+<ul>
+<li>ユーザーの依頼で、<code>bin/</code>
+の36本を役割で分けた（削除はしない）。本作りで使う15本（入口、各段、読み込まれる部品、閲覧用コピー、文書のHTML化）は
+<code>bin/</code> に残し、試験・評価用15本を
+<code>bin/study/</code>、『夏への扉』の注釈試作5本を
+<code>bin/annotate/</code> に移した。<code>deskew-study.py</code>
+は試験用だが、本作りで使う <code>ocr-sensitivity.py</code>
+が読み込むので <code>bin/</code> に残した。</li>
+<li>移したスクリプトは、リポジトリの位置（<code>parents[2]</code>、Rubyは
+<code>../..</code>）と、<code>bin/</code> の
+<code>text_layer_utils.py</code>
+などを読み込むパスを直した。README・作業記録などの <code>bin/名前</code>
+の参照も書き換えた。20本とも起動を確かめ（Pythonは
+<code>--help</code>、Rubyとshは構文検査）、『星を継ぐもの』を本作りの流れで通し直した。</li>
 </ul>
 <h2 id="次の作業">次の作業</h2>
 <ol type="1">

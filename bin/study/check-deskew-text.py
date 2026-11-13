@@ -78,7 +78,7 @@ def main():
     parser.add_argument('angles', type=Path)
     parser.add_argument('pdfs', type=Path, nargs='+', help='first PDF supplies the page images')
     parser.add_argument('--ndl-src', type=Path, default=Path(os.environ.get(
-        'NDLOCR_SRC', Path(__file__).resolve().parents[1] / 'vendor/ndlocr-lite/src')))
+        'NDLOCR_SRC', Path(__file__).resolve().parents[2] / 'vendor/ndlocr-lite/src')))
     args = parser.parse_args()
     with args.angles.open(newline='') as handle:
         angles = {int(row['page']): float(row['angle_deg'])

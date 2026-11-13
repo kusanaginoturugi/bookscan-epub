@@ -7,7 +7,7 @@ Lines are paired by box overlap (IoU > 0.5). Gold lines are scored against the
 best-matching line on their page with whitespace removed, so the score does not
 depend on line ids. Differences are counts, not accuracy: check the image.
 
-usage: bin/compare-ocr-runs.py work/ocr-engine-check saved cpu cuda cuda2
+usage: bin/study/compare-ocr-runs.py work/ocr-engine-check saved cpu cuda cuda2
 """
 
 import argparse

@@ -3,7 +3,7 @@
 
 require 'json'
 
-root = File.expand_path('..', __dir__)
+root = File.expand_path('../..', __dir__)
 header, *lines = File.readlines(File.join(root, 'eval/ruby-gold.tsv'), chomp: true)
 gold = lines.map { |line| header.split("\t").zip(line.split("\t")).to_h }
 models = %w[30 50 100 Paddle]

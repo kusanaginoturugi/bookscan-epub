@@ -6,7 +6,7 @@ image-verified gold lines plus 20 random body pages (fixed seed), and
 manifest.json maps subset page N to its PDF page and keeps the gold lines.
 Book text stays under work/ and is not committed.
 
-usage: bin/ocr-sample-pages.py work/ocr-engine-check
+usage: bin/study/ocr-sample-pages.py work/ocr-engine-check
 """
 
 import argparse
@@ -17,7 +17,7 @@ from pathlib import Path
 
 from pypdf import PdfReader, PdfWriter
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 PDF = ROOT.parent / 'bookscan/pdf'
 BOOKS = {
     'tiger': dict(pdf=ROOT / 'output/trial/tiger-sanitized.pdf',

@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Score OCR engines on the sample from bin/ocr-sample-pages.py, independent of line splits.
+"""Score OCR engines on the sample from bin/study/ocr-sample-pages.py, independent of line splits.
 
 Run with .venv-ndl/bin/python. Engines are KIND:RUN under each book directory:
   ndl:RUN       ocr.py JSON in BOOK/RUN/subset_NNNNN.json (lines in file order)
@@ -16,7 +16,7 @@ differently are not penalized. Totals are also split by the gold group
 --diff ENGINE_A ENGINE_B lists long lines of A (>= 20 chars) on the random
 pages (no gold) whose best match in B's page text differs, for image review.
 
-usage: bin/score-ocr-engines.py work/ocr-engine-check margin:ocrcpu-reccpu yomitoku:yomitoku
+usage: bin/study/score-ocr-engines.py work/ocr-engine-check margin:ocrcpu-reccpu yomitoku:yomitoku
 """
 
 import argparse
@@ -27,6 +27,9 @@ import unicodedata
 from collections import defaultdict
 from pathlib import Path
 
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # bin/, for text_layer_utils
 from text_layer_utils import fix_brackets, fix_dashes, fix_quotes
 
 DASHES = re.compile('[―—–─‐-]+')

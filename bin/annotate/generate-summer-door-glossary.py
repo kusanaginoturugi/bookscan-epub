@@ -31,7 +31,7 @@ def main():
     parser.add_argument('--url', default='http://127.0.0.1:18089/v1/chat/completions')
     parser.add_argument('--batch-size', type=int, default=8)
     args = parser.parse_args()
-    root = Path(__file__).resolve().parents[1]
+    root = Path(__file__).resolve().parents[2]
     rows = list(csv.DictReader((root / 'data/summer-door-reading-term-candidates_fix.tsv').open(), delimiter='\t'))
     pages = [page.extract_text().replace('\n', '') for name in PDFS
              for page in PdfReader(root / 'output' / name).pages]

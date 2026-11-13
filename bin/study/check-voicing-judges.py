@@ -14,7 +14,7 @@ occurrence of either form. Judges:
            an answer counts only when both orders agree (--llm-sample of the
            cases NDL read right are asked, and every case NDL read wrong)
 
-usage: bin/check-voicing-judges.py PDF OCR_DIR GLOSSARY OUT.tsv --ocr-stem STEM
+usage: bin/study/check-voicing-judges.py PDF OCR_DIR GLOSSARY OUT.tsv --ocr-stem STEM
          [--recognized margin.tsv] [--yomitoku-dir DIR]
 """
 
@@ -22,13 +22,15 @@ import argparse
 import csv
 import importlib.util
 import random
+import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 
 import numpy as np
 import pypdfium2
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[1]  # bin/, whose modules this script loads
+sys.path.insert(0, str(ROOT))
 
 
 def load_module(name, path):

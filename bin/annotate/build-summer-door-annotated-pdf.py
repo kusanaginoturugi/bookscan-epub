@@ -41,7 +41,7 @@ def main():
     args = parser.parse_args()
     if args.output.exists():
         parser.error(f'output already exists: {args.output}')
-    root = Path(__file__).resolve().parents[1]
+    root = Path(__file__).resolve().parents[2]
     sources = [PdfReader(root / 'output' / name) for name in PDFS]
     writer = PdfWriter()
     for source in sources:

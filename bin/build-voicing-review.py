@@ -14,7 +14,7 @@ marks away). A pair is decided automatically only when the crop majority picks
 one form, the crop never confirms the other form where NDL read it, and, for a
 word seen once, YomiToku read the same form. Everything else waits for a
 person. On The Door into Summer this decided pairs with no error against the
-52 pairs the user settled (bin/check-voicing-judges.py).
+52 pairs the user settled (bin/study/check-voicing-judges.py).
 
 The page shows each pair with a few occurrences (YomiToku disagreements first):
 page thumbnail with a red box, the line, and the word at 3x. The reviewer picks

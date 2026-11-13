@@ -11,7 +11,7 @@ import cv2
 import yaml
 
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 NDL_SRC = ROOT / "vendor" / "ndlocr-lite" / "src"
 sys.path.insert(0, str(NDL_SRC))
 from parseq import PARSEQ  # noqa: E402

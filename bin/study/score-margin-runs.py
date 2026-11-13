@@ -7,7 +7,7 @@ high, the saved OCR otherwise, then --fix-dashes and --fix-brackets on vertical
 lines (double quotes paired over the page's vertical lines). Gold lines
 are scored against the best-matching line on their page, whitespace removed.
 
-usage: bin/score-margin-runs.py work/ocr-engine-check ocrcpu-reccpu ocrcuda-reccuda
+usage: bin/study/score-margin-runs.py work/ocr-engine-check ocrcpu-reccpu ocrcuda-reccuda
 """
 
 import argparse
@@ -16,6 +16,9 @@ import json
 import re
 from pathlib import Path
 
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # bin/, for text_layer_utils
 from text_layer_utils import fix_brackets, fix_dashes, fix_quotes
 
 WS = re.compile(r'\s+')
