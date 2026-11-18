@@ -2,7 +2,8 @@
 # Build one searchable PDF:
 # prepare (background cleanup + deskew, angles saved) -> NDLOCR-Lite on the
 # unrotated original -> margin re-recognition -> YomiToku -> バ/パ pairs settled
-# by word-crop re-reads and the human choices (review page) -> remaining
+# by word-crop margins, the local LLM for pairs the image leaves open, and the
+# human choices (review page) -> remaining
 # NDLOCR-Lite/YomiToku disagreements judged by a local LLM and the human
 # verdicts (review page) -> text layer rotated with each deskewed page
 # (margin30, --min-height 400, --fix-dashes, --fix-brackets, voicing glossary,
@@ -30,7 +31,7 @@
 #              JUDGE_PROMPT (v1+v2 default: v1 decides, v2 with context can veto)
 #   SKIP_YOMITOKU=1, SKIP_JUDGE=1  turn those stages off on purpose; without them
 #              a missing YomiToku or LLM stops the build. YomiToku off also turns
-#              the judge off. A book keeps the stages it was started with.
+#              the judge off; judge off also keeps the LLM out of the バ/パ step. A book keeps the stages it was started with.
 #   VOCAB_FROM  comma-separated SLUGs of finished books of the same series: their
 #              katakana words (3+ characters, 2+ times) help the judge's book-word rule
 #   WORK/char-map.tsv  (from, to) characters this book prints differently, e.g. 掴 摑
@@ -181,16 +182,22 @@ YOMI_ARGS=
 SKIP_ARGS=--skip-catalog
 [ ! -e "$WORK/skip-pages.txt" ] || SKIP_ARGS="$SKIP_ARGS --skip-pages $(tr -d ' \n' < "$WORK/skip-pages.txt")"
 
-# バ/パ: word-crop re-reads decide safe pairs; human choices win.
+# バ/パ: word-crop margins decide pairs, the LLM (with the judge stage on)
+# the pairs no place decides by image; human choices win.
 VOICING_GLOSSARY=${GLOSSARY:-$WORK/voicing-glossary.tsv}
 if [ -z "$GLOSSARY" ]; then
-  KEY=$(inputs_key "$WORK/voicing-human.tsv" "$WORK/margin.tsv" "$WORK/stages" "$WORK/skip-pages.txt")skip-catalog,line-joins,reread-all,fix-review,save-path,fix-group,save-cmd,chains,machine
+  VOICING_LLM=
+  [ "$USE_JUDGE" = off ] ||
+    VOICING_LLM="--llm-url $LLM_URL/chat/completions --llm-model $LLM_MODEL --llm-history $WORK/voicing-llm.tsv"
+  KEY=$(inputs_key "$WORK/voicing-human.tsv" "$WORK/margin.tsv" "$WORK/stages" "$WORK/skip-pages.txt")skip-catalog,line-joins,reread-all,fix-review,save-path,fix-group,save-cmd,chains,machine,margins,llm$VOICING_LLM
   if [ ! -e "$VOICING_GLOSSARY" ] || [ ! -e "$WORK/machine/voicing-glossary.tsv" ] ||
      [ "$(cat "$WORK/voicing.key" 2>/dev/null)" != "$KEY" ]; then
     echo "[$(date +%T)] voicing"
+    [ -z "$VOICING_LLM" ] || curl -sf -m 10 "$LLM_URL/models" > /dev/null ||
+      fail "no LLM server at $LLM_URL (start llama-server, set LLM_URL, or SKIP_JUDGE=1)"
     # shellcheck disable=SC2086
     "$PY" "$BIN/build-voicing-review.py" "$ORIGINAL" "$WORK/ocr" "$REVIEW-voicing" --ocr-stem "$OCR_STEM" \
-      --recognized "$WORK/margin.tsv" $YOMI_ARGS $SKIP_ARGS --auto-crop --device "$DEVICE" \
+      --recognized "$WORK/margin.tsv" $YOMI_ARGS $SKIP_ARGS --auto-crop --device "$DEVICE" $VOICING_LLM \
       --human "$WORK/voicing-human.tsv" --glossary-out "$VOICING_GLOSSARY" \
       --corrections-out "$WORK/voicing-corrections.tsv" --machine-out "$WORK/machine" \
       --title "$TITLE 濁点・半濁点レビュー" > "$WORK/voicing.log" 2>&1 ||

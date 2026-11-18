@@ -9,12 +9,19 @@ bin/auto-variant-glossary.py), or when YomiToku (--yomitoku-dir) reads the
 other form on the same page.
 
 --auto-crop re-reads every occurrence cropped from the page at full
-resolution with the NDLOCR-Lite recognizer (the line-wide read shrinks the
-marks away). A pair is decided automatically only when the crop majority picks
-one form, the crop never confirms the other form where NDL read it, and, for a
-word seen once, YomiToku read the same form. Everything else waits for a
-person. On The Door into Summer this decided pairs with no error against the
-52 pairs the user settled (bin/study/check-voicing-judges.py).
+resolution with the NDLOCR-Lite recognizers (the line-wide read shrinks the
+marks away) and scores both spellings at the mark: log P of the one read minus
+log P of the other, summed over the three recognizers. Places with a margin of
+STRONG or more decide the pair: one spelling when the strong places agree (up to
+MINORITY against them; with fewer than FEW, no place may lean the other way),
+"both" when strong places point both ways; then each
+strong place whose image shows the other spelling than NDL read is fixed. With
+--llm-url, a pair left undecided is asked place by place (passage of three
+lines, both orders, answers kept in --llm-history): an answer counts when both
+orders agree and the weak margin (LEAN or more) does not lean the other way; all places
+answered alike decide the pair, different answers make it "both" with fixes.
+Pairs still undecided wait for a person. Checked against the pairs settled by
+the user in six books (bin/study/check-voicing-judges.py, docs/progress.md).
 
 The page shows each pair with a few occurrences (YomiToku disagreements first):
 page thumbnail with a red box, the line, and the word at 3x. The reviewer picks
@@ -33,6 +40,7 @@ usage: bin/build-voicing-review.py PDF OCR_DIR OUT_DIR --ocr-stem STEM
 
 import argparse
 import csv
+import difflib
 import html
 import importlib.util
 import json
@@ -120,8 +128,34 @@ def find_pairs(lines, yomitoku, min_length):
     return occurrences, pairs
 
 
+def voicing_margins(models, image, word):
+    """{k: margin} for each バ行/パ行 kana word[k]: log P(word[k]) - log P(the other
+    mark) at its position, summed over the three recognizers. Positive means the
+    image looks like the spelling read, negative like the other one. Each model's
+    read is aligned to word without the marks; a model whose read does not cover
+    word[k] says nothing about it."""
+    margins = defaultdict(float)
+    for model in models:
+        if not hasattr(model, 'char_index'):
+            model.char_index = {c: i + 1 for i, c in enumerate(model.charlist)}  # class 0 ends the text
+        logits = model.session.run(model.output_names, {model.input_names[0]: model.preprocess(image)})[0][0]
+        indices = logits.argmax(axis=1)
+        stop = np.where(indices == 0)[0]
+        read = ''.join(model.charlist[i - 1] for i in indices[:stop[0] if stop.size else len(indices)])
+        logp = logits - np.logaddexp.reduce(logits, axis=1, keepdims=True)
+        matcher = difflib.SequenceMatcher(None, base(word), base(read), autojunk=False)
+        for a, b, size in matcher.get_matching_blocks():
+            for k in range(a, a + size):
+                other = word[k].translate(VOICING)
+                if word[k] in VOICED and word[k] in model.char_index and other in model.char_index:
+                    row = logp[b + k - a]
+                    margins[k] += float(row[model.char_index[word[k]]] - row[model.char_index[other]])
+    return dict(margins)
+
+
 def crop_readings(lines, places, pdf, device, margin=0.3):
-    """{(line index, start, end): text} from re-reading each word crop alone."""
+    """({(line index, start, end): text}, {place: voicing_margins}) from
+    re-reading each word crop alone."""
     spec = importlib.util.spec_from_file_location('ocr_sensitivity', Path(__file__).resolve().parent / 'ocr-sensitivity.py')
     sensitivity = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(sensitivity)
@@ -129,7 +163,7 @@ def crop_readings(lines, places, pdf, device, margin=0.3):
     by_page = defaultdict(list)
     for place in sorted(places):
         by_page[lines[place[0]]['page']].append(place)
-    readings = {}
+    readings, margins = {}, {}
     document = pypdfium2.PdfDocument(str(pdf))
     for page, items in sorted(by_page.items()):
         image = np.array(document[page - 1].render(scale=300 / 72).to_pil().convert('RGB'))
@@ -149,32 +183,146 @@ def crop_readings(lines, places, pdf, device, margin=0.3):
         texts = sensitivity.recognize(models, crops_)
         for n, place in enumerate(items):
             readings[place] = texts[n]
+            if crops_[n][1].size:
+                margins[place] = voicing_margins(models, crops_[n][1], line_word(lines, place))
     document.close()
-    return readings
+    return readings, margins
 
 
-def auto_decide(key, occurrences, readings, yomi_read):
-    """(choice, note) from crop re-reads, or (None, note) when not safe to decide."""
-    votes = Counter()
-    confirmed_loser = defaultdict(int)
+def line_word(lines, place):
+    index, start, end = place
+    return lines[index]['text'][start:end]
+
+
+# A place whose margin is at least STRONG counts as the image deciding it. On
+# six reviewed books (357 settled pairs) every pair with a strong place was
+# decided right this way; the margins of wrong single places were mostly below 8.
+STRONG = 8.0
+# Strong places against the majority up to this share are misreads of one
+# word (ブローヒリオ, 183 to 1); more make the pair two words of the book.
+MINORITY = 0.05
+# A spelling backed by fewer strong places than this is not chosen when any
+# place leans the other way, however weakly (バック 1 strong, パック 1 weak: both).
+FEW = 3
+# A weaker margin than this is about as often wrong as right (18 to 28 on the
+# six books), so it does not overrule an LLM answer.
+LEAN = 3.0
+
+
+def margin_decide(key, occurrences, margins):
+    """(choice, note, fixes) for a pair from the word-crop margins. choice is a
+    spelling, 'both' (both words are in the book: ビッグ・バン and パン), or None
+    when no place is strong or a few strong places meet one leaning the other
+    way. fixes ({place: spelling}) are the strong places of
+    a 'both' pair whose image shows the other spelling than NDL read."""
+    a, b = key
+    k = next(i for i in range(len(a)) if a[i] != b[i])
+    votes = {}  # place -> (word read there, margin toward a)
     for word in key:
         for place in occurrences.get(word, []):
-            hits = [w for w in key if w in readings.get(place, '')]
-            if len(hits) == 1:
-                votes[hits[0]] += 1
-                if hits[0] == word:
-                    confirmed_loser[word] += 1  # crop agrees with what NDL read here
+            if k in margins.get(place, {}):
+                votes[place] = (word, margins[place][k] if word == a else -margins[place][k])
+    strong_a = sum(v >= STRONG for _, v in votes.values())
+    strong_b = sum(v <= -STRONG for _, v in votes.values())
+    note = f'画像 {a}:{strong_a} {b}:{strong_b}（弱い {len(votes) - strong_a - strong_b}）'
+    if not strong_a and not strong_b:
+        return None, note, {}
+    if strong_a and strong_b and min(strong_a, strong_b) / (strong_a + strong_b) > MINORITY:
+        fixes = {place: (a if v > 0 else b) for place, (word, v) in votes.items()
+                 if abs(v) >= STRONG and (a if v > 0 else b) != word}
+        return 'both', note, fixes
+    winner, strong, against = (a, strong_a, b) if strong_a > strong_b else (b, strong_b, a)
+    if strong < FEW and any((v < 0) == (winner == a) for _, v in votes.values()):
+        return None, note + f'。{against}寄りの箇所あり', {}
+    return winner, note, {}
+
+
+LLM_PROMPT = """次のA・Bは、小説をOCRで読み取った同じ箇所です。カタカナ語1語の濁点・半濁点だけが違います。
+OCRは「バ」と「パ」のような濁点・半濁点をよく読み違えます。日本語の文章として自然で正しい方を、AかBの1文字だけで答えてください。
+
+A: {a}
+
+B: {b}"""
+
+
+def passages(lines, place, key):
+    """{spelling: the previous, current and next line of the same page with that
+    spelling at place}, the text shown to the LLM."""
+    index, start, end = place
+    page = lines[index]['page']
+    same_page = lambda i: 0 <= i < len(lines) and lines[i]['page'] == page
+    before = lines[index - 1]['text'] if same_page(index - 1) else ''
+    after = lines[index + 1]['text'] if same_page(index + 1) else ''
+    text = lines[index]['text']
+    return {w: before + text[:start] + w + text[end:] + after for w in key}
+
+
+class LlmVoicing:
+    """Asks the LLM (bin/auto-variant-glossary.ask) which spelling reads right,
+    in both orders; answers are kept in a TSV (first, second, answer) and never
+    asked twice."""
+
+    def __init__(self, url, model, history):
+        spec = importlib.util.spec_from_file_location(
+            'auto_variant_glossary', Path(__file__).resolve().parent / 'auto-variant-glossary.py')
+        self.module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(self.module)
+        self.url, self.model, self.history = url, model, history
+        self.answers = {}
+        if history and history.exists():
+            with history.open(newline='') as handle:
+                self.answers = {(r['first'], r['second']): r['answer']
+                                for r in csv.DictReader(handle, delimiter='\t', quoting=csv.QUOTE_NONE)}
+        self.asked = 0
+
+    def ask(self, first, second):
+        if (first, second) not in self.answers:
+            answer = self.module.ask(self.url, self.model, LLM_PROMPT.format(a=first, b=second))
+            self.answers[(first, second)] = answer
+            self.asked += 1
+            if self.history:
+                new = not self.history.exists()
+                with self.history.open('a', newline='') as handle:
+                    writer = csv.writer(handle, delimiter='\t', lineterminator='\n', quoting=csv.QUOTE_NONE,
+                                        escapechar='\\')
+                    if new:
+                        writer.writerow(['first', 'second', 'answer'])
+                    writer.writerow([first, second, answer])
+        return self.answers[(first, second)]
+
+    def choose(self, lines, place, key):
+        """The spelling the LLM picks in both orders, or None."""
+        a, b = key
+        text = passages(lines, place, key)
+        one = {'A': a, 'B': b}.get(self.ask(text[a], text[b]))
+        two = {'A': b, 'B': a}.get(self.ask(text[b], text[a]))
+        return one if one and one == two else None
+
+
+def llm_decide(key, occurrences, margins, lines, llm):
+    """(choice, note, fixes) for a pair no place decided by image. Every place is
+    asked; an answer counts only when both orders agree and the weak image
+    margin (LEAN or more) does not lean the other way. With every place answered, one spelling
+    everywhere decides the pair and different ones make it 'both' (fixes are the
+    places answered with the other spelling than NDL read); else None."""
     a, b = key
-    note = f'crop {a}:{votes[a]} {b}:{votes[b]}'
-    if votes[a] == votes[b]:
-        return None, note
-    winner, loser = (a, b) if votes[a] > votes[b] else (b, a)
-    if confirmed_loser[loser]:
-        return None, note + f'; crop confirms {loser} {confirmed_loser[loser]}x'
-    seen = [place for word in key for place in occurrences.get(word, [])]
-    if len(seen) == 1 and yomi_read.get(seen[0]) != winner:
-        return None, note + '; seen once, YomiToku differs'
-    return winner, note
+    k = next(i for i in range(len(a)) if a[i] != b[i])
+    answers = {}
+    for word in key:
+        other = b if word == a else a
+        for place in occurrences.get(word, []):
+            answer = llm.choose(lines, place, key)
+            m = margins.get(place, {}).get(k)
+            if answer and m and abs(m) >= LEAN and answer != (word if m > 0 else other):
+                answer = None
+            answers[place] = (word, answer)
+    picked = Counter(answer for _, answer in answers.values())
+    note = f'LLM {a}:{picked[a]} {b}:{picked[b]} 決まらない:{picked[None]}'
+    if not answers or picked[None]:
+        return None, note, {}
+    if len(picked) == 1:
+        return next(iter(picked)), note, {}
+    return 'both', note, {place: answer for place, (word, answer) in answers.items() if answer != word}
 
 
 def base(word):
@@ -432,6 +580,10 @@ def main():
     parser.add_argument('--title', default='濁点・半濁点のレビュー')
     parser.add_argument('--auto-crop', action='store_true', help='decide safe pairs from word-crop re-reads')
     parser.add_argument('--device', choices=['cpu', 'cuda'], default='cpu')
+    parser.add_argument('--llm-url', help='chat completions URL; with --auto-crop, pairs no place decides by image '
+                                          'are asked place by place (e.g. http://127.0.0.1:8080/v1/chat/completions)')
+    parser.add_argument('--llm-model', default='dahara1/gemma-4-12B-it-qat-UD-japanese-imatrix:Q4_K_XL')
+    parser.add_argument('--llm-history', type=Path, help='TSV of LLM answers to read and append to')
     parser.add_argument('--human', type=Path, help='pair choices saved from the page (a, b, choice)')
     parser.add_argument('--glossary-out', type=Path, help='glossary TSV for --glossary --fix-variants')
     parser.add_argument('--machine-out', type=Path,
@@ -451,12 +603,6 @@ def main():
         print(f'pages left out: {",".join(map(str, sorted(skip)))}')
     yomitoku = load_yomitoku(args.yomitoku_dir) if args.yomitoku_dir else {}
     occurrences, pairs = find_pairs(lines, yomitoku, args.min_length)
-    yomi_read = {}
-    for key, info in pairs.items():
-        for word in key:
-            for place in occurrences.get(word, []):
-                text = yomitoku.get(lines[place[0]]['page'], '')
-                yomi_read[place] = info['yomi'].get(place[:2]) or (word if word in text else None)
     human = load_human(args.human)
     fix_verdicts = {k[1]: human.pop(k) for k in [k for k in human if k[0] == 'fix:']}
     # Candidates only change with the code (e.g. words split over a line break
@@ -464,7 +610,7 @@ def main():
     unknown = [k for k in human if k not in pairs]
     for key in unknown:
         print(f'warning: human choice for a pair that is no longer a candidate: {"/".join(key)} -> {human.pop(key)}')
-    auto, notes, fixes = {}, {}, {}
+    auto, notes, fixes, both_fixes, auto_source = {}, {}, {}, {}, {}
     def fix_id(place, to):
         index, start, end = place
         line = lines[index]
@@ -481,7 +627,7 @@ def main():
         judgements and the person's choices (empty for machine processing only)."""
         custom = {k: c for k, c in human.items() if c != 'both' and c not in k}
         decisions = {k: c for k, c in auto.items() if c}
-        sources = {k: 'auto' for k in decisions}
+        sources = {k: auto_source[k] for k in decisions}
         decisions.update({k: c for k, c in human.items() if k not in custom})
         sources.update({k: 'human' for k in human if k not in custom})
         for key in custom:
@@ -490,8 +636,13 @@ def main():
                    for place in occurrences.get(word, [])}
         agreed, fixes = {}, {}
         if args.auto_crop:
-            agreed = agreed_fixes(occurrences, readings, yomitoku, lines, settled)
-            fixes = {place: (to, 'auto-agree') for place, to in agreed.items()
+            agreed = {place: (to, 'auto-agree')
+                      for place, to in agreed_fixes(occurrences, readings, yomitoku, lines, settled).items()}
+            for key, places in both_fixes.items():
+                if decisions.get(key) == 'both' and sources[key] in ('auto', 'llm'):
+                    source = 'auto-margin' if sources[key] == 'auto' else 'llm'
+                    agreed.update({place: (to, source) for place, to in places.items()})
+            fixes = {place: (to, source) for place, (to, source) in agreed.items()
                      if 'reject' not in (fix_verdicts.get(fix_id(place, to)), fix_verdicts.get(fix_word(place, to)))}
         for key, to in custom.items():
             for word in key:
@@ -531,17 +682,29 @@ def main():
         # Every katakana word with dakuten/handakuten is re-read from a full-size
         # crop: the line-wide read shrinks the marks away.
         places = {place for word in occurrences for place in occurrences[word]}
-        readings = crop_readings(lines, places, args.pdf, args.device)
+        readings, margins = crop_readings(lines, places, args.pdf, args.device)
         for key in pairs:
-            auto[key], notes[key] = auto_decide(key, occurrences, readings, yomi_read)
+            auto[key], notes[key], both_fixes[key] = margin_decide(key, occurrences, margins)
+            auto_source[key] = 'auto'
+        if args.llm_url:
+            llm = LlmVoicing(args.llm_url, args.llm_model, args.llm_history)
+            for key in pairs:
+                if auto[key] is None:
+                    auto[key], note, both_fixes[key] = llm_decide(key, occurrences, margins, lines, llm)
+                    notes[key] += '。' + note
+                    auto_source[key] = 'llm'
+            print(f'LLM: {sum(1 for k in pairs if auto_source[k] == "llm")} pairs without a strong place, '
+                  f'{sum(1 for k in pairs if auto_source[k] == "llm" and auto[k])} decided; {llm.asked} questions asked now')
     decisions, sources, custom, agreed, fixes = choose(human, fix_verdicts)
-    proposed = {fix_id(p, to) for p, to in agreed.items()} | {fix_word(p, to) for p, to in agreed.items()}
+    proposed = {fix_id(p, to) for p, (to, _) in agreed.items()} | {fix_word(p, to) for p, (to, _) in agreed.items()}
     for gone in set(fix_verdicts) - proposed:
         print(f'warning: human verdict for an automatic fix that is no longer proposed: {gone}')
     if args.corrections_out:
         write_corrections(args.corrections_out, fixes)
     sources_count = Counter(source for _, source in fixes.values())
     print(f'corrections: {sources_count["auto-agree"]} where crop and YomiToku agree, '
+          f'{sources_count["auto-margin"]} at strong places of pairs that are both words, '
+          f'{sources_count["llm"]} by the LLM in pairs that are both words, '
           f'{sources_count["human"]} from "both wrong" choices, {sources_count["chain"]} through chains of choices')
     if args.glossary_out:
         write_glossary(args.glossary_out, decisions, sources)
@@ -555,9 +718,10 @@ def main():
                                          -sum(len(occurrences.get(w, [])) for w in k), k))
     examples = {key: pick_examples(key, pairs[key], occurrences, args.examples) for key in order}
     # Automatic fixes are shown after the pairs, one item per word, to keep or reject.
-    fix_groups = defaultdict(list)
-    for place, to in sorted(agreed.items()):
+    fix_groups, fix_sources = defaultdict(list), defaultdict(set)
+    for place, (to, _) in sorted(agreed.items()):
         fix_groups[fix_word(place, to)].append(place)
+        fix_sources[fix_word(place, to)].add(agreed[place][1])
     fix_items = sorted(fix_groups.items(), key=lambda kv: (-len(kv[1]), kv[0]))
     for word_key, places in fix_items:
         spread = places if len(places) <= args.examples else [places[i * len(places) // args.examples]
@@ -596,8 +760,12 @@ def main():
         pages = sorted({lines[index]['page'] for index, _, _ in places})
         sections.append(
             f'<section id="s{n}" class="fix"><h2>#{n + 1} 自動修正 {html.escape(word)} → {html.escape(to)}'
-            f'（{len(places)}か所）</h2><p>語を切り出して読み直した結果とYomiTokuが、NDLと違う同じ綴りを読んだので直した。'
-            f'原本と違えば「直さない」を選ぶ（{len(places)}か所すべてに当たる）。ページ: '
+            f'（{len(places)}か所）{"【LLM】" if "llm" in fix_sources[word_key] else ""}</h2><p>'
+            + ('両方の語が本に出る組で、LLMが前後の文からNDLと違う綴りを選んだので直した。'
+               if fix_sources[word_key] == {'llm'} else
+               '語を切り出して読み直した結果が、NDLと違う綴りを示したので直した'
+               '（YomiTokuも同じ綴りを読んだか、両方の語が本に出る組で画像の差がはっきりしている）。')
+            + f'原本と違えば「直さない」を選ぶ（{len(places)}か所すべてに当たる）。ページ: '
             f'{html.escape(", ".join(map(str, pages[:20])))}{" ほか" if len(pages) > 20 else ""}</p>'
             f'<div class="opts">{options} <a href="#" class="go" data-n="{n}">次の未確認へ ↓</a></div>'
             f'<div class="ex">{figures}</div></section>')
@@ -609,7 +777,7 @@ def main():
         choice = human.get(key)
         data.append({'a': a, 'b': b, 'ca': ca, 'cb': cb, 'auto': auto.get(key) or '',
                      'human': {a: 'a', b: 'b', 'both': 'both'}.get(choice, f'custom:{choice}' if choice else '')})
-        agreed = sorted({fixes[place][0] for w in key for place in occurrences.get(w, []) if place in fixes})
+        fixed_to = sorted({fixes[place][0] for w in key for place in occurrences.get(w, []) if place in fixes})
         figures = []
         for k, (index, start, end) in enumerate(examples[key]):
             line = lines[index]
@@ -621,24 +789,26 @@ def main():
                            f'<img src="img/{n}-{k}-thumb.jpg"><img src="img/{n}-{k}-line.jpg">'
                            f'<img src="img/{n}-{k}-zoom.jpg"><figcaption>{caption}</figcaption></figure>')
         decided = auto.get(key)
-        rest = f'自動判定に任せる（{html.escape(decided)}）' if decided else '保留（自動判定なし）'
+        rest = (f'自動判定に任せる（{"両方正しい" if decided == "both" else html.escape(decided)}）'
+                if decided else '保留（自動判定なし）')
         options = ''.join(f'<label><input type="radio" name="p{n}" value="{value}">{label}</label>'
                           for value, label in (('a', html.escape(a)), ('b', html.escape(b)),
                                                ('both', '両方正しい'), ('custom', 'どちらも違う:'),
                                                ('undecided', rest)))
         options += f'<input id="c{n}" size="10" placeholder="正しい綴り"> '
-        if agreed:
-            rest_note = f'切り出しとYomiTokuが一致した箇所は {html.escape("・".join(agreed))} に直す。'
+        if fixed_to:
+            rest_note = f'画像の読み直しかLLMで違う綴りに決まった箇所は {html.escape("・".join(fixed_to))} に直す。'
         else:
             rest_note = ''
         sections_pairs.append(f'<section id="s{n}"><h2>#{n + 1} {html.escape(a)}（{ca}）／{html.escape(b)}（{cb}）'
-                        f'{"【自動】" if decided else ""}</h2><p>YomiTokuと割れた箇所: {len(pairs[key]["yomi"])}。{html.escape(notes.get(key, ""))}{rest_note}</p>'
+                        f'{("【LLM】" if auto_source.get(key) == "llm" else "【自動】") if decided else ""}</h2><p>YomiTokuと割れた箇所: {len(pairs[key]["yomi"])}。{html.escape(notes.get(key, ""))}{rest_note}</p>'
                         f'<div class="opts">{options} <a href="#" class="go" data-n="{n}">次の未確認へ ↓</a></div>'
                         f'<div class="ex">{"".join(figures)}</div></section>')
     data.extend(fix_data)
     auto_count = sum(1 for k in order if auto.get(k))
+    llm_count = sum(1 for k in order if auto.get(k) and auto_source.get(k) == 'llm')
     summary = (f'{len(order)}組。うちYomiTokuと割れた組 {sum(bool(pairs[k]["yomi"]) for k in order)}。'
-               f'自動判定 {auto_count}組、人の選択 {len(human)}組、どちらもない {sum(1 for k in order if not auto.get(k) and k not in human)}組。'
+               f'自動判定 {auto_count}組（うちLLM {llm_count}組、両方 {sum(1 for k in order if auto.get(k) == "both")}組）、人の選択 {len(human)}組、どちらもない {sum(1 for k in order if not auto.get(k) and k not in human)}組。'
                f'自動修正 {sum(len(p) for _, p in fix_items)}か所・{fix_count}語（最後に並ぶ）。本文の行 {len(lines)}、YomiTokuのページ {len(yomitoku)}。')
     (args.output / 'index.html').write_text(PAGE.format(
         title=html.escape(args.title), summary=summary, sections='\n'.join(sections_pairs + sections),

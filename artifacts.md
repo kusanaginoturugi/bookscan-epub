@@ -13,6 +13,16 @@
 | 天の光はすべて星 | 284 | 1 | [PDF](output/searchable/天の光はすべて星%20-%20フレドリック・ブラウン.pdf) | [PDF](output/searchable/天の光はすべて星%20-%20フレドリック・ブラウン%20辞書補正.pdf) | [5語7か所](work/searchable/ten-no-hikari/variant-glossary.tsv) |
 | インフィニティ・リミテッド（下） | 388 | 3 | [PDF](output/searchable/インフィニティ・リミテッド（下）%20-%20ジェイムズ・P・ホーガン.pdf) | [PDF](output/searchable/インフィニティ・リミテッド（下）%20-%20ジェイムズ・P・ホーガン%20辞書補正.pdf) | [20語61か所](work/searchable/infinity-lower/variant-glossary.tsv) |
 
+## 造物主の選択（2026-11-18）
+
+『造物主の掟』の続編（同じ小隅黎訳）。前作の語彙（`VOCAB_FROM`）と、前作が引き継いだ5冊分のパ／バの選択を引き継いで、`bin/build-searchable-book.sh` で通した。人のレビュー前。
+
+| 種類 | ファイル | 内容 |
+|---|---|---|
+| 完成品 | [検索可能PDF](output/searchable/造物主の選択%20-%20ジェイムズ・P・ホーガン.pdf) | 500ページ。巻末目録（496〜498ページ）はレビューの対象外 |
+| レビュー | [パ／バ](review/zoubutsushu-no-sentaku-voicing/index.html)・[判断モデル](review/zoubutsushu-no-sentaku-judge/index.html)・[抜き取り検査](review/zoubutsushu-no-sentaku-proofread/index.html) | パ／バは14組と自動修正5語、判断モデルは割れた43か所、抜き取り検査は200行 |
+| 作業ファイル | [パ／バの辞書](work/searchable/zoubutsushu-no-sentaku/voicing-glossary.tsv)・[自動修正](work/searchable/zoubutsushu-no-sentaku/voicing-corrections.tsv)・[判断モデルの反映](work/searchable/zoubutsushu-no-sentaku/judge/corrections.tsv)・[前作の語彙](work/searchable/zoubutsushu-no-sentaku/vocabulary.tsv) | |
+
 ## 造物主の掟（2026-11-13）
 
 前の5冊のパ／バの選択を引き継いで、`bin/build-searchable-book.sh` で通した（翻訳者が違うので語彙は引き継いでいない）。人のレビュー前。
