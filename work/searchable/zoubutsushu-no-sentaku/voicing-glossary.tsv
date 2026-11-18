@@ -5,6 +5,8 @@ term	occurrences	variants	verified	note
 アバカーン	50	アパカーン(3):auto	yes	
 ワイナーバウム	210	ワイナーパウム(2):auto	yes	
 クライパー	40	クライバー(2):auto	yes	
+ブロンギッド	23	プロンギッド(33):auto	yes	
+ボリジャン	48	ポリジャン(46):auto	yes	
 パルス	4	バルス(0):auto	yes	
 ロボット	61	ロポット(9):auto	yes	
 リベラル	0	リペラル(1):auto	yes	
@@ -24,6 +26,7 @@ term	occurrences	variants	verified	note
 ロビア	21	ロピア(4):auto	yes	
 バートン	4	パートン(1):auto	yes	
 ブランデー	0	プランデー(1):auto	yes	
+プール	1	ブール(1):human	yes	
 ロバート	3	ロパート(1):auto	yes	
 ブレンダ	0	プレンダ(5):auto	yes	
 ポケット	3	ボケット(1):auto	yes	
@@ -35,9 +38,12 @@ term	occurrences	variants	verified	note
 ウェブスター	9	ウェプスター(2):auto	yes	
 オープン	4	オーブン(0):auto	yes	
 パーガッソス	21	バーガッソス(0):auto	yes	
+バスローブ	1	バスロープ(0):auto	yes	
 バリケード	0	パリケード(1):auto	yes	
 ブロック	4	プロック(1):auto	yes	
 ベクトル	0	ペクトル(1):auto	yes	
+ブリザード	1	プリザード(0):auto	yes	
+ピガル	17	ビガル(7):auto	yes	
 レプリマティコン	38	レブリマティコン(1):auto	yes	
 プリネム	5	ブリネム(0):auto	yes	
 ロビー	1	ロピー(1):human	yes	
@@ -64,4 +70,8 @@ term	occurrences	variants	verified	note
 バーナード	0	パーナード(1):auto	yes	
 プリンター	2	ブリンター(0):auto	yes	
 ベータ	5	ペータ(5):auto	yes	
-プール	1	ブール(1):human	yes	
+ピッチ	1	ビッチ(0):auto	yes	
+ビキニ	1	ピキニ(0):auto	yes	
+カウボーイ	0	カウポーイ(1):auto	yes	
+プロメテウス	2	ブロメテウス(0):llm	yes	
+マルチプレックス	0	マルチブレックス(1):auto	yes	

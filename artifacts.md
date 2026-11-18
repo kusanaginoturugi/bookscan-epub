@@ -15,12 +15,12 @@
 
 ## 造物主の選択（2026-11-18）
 
-『造物主の掟』の続編（同じ小隅黎訳）。前作の語彙（`VOCAB_FROM`）と、前作が引き継いだ5冊分のパ／バの選択を引き継いで、`bin/build-searchable-book.sh` で通した。人のレビュー前。
+『造物主の掟』の続編（同じ小隅黎訳）。前作の語彙（`VOCAB_FROM`）と、前作が引き継いだ5冊分のパ／バの選択を引き継いで、`bin/build-searchable-book.sh` で通した。パ／バは、画像の確率差とLLMで決める新しい段で作り直した（[作業記録](docs/progress.md)の「パ／バを画像の確率とLLMで決める」）。人のレビュー前。
 
 | 種類 | ファイル | 内容 |
 |---|---|---|
 | 完成品 | [検索可能PDF](output/searchable/造物主の選択%20-%20ジェイムズ・P・ホーガン.pdf) | 500ページ。巻末目録（496〜498ページ）はレビューの対象外 |
-| レビュー | [パ／バ](review/zoubutsushu-no-sentaku-voicing/index.html)・[判断モデル](review/zoubutsushu-no-sentaku-judge/index.html)・[抜き取り検査](review/zoubutsushu-no-sentaku-proofread/index.html) | パ／バは14組と自動修正5語、判断モデルは割れた43か所、抜き取り検査は200行 |
+| レビュー | [パ／バ](review/zoubutsushu-no-sentaku-voicing/index.html)・[判断モデル](review/zoubutsushu-no-sentaku-judge/index.html)・[抜き取り検査](review/zoubutsushu-no-sentaku-proofread/index.html) | パ／バは80組すべて自動判定（LLM 2組、両方正しい5組）と箇所ごとの修正3か所、判断モデルは割れた37か所、抜き取り検査は200行 |
 | 作業ファイル | [パ／バの辞書](work/searchable/zoubutsushu-no-sentaku/voicing-glossary.tsv)・[自動修正](work/searchable/zoubutsushu-no-sentaku/voicing-corrections.tsv)・[判断モデルの反映](work/searchable/zoubutsushu-no-sentaku/judge/corrections.tsv)・[前作の語彙](work/searchable/zoubutsushu-no-sentaku/vocabulary.tsv) | |
 
 ## 造物主の掟（2026-11-13）
