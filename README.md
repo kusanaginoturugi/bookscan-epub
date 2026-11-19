@@ -4,7 +4,7 @@
 
 ## 現在の段階
 
-『虎よ、虎よ！』『インフィニティ・リミテッド（上）』『夏への扉』の検索可能PDFを作成した。続けて傾き補正込みの手順で『時間泥棒』『暗黒星雲突破！』『天の光はすべて星』『インフィニティ・リミテッド（下）』を作り、ローカルLLMで作った濁点・半濁点の辞書で補正した版も作った。YomiToku、パ／バの読み直し、判断モデル、人のレビューまでを通す `bin/build-searchable-book.sh` で、ホーガンの『星を継ぐもの』『ガニメデの優しい巨人』『巨人たちの星』『内なる宇宙（上・下）』を作り、レビューを済ませた。『造物主の掟』『造物主の選択』も作った（人のレビュー前）。[成果物の目次](artifacts.html)から完成PDF、辞書、レビューを開ける。目次の原稿は `artifacts.md` で、`bin/build-docs-html.sh` がこのREADMEや作業記録と一緒にHTMLにする（mdへのリンクはhtmlへのリンクになる）。原本・抽出画像・OCR結果は `.gitignore` で管理対象から外す。
+『虎よ、虎よ！』『インフィニティ・リミテッド（上）』『夏への扉』の検索可能PDFを作成した。続けて傾き補正込みの手順で『時間泥棒』『暗黒星雲突破！』『天の光はすべて星』『インフィニティ・リミテッド（下）』を作り、ローカルLLMで作った濁点・半濁点の辞書で補正した版も作った。YomiToku、パ／バの読み直し、判断モデル、人のレビューまでを通す `bin/build-searchable-book.sh` で、ホーガンの『星を継ぐもの』『ガニメデの優しい巨人』『巨人たちの星』『内なる宇宙（上・下）』を作り、レビューを済ませた。『造物主の掟』『造物主の選択』も作った（人のレビュー前）。[成果物の目次](artifacts.html)から完成PDF、辞書、レビューを開ける。目次の原稿は `artifacts.md` で、`bin/build-docs-html.sh` がこのREADMEや作業記録と一緒にHTMLにする（mdへのリンクはhtmlへのリンクになり、mermaidの図は mermaid-cli の `mmdc` でSVGにして埋め込む。`mmdc` がなければ図はコードのまま）。原本・抽出画像・OCR結果は `.gitignore` で管理対象から外す。
 
 次の段階はePub化。検索可能PDFの文字を青空文庫形式（縦中横などの注記つきテキスト）で書き出し、AozoraEpub3 でePubにする方針で、青空文庫の注記と AozoraEpub3 の調査結果、進め方の案、未調査の課題（段落の組み立て、ルビなど）を [docs/epub-plan.md](docs/epub-plan.md) にまとめた。
 
@@ -35,7 +35,7 @@ NDLの生の読みの誤り83字のうち43字は、長い行の後半を丸ご�
 
 ### スクリプトの置き場所
 
-- `bin/`：今の本作りで使うもの。入口は `build-searchable-book.sh` で、そこから `prepare-trial-pdf.py`、`margin-recognize.py`、`build-voicing-review.py`、`judge-ocr-disagreements.py`、`rebuild-text-layer.py`、`finalize-trial-pdf.py`、`build-proofread-sample.py` を呼ぶ。`text_layer_utils.py`、`ocr-sensitivity.py`、`deskew-study.py`、`auto-variant-glossary.py` は、これらが読み込む部品（`deskew-study.py` は試験用でもある）。ほかに、閲覧用コピーを作る `prepare-books.py` と、文書をHTMLにする `build-docs-html.sh`（`md-links-to-html.lua`）。
+- `bin/`：今の本作りで使うもの。入口は `build-searchable-book.sh` で、そこから `prepare-trial-pdf.py`、`margin-recognize.py`、`build-voicing-review.py`、`judge-ocr-disagreements.py`、`rebuild-text-layer.py`、`finalize-trial-pdf.py`、`build-proofread-sample.py` を呼ぶ。`text_layer_utils.py`、`ocr-sensitivity.py`、`deskew-study.py`、`auto-variant-glossary.py` は、これらが読み込む部品（`deskew-study.py` は試験用でもある）。ほかに、閲覧用コピーを作る `prepare-books.py` と、文書をHTMLにする `build-docs-html.sh`（`md-links-to-html.lua`、`mermaid-svg.lua`）。
 - `bin/study/`：OCRエンジンや設定を比べた試験と評価のスクリプト（`ocr-sample-pages.py`、`score-ocr-engines.py`、`check-voicing-judges.py` など）。作業記録の数字を出し直すときに使う。
 - `bin/annotate/`：『夏への扉』の読書注釈の試作（`generate-summer-door-glossary.py`、`build-summer-door-annotated-pdf.py` など）。
 
@@ -54,20 +54,21 @@ flowchart TD
   SRC --> PREP["閲覧用PDF<br>背景補正・傾き補正（角度を記録）<br>prepare-trial-pdf.py"]
   SRC --> OCR["NDLOCR-Lite<br>傾き補正前の原本を読む"]
   OCR --> MARGIN["余白つき再認識<br>高さ400px以上の行を余白30pxで<br>margin-recognize.py"]
-  SRC --> YOMI["YomiToku（GPU）"]
+  SRC --> YOMI["YomiToku"]
 
   MARGIN --> CAND
   YOMI --> CAND
   subgraph VOICING["パ／バ build-voicing-review.py"]
     CAND["候補の組<br>本に両方の綴りがある／YomiTokuが別の綴り"] --> CROP["語を切り出し、3つの認識モデルで<br>2つの綴りの確率差を出す"]
     CROP -->|"強い箇所が片側だけ"| ONE["その綴りに決める"]
-    CROP -->|"強い箇所が両側"| BOTH["両方正しい<br>強い箇所ごとに直す"]
+    CROP -->|"強い箇所が両側"| BOTH["両方正しい（人の選択も）<br>箇所ごとに直す：強い箇所は画像、<br>弱い箇所はLLMの答え"]
     CROP -->|"強い箇所なし"| LLMV["ローカルLLMに箇所ごとに聞く<br>（2つの順序、voicing-llm.tsv）"]
     LLMV -->|"全箇所が同じ答え"| ONE
     LLMV -->|"箇所で答えが分かれる"| BOTH
     LLMV -->|"決まらない"| HV["人：パ／バのレビュー画面<br>voicing-human.tsv"]
     ONE --> GLOSS[/"voicing-glossary.tsv<br>voicing-corrections.tsv"/]
     BOTH --> GLOSS
+    HV -->|"両方正しいを選ぶ"| BOTH
     HV --> GLOSS
   end
 
@@ -87,7 +88,7 @@ flowchart TD
   GLOSS --> TEXT
   CORR --> TEXT
   MAP[/"char-map.tsv（任意）"/] --> TEXT
-  TEXT["文字層 rebuild-text-layer.py<br>ダッシュ・括弧 → パ／バの箇所修正 → 辞書 →<br>判断の差分 → 〝〟 → 字の置き換え<br>傾き補正したページに合わせて回転"] --> FINAL["書誌設定 finalize-trial-pdf.py"]
+  TEXT["文字層 rebuild-text-layer.py<br>ダッシュ・括弧 → パ／バの箇所修正 → 辞書 →<br>判断の差分 → 引用符の組み直し → 字の置き換え<br>傾き補正したページに合わせて回転"] --> FINAL["書誌設定 finalize-trial-pdf.py"]
   FINAL --> OUT[/"output/searchable/書名 - 著者.pdf"/]
 
   TEXT -->|"lines.tsv（段階ごとの読み）"| PROOF["抜き取り検査 build-proofread-sample.py<br>本文から200行"]
@@ -100,7 +101,7 @@ flowchart TD
   HJ -.->|"保存して再実行"| DIFF
 ```
 
-人が保存したTSVは、次の実行で自動判定より優先される。パ／バを先にレビューする（辞書が変わると、判断モデルの差分の前後4文字も変わるため）。
+NDLOCR-Lite、余白つき再認識、YomiToku、パ／バの語の切り出しは、どれも `NDLOCR_DEVICE`（`cpu` が既定、GPUなら `cuda`）で選んだ同じデバイスで動く。ローカルLLM（llama-server）は別に動かす。人が保存したTSVは、次の実行で自動判定より優先される。パ／バを先にレビューする（辞書が変わると、判断モデルの差分の前後4文字も変わるため）。
 
 OCR、余白つき再認識、YomiTokuは、済んでいれば飛ばす。パ／バ、判断モデル、文字層は、入力の中身が変わったときだけ作り直す（ファイルの日付は見ない）。変わる完成品は上書きする（古い版は残さない。作業ディレクトリと作業履歴で足りる）。
 
@@ -146,8 +147,10 @@ NDLOCR_DEVICE=cuda bin/build-searchable-book.sh "$SOURCE" jikan-dorobou
 - **候補：** 本の中で両方の表記が出る組と、YomiTokuが別の表記に読んだ組。
 - **自動判定（`--auto-crop`）：** 濁点・半濁点を含むカタカナ語をすべて原本から切り出し、NDLOCR-Liteの3つの認識モデルに読ませる。違う字の位置で、2つの綴りの対数確率の差（確率差）を3モデル分足す。|確率差|が8以上の箇所を「強い」とし、組をこう決める。
   - 強い箇所が片方の綴りだけを指す → その綴り。逆を指す強い箇所が5%以下なら、読み損ねとみなして多数側（ブローヒリオ183対1）。ただし強い箇所が3未満で、逆を指す箇所が弱くても1つあれば決めない。
-  - 強い箇所が両方を指す → 「両方正しい」。強い箇所のうちNDLと逆の綴りを指す箇所を直す（ビッグ・パン→ビッグ・バン）。
-  - 強い箇所がない → `--llm-url` があれば、箇所ごとに前後の行を付けた2通りの文を、順序を入れ替えて2回LLMに聞く。2回とも同じで、弱い確率差（|確率差|が3以上）が逆を指さない答えだけを数える。全箇所が同じ答えならその綴り、箇所で分かれたら「両方正しい」として箇所ごとに直す。1か所でも決まらなければ人に回す。答えは `--llm-history` のTSVに残し、聞き直さない。
+  - 強い箇所が両方を指す → 「両方正しい」。
+  - 強い箇所がないが、2か所以上の弱い箇所が全部同じ綴りを指し、確率差の合計が8以上 → その綴り（シャピ: 6.8、7.8、7.5）。
+  - それ以外で強い箇所がない → `--llm-url` があれば、箇所ごとに前後の行を付けた2通りの文を、順序を入れ替えて2回LLMに聞く。2回とも同じで、弱い確率差（|確率差|が3以上）が逆を指さない答えだけを数える。全箇所が同じ答えならその綴り、箇所で分かれたら「両方正しい」。1か所でも決まらなければ人に回す。答えは `--llm-history` のTSVに残し、聞き直さない。
+  - 「両方正しい」の組（自動でも、人がレビュー画面で選んだものでも）は、箇所ごとに直す。強い箇所は画像のとおり、弱い箇所はLLMの答え（上と同じ条件）で、NDLと違えば直す（ビッグ・パン→ビッグ・バン）。どちらでも決まらない箇所はNDLの読みのまま。
   組として決まっていない箇所で、読み直しとYomiTokuがNDLと違う同じ綴りを読んだら、その箇所も直す。画面では、LLMで決めた組と修正に【LLM】の印が付く。
 - **レビュー画面：** 組ごとに、ページの縮小画像・行・3倍拡大を並べる。選択肢は2つの綴り、「両方正しい」、「どちらも違う」（正しい綴りを書く）。自動修正は最後に並び、同じ語の修正は1項目にまとまる（1回の選択でその語の全箇所に当たる）。「直さない」を選べる。人が選んだものだけが、画面の下のTSV（a、b、choice。自動修正は `fix:元の綴り→直した綴り`。以前の箇所ごとの `fix:ID` も読む）にまとまる。それを `--human` に渡すと、自動判定より優先される。
 - **辞書と修正：** `--glossary-out` が、人の選択、次に自動判定から、`--fix-variants` 用の辞書を書き出す。人の選択が連鎖するとき（バーセブトロン＜パーセブトロン＜パーセプトロン）は、最後に勝つ語だけを辞書に入れる。負けた語が勝った語を負かしていても、その語は辞書に入れない。選択が輪になったときだけ止まる。`--corrections-out` は、自動修正と「どちらも違う」の箇所ごとの修正を書き出す。連鎖の先の語と2文字以上違う読み（辞書の1文字違いの読み替えでは届かない）も、ここで箇所ごとに直す。これは `rebuild-text-layer.py --word-corrections` が、括弧の補正のあと、辞書の前に当てる。行をまたぐカタカナ語の片割れ（パター｜ン）は組に入れない。

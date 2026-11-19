@@ -154,10 +154,10 @@ def main():
                   f'wrong {tally[(group, "wrong")]:3}  no answer {tally[(group, "none")]:3}')
 
     if args.pairs_out:
-        write_pairs(args.pairs_out, pairs, occurrences, truth, review.load_human(args.human), margins)
+        write_pairs(args.pairs_out, pairs, occurrences, truth, review.load_human(args.human), margins, lines)
 
 
-def write_pairs(path, pairs, occurrences, truth, human, margins):
+def write_pairs(path, pairs, occurrences, truth, human, margins, lines):
     with path.open('w', newline='') as handle:
         writer = csv.writer(handle, delimiter='\t', lineterminator='\n')
         writer.writerow(['a', 'b', 'right', 'ca', 'cb', 'scored', 'sum', 'toward_a', 'toward_b',
@@ -168,8 +168,10 @@ def write_pairs(path, pairs, occurrences, truth, human, margins):
             # Each occurrence's margin turned into evidence for a (positive) or b.
             votes = [(margins[p][k] if w == a else -margins[p][k])
                      for w in key for p in occurrences.get(w, []) if k in margins.get(p, {})]
-            auto, note, fixes = review.margin_decide(key, occurrences, margins)
+            auto, note = review.margin_decide(key, occurrences, margins)
             right = 'both' if human.get(key) == 'both' else truth.get(key, '')
+            # Places the image alone fixes when the pair is both words (no LLM here).
+            fixes = review.place_fixes(key, occurrences, margins, lines, None) if 'both' in (auto, right) else {}
             writer.writerow([a, b, right, len(occurrences.get(a, [])), len(occurrences.get(b, [])), len(votes),
                              f'{sum(votes):.2f}', sum(v > 0 for v in votes), sum(v < 0 for v in votes),
                              f'{min(votes):.2f}' if votes else '', f'{max(votes):.2f}' if votes else '',

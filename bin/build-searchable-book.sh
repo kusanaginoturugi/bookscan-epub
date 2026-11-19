@@ -189,7 +189,7 @@ if [ -z "$GLOSSARY" ]; then
   VOICING_LLM=
   [ "$USE_JUDGE" = off ] ||
     VOICING_LLM="--llm-url $LLM_URL/chat/completions --llm-model $LLM_MODEL --llm-history $WORK/voicing-llm.tsv"
-  KEY=$(inputs_key "$WORK/voicing-human.tsv" "$WORK/margin.tsv" "$WORK/stages" "$WORK/skip-pages.txt")skip-catalog,line-joins,reread-all,fix-review,save-path,fix-group,save-cmd,chains,machine,margins,llm$VOICING_LLM
+  KEY=$(inputs_key "$WORK/voicing-human.tsv" "$WORK/margin.tsv" "$WORK/stages" "$WORK/skip-pages.txt")skip-catalog,line-joins,reread-all,fix-review,save-path,fix-group,save-cmd,chains,machine,margins,both-places,weak-sum,llm$VOICING_LLM
   if [ ! -e "$VOICING_GLOSSARY" ] || [ ! -e "$WORK/machine/voicing-glossary.tsv" ] ||
      [ "$(cat "$WORK/voicing.key" 2>/dev/null)" != "$KEY" ]; then
     echo "[$(date +%T)] voicing"

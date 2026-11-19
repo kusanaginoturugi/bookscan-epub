@@ -13,14 +13,17 @@ resolution with the NDLOCR-Lite recognizers (the line-wide read shrinks the
 marks away) and scores both spellings at the mark: log P of the one read minus
 log P of the other, summed over the three recognizers. Places with a margin of
 STRONG or more decide the pair: one spelling when the strong places agree (up to
-MINORITY against them; with fewer than FEW, no place may lean the other way),
-"both" when strong places point both ways; then each
-strong place whose image shows the other spelling than NDL read is fixed. With
+MINORITY against them; with fewer than FEW, no place may lean the other way;
+with none, two or more weak places all leaning one way and adding up to STRONG),
+"both" when strong places point both ways. With
 --llm-url, a pair left undecided is asked place by place (passage of three
 lines, both orders, answers kept in --llm-history): an answer counts when both
 orders agree and the weak margin (LEAN or more) does not lean the other way; all places
-answered alike decide the pair, different answers make it "both" with fixes.
-Pairs still undecided wait for a person. Checked against the pairs settled by
+answered alike decide the pair, different answers make it "both".
+Pairs still undecided wait for a person. A pair that is "both", decided so or
+chosen by a person, is fixed place by place: a strong place takes what its
+image shows, a weaker one the LLM's answer, and a place neither settles keeps
+NDL's read. Checked against the pairs settled by
 the user in six books (bin/study/check-voicing-judges.py, docs/progress.md).
 
 The page shows each pair with a few occurrences (YomiToku disagreements first):
@@ -210,11 +213,11 @@ LEAN = 3.0
 
 
 def margin_decide(key, occurrences, margins):
-    """(choice, note, fixes) for a pair from the word-crop margins. choice is a
+    """(choice, note) for a pair from the word-crop margins. choice is a
     spelling, 'both' (both words are in the book: ビッグ・バン and パン), or None
-    when no place is strong or a few strong places meet one leaning the other
-    way. fixes ({place: spelling}) are the strong places of
-    a 'both' pair whose image shows the other spelling than NDL read."""
+    when no place is strong (unless two or more weak places all lean one way
+    and add up to STRONG) or a few strong places meet one leaning the other
+    way."""
     a, b = key
     k = next(i for i in range(len(a)) if a[i] != b[i])
     votes = {}  # place -> (word read there, margin toward a)
@@ -226,15 +229,17 @@ def margin_decide(key, occurrences, margins):
     strong_b = sum(v <= -STRONG for _, v in votes.values())
     note = f'画像 {a}:{strong_a} {b}:{strong_b}（弱い {len(votes) - strong_a - strong_b}）'
     if not strong_a and not strong_b:
-        return None, note, {}
+        # Weak places that all lean one way add up (シャピ: 6.8, 7.8 and 7.5).
+        total = sum(v for _, v in votes.values())
+        if len(votes) >= 2 and abs(total) >= STRONG and all((v > 0) == (total > 0) for _, v in votes.values()):
+            return (a if total > 0 else b), note + f'。弱い箇所がそろって {a if total > 0 else b}'
+        return None, note
     if strong_a and strong_b and min(strong_a, strong_b) / (strong_a + strong_b) > MINORITY:
-        fixes = {place: (a if v > 0 else b) for place, (word, v) in votes.items()
-                 if abs(v) >= STRONG and (a if v > 0 else b) != word}
-        return 'both', note, fixes
+        return 'both', note
     winner, strong, against = (a, strong_a, b) if strong_a > strong_b else (b, strong_b, a)
     if strong < FEW and any((v < 0) == (winner == a) for _, v in votes.values()):
-        return None, note + f'。{against}寄りの箇所あり', {}
-    return winner, note, {}
+        return None, note + f'。{against}寄りの箇所あり'
+    return winner, note
 
 
 LLM_PROMPT = """次のA・Bは、小説をOCRで読み取った同じ箇所です。カタカナ語1語の濁点・半濁点だけが違います。
@@ -299,30 +304,54 @@ class LlmVoicing:
         return one if one and one == two else None
 
 
-def llm_decide(key, occurrences, margins, lines, llm):
-    """(choice, note, fixes) for a pair no place decided by image. Every place is
-    asked; an answer counts only when both orders agree and the weak image
-    margin (LEAN or more) does not lean the other way. With every place answered, one spelling
-    everywhere decides the pair and different ones make it 'both' (fixes are the
-    places answered with the other spelling than NDL read); else None."""
+def llm_place(key, place, word, margins, lines, llm):
+    """The spelling the LLM picks at place (NDL read word there), or None: both
+    orders must agree and the weak image margin (LEAN or more) must not lean
+    the other way."""
     a, b = key
     k = next(i for i in range(len(a)) if a[i] != b[i])
-    answers = {}
+    answer = llm.choose(lines, place, key)
+    m = margins.get(place, {}).get(k)
+    if answer and m and abs(m) >= LEAN and answer != (word if m > 0 else (b if word == a else a)):
+        return None
+    return answer
+
+
+def llm_decide(key, occurrences, margins, lines, llm):
+    """(choice, note) for a pair no place decided by image. Every place is asked
+    (llm_place). With every place answered, one spelling everywhere decides the
+    pair and different ones make it 'both'; else None."""
+    a, b = key
+    picked = Counter(llm_place(key, place, word, margins, lines, llm)
+                     for word in key for place in occurrences.get(word, []))
+    note = f'LLM {a}:{picked[a]} {b}:{picked[b]} 決まらない:{picked[None]}'
+    if not picked or picked[None]:
+        return None, note
+    return (next(iter(picked)) if len(picked) == 1 else 'both'), note
+
+
+def place_fixes(key, occurrences, margins, lines, llm):
+    """{place: (spelling, source)} for a pair that is both words (chosen by a
+    person or decided automatically): each place takes what its image shows
+    when the margin is STRONG ('auto-margin'), else the LLM's answer
+    (llm_place, 'llm'), and is fixed where that differs from NDL's read.
+    Places neither settles keep NDL's read."""
+    a, b = key
+    k = next(i for i in range(len(a)) if a[i] != b[i])
+    fixes = {}
     for word in key:
         other = b if word == a else a
         for place in occurrences.get(word, []):
-            answer = llm.choose(lines, place, key)
             m = margins.get(place, {}).get(k)
-            if answer and m and abs(m) >= LEAN and answer != (word if m > 0 else other):
-                answer = None
-            answers[place] = (word, answer)
-    picked = Counter(answer for _, answer in answers.values())
-    note = f'LLM {a}:{picked[a]} {b}:{picked[b]} 決まらない:{picked[None]}'
-    if not answers or picked[None]:
-        return None, note, {}
-    if len(picked) == 1:
-        return next(iter(picked)), note, {}
-    return 'both', note, {place: answer for place, (word, answer) in answers.items() if answer != word}
+            if m is not None and abs(m) >= STRONG:
+                to, source = (word if m > 0 else other), 'auto-margin'
+            elif llm:
+                to, source = llm_place(key, place, word, margins, lines, llm), 'llm'
+            else:
+                continue
+            if to and to != word:
+                fixes[place] = (to, source)
+    return fixes
 
 
 def base(word):
@@ -639,9 +668,8 @@ def main():
             agreed = {place: (to, 'auto-agree')
                       for place, to in agreed_fixes(occurrences, readings, yomitoku, lines, settled).items()}
             for key, places in both_fixes.items():
-                if decisions.get(key) == 'both' and sources[key] in ('auto', 'llm'):
-                    source = 'auto-margin' if sources[key] == 'auto' else 'llm'
-                    agreed.update({place: (to, source) for place, to in places.items()})
+                if decisions.get(key) == 'both':  # a person's "both" too
+                    agreed.update(places)
             fixes = {place: (to, source) for place, (to, source) in agreed.items()
                      if 'reject' not in (fix_verdicts.get(fix_id(place, to)), fix_verdicts.get(fix_word(place, to)))}
         for key, to in custom.items():
@@ -684,15 +712,21 @@ def main():
         places = {place for word in occurrences for place in occurrences[word]}
         readings, margins = crop_readings(lines, places, args.pdf, args.device)
         for key in pairs:
-            auto[key], notes[key], both_fixes[key] = margin_decide(key, occurrences, margins)
+            auto[key], notes[key] = margin_decide(key, occurrences, margins)
             auto_source[key] = 'auto'
-        if args.llm_url:
-            llm = LlmVoicing(args.llm_url, args.llm_model, args.llm_history)
+        llm = LlmVoicing(args.llm_url, args.llm_model, args.llm_history) if args.llm_url else None
+        if llm:
             for key in pairs:
                 if auto[key] is None:
-                    auto[key], note, both_fixes[key] = llm_decide(key, occurrences, margins, lines, llm)
+                    auto[key], note = llm_decide(key, occurrences, margins, lines, llm)
                     notes[key] += '。' + note
                     auto_source[key] = 'llm'
+        # Pairs that are both words, by the automatic decision or a person's
+        # choice, are fixed place by place.
+        for key in pairs:
+            if auto[key] == 'both' or human.get(key) == 'both':
+                both_fixes[key] = place_fixes(key, occurrences, margins, lines, llm)
+        if llm:
             print(f'LLM: {sum(1 for k in pairs if auto_source[k] == "llm")} pairs without a strong place, '
                   f'{sum(1 for k in pairs if auto_source[k] == "llm" and auto[k])} decided; {llm.asked} questions asked now')
     decisions, sources, custom, agreed, fixes = choose(human, fix_verdicts)

@@ -30,7 +30,7 @@
 | 種類 | ファイル | 内容 |
 |---|---|---|
 | 完成品 | [検索可能PDF](output/searchable/造物主の掟%20-%20ジェイムズ・P・ホーガン.pdf) | 580ページ。巻末目録（561〜577ページ）はレビューの対象外 |
-| レビュー | [パ／バ](review/zoubutsushu-no-okite-voicing/index.html)・[判断モデル](review/zoubutsushu-no-okite-judge/index.html)・[抜き取り検査](review/zoubutsushu-no-okite-proofread/index.html) | パ／バは25組と自動修正8語、判断モデルは割れた58か所、抜き取り検査は200行 |
+| レビュー | [パ／バ](review/zoubutsushu-no-okite-voicing/index.html)・[判断モデル](review/zoubutsushu-no-okite-judge/index.html)・[抜き取り検査](review/zoubutsushu-no-okite-proofread/index.html) | パ／バは115組中114組を自動判定（LLM 3組、両方正しい1組）と自動修正5語8か所（2026-11-19に作り直し）、判断モデルは割れた57か所、抜き取り検査は200行 |
 
 ## 内なる宇宙（上・下）（2026-11-12）
 

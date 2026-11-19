@@ -10,6 +10,7 @@ term	occurrences	variants	verified	note
 ビール	9	ピール(2):auto	yes	
 ブロンズ	0	プロンズ(2):auto	yes	
 ビーム	11	ピーム(5):auto	yes	
+ブリキ	1	プリキ(0):human	yes	
 プジョー	2	ブジョー(0):auto	yes	
 テーブル	23	テープル(2):auto	yes	
 バスローブ	0	バスロープ(2):auto	yes	
@@ -19,6 +20,7 @@ term	occurrences	variants	verified	note
 ベース	1	ペース(1):auto	yes	
 リパブリカン	2	リパプリカン(1):auto	yes	
 フットボール	0	フットポール(1):auto	yes	
+バーテンダー	1	パーテンダー(0):human	yes	
 ブラック	1	プラック(1):auto	yes	
 ソブロスキン	1	ソプロスキン(2):auto	yes	
 ジェブレン	0	ジェプレン(1):auto	yes	
@@ -28,6 +30,8 @@ term	occurrences	variants	verified	note
 ゴブラン	0	ゴプラン(1):auto	yes	
 ローブ	0	ロープ(1):auto	yes	
 ギアベーン	13	ギアペーン(2):auto	yes	
+ボス	1	ポス(0):human	yes	
+ロビー	3	ロピー(2):human	yes	
 バス	14	パス(1):auto	yes	
 コバーグ	14	コパーグ(2):auto	yes	
 レバンスキー	17	レパンスキー(0):auto	yes	
@@ -35,12 +39,7 @@ term	occurrences	variants	verified	note
 カーブ	0	カープ(1):auto	yes	
 エレベーター	5	エレペーター(2):auto	yes	
 バンパー	1	パンパー(1):auto	yes	
+ボン	1	ポン(0):human	yes	
 ブレーク	0	プレーク(1):auto	yes	
 データベース	0	データペース(1):auto	yes	
-ロビー	3	ロピー(2):human	yes	
-ビル	9	ピル(1):human	yes	
 ドランビュイ	0	ドランピュイ(1):human	yes	
-バーテンダー	1	パーテンダー(0):human	yes	
-ブリキ	1	プリキ(0):human	yes	
-ボス	1	ポス(0):human	yes	
-ボン	1	ポン(0):human	yes	

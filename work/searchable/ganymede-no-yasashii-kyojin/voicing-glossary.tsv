@@ -17,7 +17,6 @@ term	occurrences	variants	verified	note
 プール	1	ブール(1):auto	yes	
 ケンブリッジ	2	ケンプリッジ(1):auto	yes	
 コペルニクス	0	コベルニクス(1):auto	yes	
-パン	1	バン(3):human	yes	
 カプセル	4	カブセル(1):auto	yes	
 ブリッジ	19	プリッジ(2):auto	yes	
 パノラマ	2	バノラマ(0):auto	yes	
@@ -31,9 +30,11 @@ term	occurrences	variants	verified	note
 バス	17	パス(2):auto	yes	
 ズボン	1	ズポン(1):auto	yes	
 エレベーター	15	エレペーター(1):auto	yes	
+イヤピース	1	イヤビース(0):human	yes	
 サピエンス	2	サビエンス(2):auto	yes	
 テューブ	11	テュープ(3):auto	yes	
 スーパーコンピュータ	3	スーバーコンピュータ(1):auto	yes	
+パイナップル	1	バイナップル(0):human	yes	
 パイプ	2	バイプ(1):auto	yes	
 パタースン	5	バタースン(2):auto	yes	
 アッセンブリー	0	アッセンプリー(1):auto	yes	
@@ -42,6 +43,7 @@ term	occurrences	variants	verified	note
 シャピ	0	シャビ(3):auto	yes	
 ブロック	1	プロック(1):auto	yes	
 エベレスト	0	エペレスト(1):auto	yes	
+グレーペイン	1	グレーベイン(0):human	yes	
 ビューロー	5	ピューロー(0):auto	yes	
 ボストン	0	ポストン(1):auto	yes	
 ベートーベン	0	ベートーペン(1):auto	yes	
@@ -51,6 +53,3 @@ term	occurrences	variants	verified	note
 タピストリ	2	タビストリ(0):auto	yes	
 スタンバイ	1	スタンパイ(1):auto	yes	
 ペン	2	ベン(2):auto	yes	
-イヤピース	1	イヤビース(0):human	yes	
-グレーペイン	1	グレーベイン(0):human	yes	
-パイナップル	1	バイナップル(0):human	yes	
