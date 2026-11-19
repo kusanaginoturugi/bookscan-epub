@@ -97,7 +97,7 @@
 | 再認識 | [余白別認識結果](work/margin/summer-door.tsv)・[実行ログ](work/margin/summer-door.log) | 全6181行。保存済みOCRと余白0・8・14・20・30pxの読み |
 | 正解 | [無作為35行](work/margin/summer-door-gold-random.tsv) | 読みが変わる群15行、同じ群10行、ルビに近い行10行。完成品の編集差0（旧完成品は2） |
 | 辞書 | [画像確認済み15語](work/eval/summer-door-glossary.tsv)・[頻出語候補332語](work/eval/summer-door-glossary-candidates.tsv) | 確認済みの語だけを `--fix-variants` に使う |
-| 中間PDF | [画像保持版](output/trial/summer-door-sanitized.pdf)・[原本OCR版](output/trial/summer-door-original-ocr.pdf)・[文字層版（辞書補正前）](output/trial/summer-door-text-unfinalized.pdf)・[文字層版](output/trial/summer-door-text-unfinalized-v2.pdf)・[括弧補正の文字層版](output/trial/summer-door-text-unfinalized-brackets.pdf)・[完成品の文字層版](output/trial/summer-door-text-unfinalized-human.pdf) | 作業確認用。閲覧には完成品を使う |
+| 中間PDF | [画像保持版](output/trial/summer-door-sanitized.pdf)・[原本OCR版](output/trial/summer-door-original-ocr.pdf)・[文字層版（辞書補正前）](output/trial/summer-door-text-unfinalized.pdf)・[文字層版](output/trial/summer-door-text-unfinalized-v2.pdf)・[括弧補正の文字層版](output/trial/summer-door-text-unfinalized-brackets.pdf)・[人手辞書版の文字層版](output/trial/summer-door-text-unfinalized-human.pdf)・[完成品の文字層版](output/trial/summer-door-text-unfinalized-judge.pdf) | 作業確認用。閲覧には完成品を使う |
 
 OCRのページ別JSON・TXT・XMLは `work/trial/summer-door-ocr/` に保存してある。
 
