@@ -25,6 +25,11 @@ chosen by a person, is fixed place by place: a strong place takes what its
 image shows, a weaker one the LLM's answer, and a place neither settles keeps
 NDL's read. Checked against the pairs settled by
 the user in six books (bin/study/check-voicing-judges.py, docs/progress.md).
+A word over a line or page break (line_joins) is no candidate; its tail and
+head crops put together are scored as one word, and a kana flips when the
+margin is STRONG for the other mark, or leans that way while the book backs
+the other spelling: the pair is decided for it, or only it is a whole word
+elsewhere in the book (joined_fixes).
 
 The page shows each pair with a few occurrences (YomiToku disagreements first):
 page thumbnail with a red box, the line, and the word at 3x. The reviewer picks
@@ -93,6 +98,12 @@ def load_lines(args):
             ys = [p[1] for p in item['boundingBox']]
             lines.append(dict(page=page, line_id=int(item['id']), box=(min(xs), min(ys), max(xs), max(ys)),
                               vertical=vertical, text=text, joined=joins[position]))
+    # A word also runs over the page break (〈シャビ|アロン〉号 on pages 353 and 354);
+    # page numbers are not OCR lines, so the last line meets the next page's first.
+    for before, after in zip(lines, lines[1:]):
+        if after['page'] == before['page'] + 1 and line_joins([before['text'], after['text']])[0][1]:
+            before['joined'] = (before['joined'][0], True)
+            after['joined'] = (True, after['joined'][1])
     return lines
 
 
@@ -156,13 +167,39 @@ def voicing_margins(models, image, word):
     return dict(margins)
 
 
+_recognizers = {}
+
+
+def recognizers(device):
+    """(ocr-sensitivity module, the three NDLOCR-Lite recognizers), loaded once."""
+    if device not in _recognizers:
+        spec = importlib.util.spec_from_file_location('ocr_sensitivity', Path(__file__).resolve().parent / 'ocr-sensitivity.py')
+        sensitivity = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(sensitivity)
+        _recognizers[device] = sensitivity, sensitivity.recognizers(device)
+    return _recognizers[device]
+
+
+def word_crop(image, line, start, end, margin=0.3):
+    """The characters start:end of line cut from the page image (300 dpi), with
+    margin characters more at both ends; the character pitch is the box length
+    over the text length."""
+    x0, y0, x1, y1 = line['box']
+    size = max(len(line['text']), 1)
+    if line['vertical']:
+        per = (y1 - y0) / size
+        box = (x0 - 4, y0 + (start - margin) * per, x1 + 4, y0 + (end + margin) * per)
+    else:
+        per = (x1 - x0) / size
+        box = (x0 + (start - margin) * per, y0 - 4, x0 + (end + margin) * per, y1 + 4)
+    bx0, by0, bx1, by1 = (int(v) for v in box)
+    return image[max(0, by0):by1, max(0, bx0):bx1]
+
+
 def crop_readings(lines, places, pdf, device, margin=0.3):
     """({(line index, start, end): text}, {place: voicing_margins}) from
     re-reading each word crop alone."""
-    spec = importlib.util.spec_from_file_location('ocr_sensitivity', Path(__file__).resolve().parent / 'ocr-sensitivity.py')
-    sensitivity = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(sensitivity)
-    models = sensitivity.recognizers(device)
+    sensitivity, models = recognizers(device)
     by_page = defaultdict(list)
     for place in sorted(places):
         by_page[lines[place[0]]['page']].append(place)
@@ -170,19 +207,8 @@ def crop_readings(lines, places, pdf, device, margin=0.3):
     document = pypdfium2.PdfDocument(str(pdf))
     for page, items in sorted(by_page.items()):
         image = np.array(document[page - 1].render(scale=300 / 72).to_pil().convert('RGB'))
-        crops_ = []
-        for n, (index, start, end) in enumerate(items):
-            line = lines[index]
-            x0, y0, x1, y1 = line['box']
-            size = max(len(line['text']), 1)
-            if line['vertical']:
-                per = (y1 - y0) / size
-                box = (x0 - 4, y0 + (start - margin) * per, x1 + 4, y0 + (end + margin) * per)
-            else:
-                per = (x1 - x0) / size
-                box = (x0 + (start - margin) * per, y0 - 4, x0 + (end + margin) * per, y1 + 4)
-            bx0, by0, bx1, by1 = (int(v) for v in box)
-            crops_.append((n, image[max(0, by0):by1, max(0, bx0):bx1], end - start))
+        crops_ = [(n, word_crop(image, lines[index], start, end, margin), end - start)
+                  for n, (index, start, end) in enumerate(items)]
         texts = sensitivity.recognize(models, crops_)
         for n, place in enumerate(items):
             readings[place] = texts[n]
@@ -373,6 +399,98 @@ def agreed_fixes(occurrences, readings, yomitoku, lines, settled):
                 if token != word and len(token) == len(word) and base(token) == base(word) and token in page_text:
                     fixes[place] = token
                     break
+    return fixes
+
+
+def joined_words(lines):
+    """[(tail place, head place)] for the katakana words with バ行/パ行 kana that
+    run over a line or page break (line_joins): the tail of one line and the
+    head of the next, which find_pairs leaves out as fragments."""
+    out = []
+    for index, (line, after) in enumerate(zip(lines, lines[1:])):
+        if not (line['joined'][1] and after['joined'][0] and after['page'] in (line['page'], line['page'] + 1)):
+            continue
+        text, next_text = line['text'], after['text']
+        end = len(text.rstrip())
+        lo = len(next_text) - len(next_text.lstrip())
+        # The flags come from the first OCR text; the margin re-read may end or
+        # start differently.
+        tail, head = re.search(r'[ァ-ヴー]+$', text[:end]), re.match(r'[ァ-ヴー]+', next_text[lo:])
+        if not tail or not head:
+            continue
+        start, head = tail.start(), lo + head.end()
+        if VOICED & set(text[start:end] + next_text[lo:head]):
+            out.append(((index, start, end), (index + 1, lo, head)))
+    return out
+
+
+def stitch(first, second, vertical):
+    """Two crops of a word in reading order as one image, centred across the
+    line and padded with white."""
+    axis = 1 if vertical else 0  # the axis across the line
+    size = max(first.shape[axis], second.shape[axis])
+
+    def pad(crop):
+        extra = size - crop.shape[axis]
+        widths = [(0, 0)] * 3
+        widths[axis] = (extra // 2, extra - extra // 2)
+        return np.pad(crop, widths, constant_values=255)
+    return np.concatenate([pad(first), pad(second)], axis=0 if vertical else 1)
+
+
+def joined_margins(lines, joins, pdf, device, margin=0.3):
+    """{(tail place, head place): voicing_margins of the whole word} from the
+    tail crop and the head crop put together."""
+    _, models = recognizers(device)
+    document = pypdfium2.PdfDocument(str(pdf))
+    images = {}
+
+    def page_image(page):
+        if page not in images:
+            if len(images) > 2:  # joins come in page order
+                images.clear()
+            images[page] = np.array(document[page - 1].render(scale=300 / 72).to_pil().convert('RGB'))
+        return images[page]
+    margins = {}
+    for tail, head in joins:
+        first = word_crop(page_image(lines[tail[0]]['page']), lines[tail[0]], tail[1], tail[2], margin)
+        second = word_crop(page_image(lines[head[0]]['page']), lines[head[0]], head[1], head[2], margin)
+        if first.size and second.size:
+            image = stitch(first, second, lines[tail[0]]['vertical'])
+            margins[tail, head] = voicing_margins(models, image, line_word(lines, tail) + line_word(lines, head))
+    document.close()
+    return margins
+
+
+def joined_fixes(lines, joins, margins, occurrences, decisions):
+    """{place: (spelling, 'joined')} for the halves of words over a line break.
+    A kana flips when its stitched image is STRONG for the other mark, or leans
+    that way at all while the book backs the other spelling: the pair is
+    decided for it (プロー|ヒリオ, -1.4: ブローヒリオ, though NDL reads プローヒリオ
+    92 times), or it is a whole word elsewhere and the spelling read is not
+    (プロンギッ|ド). A strong margin for the read keeps it against the book's
+    words (メイプ|ル +10.8, メイブル once)."""
+    fixes = {}
+    for tail, head in joins:
+        if (tail, head) not in margins:
+            continue
+        word = line_word(lines, tail) + line_word(lines, head)
+        to = list(word)
+        for k, m in margins[tail, head].items():
+            other = word[:k] + word[k].translate(VOICING) + word[k + 1:]
+            backed = (decisions.get(tuple(sorted((word, other)))) == other
+                      or (occurrences.get(other) and not occurrences.get(word)))
+            if m <= -STRONG or (m < 0 and backed):
+                to[k] = word[k].translate(VOICING)
+        to = ''.join(to)
+        cut = tail[2] - tail[1]
+        for place, half in ((tail, to[:cut]), (head, to[cut:])):
+            index, start, end = place
+            text = lines[index]['text']
+            # The text layer finds a fix by its 4 characters around; skip one
+            # that would match twice.
+            if half != text[start:end] and text.count(text[max(0, start - 4):end + 4]) == 1:
+                fixes[place] = (half, 'joined')
     return fixes
 
 
@@ -640,6 +758,7 @@ def main():
     for key in unknown:
         print(f'warning: human choice for a pair that is no longer a candidate: {"/".join(key)} -> {human.pop(key)}')
     auto, notes, fixes, both_fixes, auto_source = {}, {}, {}, {}, {}
+    joins, join_margins = [], {}
     def fix_id(place, to):
         index, start, end = place
         line = lines[index]
@@ -670,6 +789,7 @@ def main():
             for key, places in both_fixes.items():
                 if decisions.get(key) == 'both':  # a person's "both" too
                     agreed.update(places)
+            agreed.update(joined_fixes(lines, joins, join_margins, occurrences, decisions))
             fixes = {place: (to, source) for place, (to, source) in agreed.items()
                      if 'reject' not in (fix_verdicts.get(fix_id(place, to)), fix_verdicts.get(fix_word(place, to)))}
         for key, to in custom.items():
@@ -726,6 +846,10 @@ def main():
         for key in pairs:
             if auto[key] == 'both' or human.get(key) == 'both':
                 both_fixes[key] = place_fixes(key, occurrences, margins, lines, llm)
+        # Words over a line break are not candidates; the two crops put together
+        # are scored as one word instead.
+        joins = joined_words(lines)
+        join_margins = joined_margins(lines, joins, args.pdf, args.device)
         if llm:
             print(f'LLM: {sum(1 for k in pairs if auto_source[k] == "llm")} pairs without a strong place, '
                   f'{sum(1 for k in pairs if auto_source[k] == "llm" and auto[k])} decided; {llm.asked} questions asked now')
@@ -739,6 +863,7 @@ def main():
     print(f'corrections: {sources_count["auto-agree"]} where crop and YomiToku agree, '
           f'{sources_count["auto-margin"]} at strong places of pairs that are both words, '
           f'{sources_count["llm"]} by the LLM in pairs that are both words, '
+          f'{sources_count["joined"]} in words over a line break, '
           f'{sources_count["human"]} from "both wrong" choices, {sources_count["chain"]} through chains of choices')
     if args.glossary_out:
         write_glossary(args.glossary_out, decisions, sources)
@@ -797,6 +922,9 @@ def main():
             f'（{len(places)}か所）{"【LLM】" if "llm" in fix_sources[word_key] else ""}</h2><p>'
             + ('両方の語が本に出る組で、LLMが前後の文からNDLと違う綴りを選んだので直した。'
                if fix_sources[word_key] == {'llm'} else
+               '行（ページ）をまたぐ語の片割れ。前後の行の切り出しをつないで読み直し、画像の差がはっきりしているか、'
+               '組の判定か本の中に1語として出る綴りの向きに傾いたので直した。'
+               if fix_sources[word_key] == {'joined'} else
                '語を切り出して読み直した結果が、NDLと違う綴りを示したので直した'
                '（YomiTokuも同じ綴りを読んだか、両方の語が本に出る組で画像の差がはっきりしている）。')
             + f'原本と違えば「直さない」を選ぶ（{len(places)}か所すべてに当たる）。ページ: '

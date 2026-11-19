@@ -1,10 +1,10 @@
 term	occurrences	variants	verified	note
-コンピュータ	31	コンビュータ(1):auto	yes	
 テーブル	33	テープル(2):auto	yes	
 パネル	12	バネル(1):auto	yes	
 ブレンザー	1	プレンザー(1):auto	yes	
 ビーム	14	ピーム(2):auto	yes	
 シャピアロン	80	シャビアロン(16):auto	yes	
+コンピュータ	30	コンビュータ(1):auto	yes	
 ピットヘッド	46	ビットヘッド(0):auto	yes	
 ジュピター	4	ジュビター(3):auto	yes	
 カーペンター	8	カーベンター(5):auto	yes	
@@ -49,7 +49,6 @@ term	occurrences	variants	verified	note
 ベートーベン	0	ベートーペン(1):auto	yes	
 ブエノスアイレス	0	プエノスアイレス(1):auto	yes	
 ライブラリー	0	ライプラリー(1):auto	yes	
-ピアロン	0	ビアロン(1):auto	yes	
 タピストリ	2	タビストリ(0):auto	yes	
 スタンバイ	1	スタンパイ(1):auto	yes	
 ペン	2	ベン(2):auto	yes	
