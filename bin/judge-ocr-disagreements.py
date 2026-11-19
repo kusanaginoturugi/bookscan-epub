@@ -186,6 +186,12 @@ def full_word(lines, index, start, end, reading):
     return word
 
 
+# NDL's word this many times as often as YomiToku's keeps NDL. In 8 books the
+# rule kept キャシディ (162:2), サーグ (243:3) and タロイド (325:1, the LLM had
+# taken クロイド); the closest pairs left to the LLM were 6:1 and 2:1.
+BOOK_WORD_RATIO = 20
+
+
 def book_word_choice(lines, index, start, end, ndl, yomi, word_counts):
     # ('ndl' or 'yomitoku' or None, reason): the reading whose whole katakana word
     # occurs elsewhere in the book while the other one's does not.
@@ -202,6 +208,10 @@ def book_word_choice(lines, index, start, end, ndl, yomi, word_counts):
         return 'yomitoku', f'{b}は本の中に{cb}回、{a}は0回'
     if ca > 0 and cb <= 0:
         return 'ndl', f'{a}は本の中に{ca}回、{b}は0回'
+    # Both words are real (キャンディ twice, キャシディ 162 times) but YomiToku's is
+    # far rarer: keep NDL. Only this direction, so the text is never changed.
+    if ca > 0 and ca >= BOOK_WORD_RATIO * cb:
+        return 'ndl', f'{a}は本の中に{ca}回、{b}は{cb}回'
     return None, ''
 
 
@@ -300,7 +310,7 @@ def load_lines(args, glossary):
             if glossary:
                 text = fix_variants(text, glossary, joined=joins[position])
             lines.append(dict(page=page, line_id=key[1], box=box_of(item['boundingBox']),
-                              vertical=vertical, text=text, joined=joins[position]))
+                              vertical=vertical, text=text, joined=joins[position], raw=item['text']))
     return lines
 
 
@@ -663,6 +673,16 @@ def main():
             counts[category] += 1
             left, right = text[max(0, start - CONTEXT):start], text[end:end + CONTEXT]
             hunk_id = f'{line["page"]}:{line["line_id"]}:{left}[{frm}→{to}]{right}'
+            if (frm, to) == ('一', '「') and not text[:start].strip() and line['raw'].lstrip().startswith('「'):
+                # The margin re-read turned the line's opening 「 into 一 and
+                # YomiToku reads 「 too: in 8 books all 21 such places were 「.
+                items.append(dict(id=hunk_id, page=line['page'], line_id=line['line_id'], left=left,
+                                  ndl=frm, yomitoku=to, right=right, line=text, first='rule-start',
+                                  second='rule-start', decision='yomitoku', model='rule:start-bracket',
+                                  prompt='', date=today, index=index, start=start, end=end,
+                                  reason='行頭の「は余白なしのNDLとYomiTokuが「と読んだ'))
+                counts['start-bracket'] += 1
+                continue
             if category == 'judge' and paired_bracket(lines, index, start, frm):
                 # 〈シャピアロン〉号: YomiToku read 〉 as ソ and the LLM liked the
                 # result; a bracket whose partner is on the line is printed.
@@ -909,6 +929,8 @@ def main():
             llm = '聞いていない（形が同じ文字。前後の文字と、本の中に出てくる語で決めた）'
         elif item['first'] == 'rule-word':
             llm = f'聞いていない（本の中の語で決めた: {esc(item.get("reason", ""))}）'
+        elif item['first'] == 'rule-start':
+            llm = '聞いていない（行頭の「を余白つき再認識が一にした。余白なしのNDLとYomiTokuは「）'
         elif item['first'] == 'review':
             llm = '聞いていない（括弧の種類だけが違う。縦書きでは『と【が似ていて、文脈では決まらない）'
         elif item['first'] == 'skip':

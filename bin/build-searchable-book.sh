@@ -237,7 +237,9 @@ WORD_ARGS=
 CORRECTIONS=
 if [ "$USE_JUDGE" = on ] && [ -z "$GLOSSARY" ]; then
   CORRECTIONS=$WORK/judge/corrections.tsv
-  KEY=$(inputs_key "$VOICING_GLOSSARY" "$WORK/voicing-corrections.tsv" "$WORK/vocabulary.tsv" "$WORK/judge-human.tsv" "$WORK/margin.tsv" "$WORK/stages" "$WORK/skip-pages.txt" $SERIES_HUMAN)skip-catalog,line-joins,joined-voicing,lookalike,propagate,book-word,save-path,paired-bracket,edge-v1,bracket-swap,forms2,bracket-marks,save-cmd,word-verdicts
+  # Rule versions: a new rule reruns both judge steps.
+  JUDGE_RULES=skip-catalog,line-joins,joined-voicing,lookalike,propagate,book-word,save-path,paired-bracket,edge-v1,bracket-swap,forms2,bracket-marks,save-cmd,word-verdicts,book-ratio,start-bracket
+  KEY=$(inputs_key "$VOICING_GLOSSARY" "$WORK/voicing-corrections.tsv" "$WORK/vocabulary.tsv" "$WORK/judge-human.tsv" "$WORK/margin.tsv" "$WORK/stages" "$WORK/skip-pages.txt" $SERIES_HUMAN)$JUDGE_RULES
   if [ ! -e "$CORRECTIONS" ] || [ "$(cat "$WORK/judge.key" 2>/dev/null)" != "$KEY$LLM_MODEL$JUDGE_PROMPT" ]; then
     echo "[$(date +%T)] judge"
     curl -sf -m 10 "$LLM_URL/models" > /dev/null ||
@@ -287,7 +289,7 @@ M=$WORK/machine
 if [ -z "$GLOSSARY" ] && [ -e "$M/voicing-glossary.tsv" ]; then
   set -- --glossary "$M/voicing-glossary.tsv" --fix-variants --word-corrections "$M/voicing-corrections.tsv"
   if [ "$USE_JUDGE" = on ]; then
-    KEY=$(inputs_key "$M/voicing-glossary.tsv" "$M/voicing-corrections.tsv" "$WORK/margin.tsv" "$WORK/stages")$LLM_MODEL$JUDGE_PROMPT
+    KEY=$(inputs_key "$M/voicing-glossary.tsv" "$M/voicing-corrections.tsv" "$WORK/margin.tsv" "$WORK/stages")$LLM_MODEL$JUDGE_PROMPT$JUDGE_RULES
     if [ ! -e "$M/judge/corrections.tsv" ] || [ "$(cat "$M/judge.key" 2>/dev/null)" != "$KEY" ]; then
       echo "[$(date +%T)] judge (machine only)"
       "$PY" "$BIN/judge-ocr-disagreements.py" "$ORIGINAL" "$WORK/ocr" "$WORK/yomitoku" "$M/judge" "$M/judge-review" \

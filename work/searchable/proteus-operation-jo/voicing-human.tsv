@@ -1,0 +1,25 @@
+a	b	choice
+セルビー	セルピー	セルビー
+ジグソーバズル	ジグソーパズル	ジグソーパズル
+ブルオーバー	プルオーバー	プルオーバー
+fix:バ→パ		keep
+fix:アバー→アパー		keep
+fix:カーベ→カーペ		keep
+fix:クーバ→クーパ		keep
+fix:グラブ→クラブ		keep
+fix:コベ→コペ		keep
+fix:ゼルビー→セルビー		keep
+fix:ダイプライター→タイプライター		keep
+fix:バイ→パイ		keep
+fix:バラ→パラ		keep
+fix:パー→バー		keep
+fix:パーベ→パーペ		keep
+fix:ピート→ビート		keep
+fix:ブリンストン→プリンストン		keep
+fix:ブルオーバー→プルオーバー		keep
+fix:プ→ブ		keep
+fix:プロ→ブロ		keep
+fix:ベスト→ペスト		keep
+fix:ベンタイン→ペンタイン		keep
+fix:ベンハーゲン→ペンハーゲン		keep
+fix:ミュンベン→ミュンヘン		keep

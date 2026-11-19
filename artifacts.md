@@ -13,6 +13,16 @@
 | 天の光はすべて星 | 284 | 1 | [PDF](output/searchable/天の光はすべて星%20-%20フレドリック・ブラウン.pdf) | [PDF](output/searchable/天の光はすべて星%20-%20フレドリック・ブラウン%20辞書補正.pdf) | [5語7か所](work/searchable/ten-no-hikari/variant-glossary.tsv) |
 | インフィニティ・リミテッド（下） | 388 | 3 | [PDF](output/searchable/インフィニティ・リミテッド（下）%20-%20ジェイムズ・P・ホーガン.pdf) | [PDF](output/searchable/インフィニティ・リミテッド（下）%20-%20ジェイムズ・P・ホーガン%20辞書補正.pdf) | [20語61か所](work/searchable/infinity-lower/variant-glossary.tsv) |
 
+## プロテウス・オペレーション（上）（2026-11-19）
+
+ホーガンの単発作（小隅黎訳）。語彙とパ／バの選択は引き継がずに、`bin/build-searchable-book.sh` で通した。パ／バ、判断モデル、抜き取り検査は、ユーザーがすべてレビューした。
+
+| 種類 | ファイル | 内容 |
+|---|---|---|
+| 完成品 | [検索可能PDF](output/searchable/プロテウス・オペレーション（上）%20-%20ジェイムズ・P・ホーガン.pdf) | 356ページ。巻末目録（340〜354ページ）はレビューの対象外 |
+| レビュー | [パ／バ](review/proteus-operation-jo-voicing/index.html)・[判断モデル](review/proteus-operation-jo-judge/index.html)・[抜き取り検査](review/proteus-operation-jo-proofread/index.html) | パ／バは88組（自動判定86組、うち両方正しい2組。人の選択3組）と自動修正21か所（うち行をまたぐ語16か所）。判断モデルは210か所を判断し、人の判定48件、反映69件。抜き取り検査は200行で、完成品の誤りは5行（1万字あたり7.0） |
+| 作業ファイル | [パ／バの辞書](work/searchable/proteus-operation-jo/voicing-glossary.tsv)・[自動修正](work/searchable/proteus-operation-jo/voicing-corrections.tsv)・[人のパ／バの選択](work/searchable/proteus-operation-jo/voicing-human.tsv)・[判断モデルの反映](work/searchable/proteus-operation-jo/judge/corrections.tsv)・[人の判定](work/searchable/proteus-operation-jo/judge-human.tsv) | |
+
 ## 造物主の選択（2026-11-18）
 
 『造物主の掟』の続編（同じ小隅黎訳）。前作の語彙（`VOCAB_FROM`）と、前作が引き継いだ5冊分のパ／バの選択を引き継いで、`bin/build-searchable-book.sh` で通した。パ／バは、画像の確率差とLLMで決める新しい段で作り直した（[作業記録](docs/progress.md)の「パ／バを画像の確率とLLMで決める」）。人のレビュー前。
