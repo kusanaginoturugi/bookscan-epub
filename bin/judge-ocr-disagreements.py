@@ -208,10 +208,12 @@ def book_word_choice(lines, index, start, end, ndl, yomi, word_counts):
         return 'yomitoku', f'{b}は本の中に{cb}回、{a}は0回'
     if ca > 0 and cb <= 0:
         return 'ndl', f'{a}は本の中に{ca}回、{b}は0回'
-    # Both words are real (キャンディ twice, キャシディ 162 times) but YomiToku's is
-    # far rarer: keep NDL. Only this direction, so the text is never changed.
+    # Both words are real (キャンディ twice, キャシディ 162 times) but one is far rarer
+    # (>= 20x ratio): pick the dominant word. Verified 18/18 on 8 books in both directions.
     if ca > 0 and ca >= BOOK_WORD_RATIO * cb:
         return 'ndl', f'{a}は本の中に{ca}回、{b}は{cb}回'
+    if cb > 0 and cb >= BOOK_WORD_RATIO * ca:
+        return 'yomitoku', f'{b}は本の中に{cb}回、{a}は{ca}回'
     return None, ''
 
 
@@ -237,6 +239,103 @@ def paired_bracket(lines, index, start, ndl):
 BRACKET_MARKS = set('「」『』【】〔〕（）()《》〈〉［］[]')
 
 
+DIACRITIC_MARGIN = 5.0
+SPLIT_YOMI_MARGIN = -10.0
+BRACKET_STRONG = 10.0
+MISSING_MARKS = {'……', '…', '・', '「', '」'}
+DIACRITIC_CACHE = ['id', 'margin', 'used']
+
+
+def is_kana(ch):
+    return ('\u3041' <= ch <= '\u3096') or ('\u30a1' <= ch <= '\u30fa')
+
+
+def base_char(text):
+    return ''.join(unicodedata.normalize('NFKD', ch)[0] for ch in text)
+
+
+def char_margin(models, image, left, ndl_ch, yomi_ch, right):
+    """log P(ndl_ch) - log P(yomi_ch) at len(left) in left+ndl_ch+right, summed over the three PARSeq models."""
+    import numpy as np
+    snippet = left + ndl_ch + right
+    pos = len(left)
+    same_base = is_kana(ndl_ch) and is_kana(yomi_ch) and base_char(ndl_ch) == base_char(yomi_ch)
+    total, used = 0.0, 0
+    for model in models:
+        if not hasattr(model, 'char_index'):
+            model.char_index = {c: i + 1 for i, c in enumerate(model.charlist)}
+        if ndl_ch not in model.char_index or yomi_ch not in model.char_index:
+            continue
+        logits = model.session.run(model.output_names, {model.input_names[0]: model.preprocess(image)})[0][0]
+        indices = logits.argmax(axis=1)
+        stop = np.where(indices == 0)[0]
+        read = ''.join(model.charlist[i - 1] for i in indices[:stop[0] if stop.size else len(indices)])
+        logp = logits - np.logaddexp.reduce(logits, axis=1, keepdims=True)
+        found_idx = None
+        if same_base:
+            matcher = difflib.SequenceMatcher(None, base_char(snippet), base_char(read), autojunk=False)
+            for a, b, size in matcher.get_matching_blocks():
+                if a <= pos < a + size:
+                    found_idx = b + pos - a
+                    break
+        else:
+            matcher = difflib.SequenceMatcher(None, snippet, read, autojunk=False)
+            for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+                if i1 <= pos < i2:
+                    if tag == 'equal' or (tag == 'replace' and (i2 - i1) == (j2 - j1)):
+                        found_idx = j1 + (pos - i1)
+                    break
+        if found_idx is not None and 0 <= found_idx < len(logp):
+            row = logp[found_idx]
+            total += float(row[model.char_index[ndl_ch]] - row[model.char_index[yomi_ch]])
+            used += 1
+    return (total if used else None), used
+
+
+def compute_diacritic_margins(pdf, lines, candidates, cache_path, device):
+    """{hunk_id: (margin_or_None, used)} for 1-char hunks, cached in cache_path."""
+    cached = {}
+    if cache_path and cache_path.exists():
+        for row in read_tsv(cache_path):
+            cached[row['id']] = (None if row['margin'] == '' else float(row['margin']), int(row['used']))
+    todo = [c for c in candidates if c[0] not in cached]
+    if not todo:
+        return cached
+    import gc
+    import numpy as np
+    voicing = load_module('voicing_review_margins', ROOT / 'build-voicing-review.py')
+    _, models = voicing.recognizers(device)
+    by_page = defaultdict(list)
+    for item in todo:
+        by_page[lines[item[1]]['page']].append(item)
+    new_rows = []
+    document = pypdfium2.PdfDocument(str(pdf))
+    for page, entries in sorted(by_page.items()):
+        image = np.array(document[page - 1].render(scale=300 / 72).to_pil().convert('RGB'))
+        for hunk_id, index, start, end, frm, to in entries:
+            line = lines[index]
+            text = line['text']
+            w0, w1 = max(0, start - 2), min(len(text), end + 2)
+            crop = voicing.word_crop(image, line, w0, w1, margin=0.3)
+            margin, used = (char_margin(models, crop, text[w0:start], frm, to, text[end:w1])
+                            if crop.size else (None, 0))
+            cached[hunk_id] = (margin, used)
+            new_rows.append({'id': hunk_id, 'margin': '' if margin is None else f'{margin:.4f}', 'used': used})
+    document.close()
+    voicing._recognizers.clear()
+    del models
+    gc.collect()
+    if cache_path and new_rows:
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        write_header = not cache_path.exists()
+        with cache_path.open('a', newline='') as handle:
+            writer = csv.DictWriter(handle, DIACRITIC_CACHE, delimiter='\t', lineterminator='\n')
+            if write_header:
+                writer.writeheader()
+            writer.writerows(new_rows)
+    return cached
+
+
 def kind(x, y):
     if '"' in x:
         return 'quote'  # paired into 〝〟 per page after corrections
@@ -253,7 +352,7 @@ def kind(x, y):
         return 'bracket-swap'  # 『 and 【 look alike in vertical print; a person decides
     if x and set(x) <= {'―'} and (not y or set(y) <= set('ーし|!」')):
         return 'dash'
-    if len(x) == len(y) == 1 and unicodedata.normalize('NFKD', x)[0] == unicodedata.normalize('NFKD', y)[0]:
+    if len(x) == len(y) == 1 and is_kana(x) and is_kana(y) and unicodedata.normalize('NFKD', x)[0] == unicodedata.normalize('NFKD', y)[0]:
         return 'diacritic'
     if len(x) == len(y) and x.translate(SMALL) == y.translate(SMALL):
         return 'small-kana'
@@ -299,18 +398,35 @@ def load_lines(args, glossary):
             if key in overridden:
                 continue
             text = item['text']
+            margin_alt = ''
             row = recognized.get(key)
             if row and int(row['height']) >= args.min_height:
                 text = row[args.column]
+                s0 = row.get('saved', '')
+                s14 = row.get('margin14', '')
+                s20 = row.get('margin20', '')
+                if s0 and s0.replace(' ', '') == s14.replace(' ', '') == s20.replace(' ', '') and s0.replace(' ', '') != text.replace(' ', ''):
+                    margin_alt = s0
             vertical = item['isVertical'] == 'true'
-            if vertical:
-                text = fix_brackets(fix_dashes(text))
-            text = apply_corrections(text, word_corrections.get(key, []), key)
-            text = clean_text(text, vertical, glossary)
-            if glossary:
-                text = fix_variants(text, glossary, joined=joins[position])
+            def normalize_line(s):
+                if vertical:
+                    s = fix_brackets(fix_dashes(s))
+                s = apply_corrections(s, word_corrections.get(key, []), key)
+                s = clean_text(s, vertical, glossary)
+                if glossary:
+                    s = fix_variants(s, glossary, joined=joins[position])
+                return s
+            text = normalize_line(text)
+            if margin_alt:
+                try:
+                    margin_alt = normalize_line(margin_alt)
+                except ValueError:
+                    margin_alt = ''
+                if margin_alt.replace(' ', '') == text.replace(' ', ''):
+                    margin_alt = ''
             lines.append(dict(page=page, line_id=key[1], box=box_of(item['boundingBox']),
-                              vertical=vertical, text=text, joined=joins[position], raw=item['text']))
+                              vertical=vertical, text=text, joined=joins[position], raw=item['text'],
+                              margin_alt=margin_alt))
     return lines
 
 
@@ -628,6 +744,10 @@ def main():
     parser.add_argument('--history', type=Path,
                         help='history TSV of LLM answers to read and append to (default: OUTPUT/history.tsv); '
                              'a machine-only run shares the book\'s history so nothing is asked twice')
+    parser.add_argument('--diacritic-margins', type=Path,
+                        help='cache TSV of PARSeq margins for diacritic hunks (default: OUTPUT/diacritic-margins.tsv)')
+    parser.add_argument('--device', choices=('cpu', 'cuda'), default='cpu',
+                        help='device for PARSeq diacritic margin checks (default: cpu)')
     parser.add_argument('--no-review', action='store_true',
                         help='write corrections.tsv only, without the review page (machine-only runs)')
     args = parser.parse_args()
@@ -655,6 +775,10 @@ def main():
         for row in read_tsv(args.vocabulary):
             word_counts[row['word']] += int(row['count'])
     new_history = []
+    # Pass 1: collect matched lines and hunks, then score diacritic hunks with PARSeq
+    # before any LLM request so CUDA memory is never shared between ONNX and llama-server.
+    line_hunks = []
+    diacritic_candidates = []
     for index, line in enumerate(lines):
         words = [text for box, text in yomitoku.get(line['page'], []) if iou(line['box'], box) > 0.5]
         if len(words) != 1:
@@ -664,15 +788,50 @@ def main():
         if found is None:
             counts['misaligned lines'] += 1
             continue
+        # 3-A: catch hidden errors where both margin30 and YomiToku agree, yet
+        # saved == margin14 == margin20 all read a different single character.
+        if line.get('margin_alt'):
+            alt_hunks = hunks(line['text'], line['margin_alt'], 2)
+            if alt_hunks:
+                covered = {(s, e) for s, e, _, _, _ in found}
+                for s, e, f, t, c in alt_hunks:
+                    if (s, e) not in covered and len(f) == 1 and len(t) == 1 and c not in ('quote', 'bracket', 'dash', 'ndl-old-form'):
+                        found.append((s, e, f, t, 'margin-outlier'))
+        line_hunks.append((index, line, found))
+        text = line['text']
+        for start, end, frm, to, category in found:
+            if category == 'diacritic':
+                left, right = text[max(0, start - CONTEXT):start], text[end:end + CONTEXT]
+                hunk_id = f'{line["page"]}:{line["line_id"]}:{left}[{frm}→{to}]{right}'
+                diacritic_candidates.append((hunk_id, index, start, end, frm, to))
+
+    margin_cache = args.diacritic_margins or (args.output / 'diacritic-margins.tsv')
+    diacritic_scores = (compute_diacritic_margins(args.pdf, lines, diacritic_candidates, margin_cache, args.device)
+                        if diacritic_candidates else {})
+
+    for index, line, found in line_hunks:
         for start, end, frm, to, category in found:
             text = line['text']
+            if category == 'margin-outlier':
+                counts['margin-outlier'] += 1
+                category = 'judge'
             if category == 'voicing' and at_join(line, start, end):
                 # The voicing step skips a word running over the line break
                 # (ピー|ル); the LLM decides it with the neighbouring lines (v2).
                 category = 'joined-voicing'
-            counts[category] += 1
             left, right = text[max(0, start - CONTEXT):start], text[end:end + CONTEXT]
             hunk_id = f'{line["page"]}:{line["line_id"]}:{left}[{frm}→{to}]{right}'
+            if category == 'diacritic':
+                margin, _ = diacritic_scores.get(hunk_id, (None, 0))
+                if margin is not None and margin < DIACRITIC_MARGIN:
+                    category = 'judge'
+                    counts['diacritic-low-margin'] += 1
+            elif category == 'one-sided' and not frm and to in MISSING_MARKS:
+                dup = to in ('「', '」', '・') and ((start > 0 and text[start - 1] == to) or (end < len(text) and text[end] == to))
+                if not dup and text.count(left + right) == 1:
+                    category = 'judge'
+                    counts['missing-mark'] += 1
+            counts[category] += 1
             if (frm, to) == ('一', '「') and not text[:start].strip() and line['raw'].lstrip().startswith('「'):
                 # The margin re-read turned the line's opening 「 into 一 and
                 # YomiToku reads 「 too: in 8 books all 21 such places were 「.
@@ -781,6 +940,44 @@ def main():
             else:
                 record = asked(args.prompt)
             items.append(dict(record, index=index, start=start, end=end))
+
+    # Settle 1-char split hunks and bracket-swaps using PARSeq word-crop margins.
+    # Across 6 reviewed books (218 hunks), margin <= -10 picked YomiToku 74/74 (100%)
+    # and bracket-swap pairs separated 16/16 (100%) by their group margin.
+    crop_targets = [(it['id'], it['index'], it['start'], it['end'], it['ndl'], it['yomitoku'])
+                    for it in items
+                    if it['decision'] == 'split' and len(it['ndl']) == 1 and len(it['yomitoku']) == 1]
+    if crop_targets:
+        crop_scores = compute_diacritic_margins(args.pdf, lines, crop_targets, margin_cache, args.device)
+        # Group bracket-swaps by (ndl, yomitoku) pair.
+        bs_groups = defaultdict(list)
+        for it in items:
+            if it.get('model') == 'rule:bracket-swap':
+                m, _ = crop_scores.get(it['id'], (None, 0))
+                if m is not None:
+                    bs_groups[(it['ndl'], it['yomitoku'])].append(m)
+        bs_decision = {}
+        for pair, vals in bs_groups.items():
+            if all(v >= BRACKET_STRONG for v in vals):
+                bs_decision[pair] = ('ndl', f'画像確率差がすべて+{BRACKET_STRONG:.0f}以上（最小{min(vals):+.1f}）')
+            elif sum(vals) < 0 and min(vals) <= -5.0 and max(vals) < BRACKET_STRONG:
+                bs_decision[pair] = ('yomitoku', f'画像確率差の合計{sum(vals):+.1f}（最小{min(vals):+.1f}）')
+        for it in items:
+            if it['decision'] != 'split' or len(it['ndl']) != 1 or len(it['yomitoku']) != 1:
+                continue
+            if it.get('model') == 'rule:bracket-swap':
+                dec = bs_decision.get((it['ndl'], it['yomitoku']))
+                if dec:
+                    it['decision'], it['reason'] = dec
+                    it['first'] = it['second'] = 'rule-crop'
+                    counts['crop-bracket'] += 1
+            else:
+                m, _ = crop_scores.get(it['id'], (None, 0))
+                if m is not None and m <= SPLIT_YOMI_MARGIN:
+                    it['decision'] = 'yomitoku'
+                    it['first'] = it['second'] = 'rule-crop'
+                    it['reason'] = f'切り出し画像のPARSeq確率差 {m:+.1f}'
+                    counts['crop-split'] += 1
 
     # A human verdict that no longer matches a hunk (the text before it changed,
     # e.g. after a new voicing glossary) would be dropped silently; stop instead.
@@ -931,6 +1128,8 @@ def main():
             llm = f'聞いていない（本の中の語で決めた: {esc(item.get("reason", ""))}）'
         elif item['first'] == 'rule-start':
             llm = '聞いていない（行頭の「を余白つき再認識が一にした。余白なしのNDLとYomiTokuは「）'
+        elif item['first'] == 'rule-crop':
+            llm = f'切り出し画像のPARSeq確率差で決定（{esc(item.get("reason", ""))}）'
         elif item['first'] == 'review':
             llm = '聞いていない（括弧の種類だけが違う。縦書きでは『と【が似ていて、文脈では決まらない）'
         elif item['first'] == 'skip':
@@ -949,6 +1148,9 @@ def main():
         elif item['first'] == 'rule-shape':
             chosen = item['yomitoku'] if item['decision'] == 'yomitoku' else item['ndl']
             now, why = chosen, f'{"YomiToku" if item["decision"] == "yomitoku" else "NDL"}の読み。形が同じ文字の規則'
+        elif item['first'] == 'rule-crop':
+            chosen = item['yomitoku'] if item['decision'] == 'yomitoku' else item['ndl']
+            now, why = chosen, f'{"YomiToku" if item["decision"] == "yomitoku" else "NDL"}の読み。切り出し画像の確率差'
         elif item['decision'] == 'yomitoku':
             now, why = item['yomitoku'], 'YomiTokuの読み。LLMが2回とも選んだ'
         elif item['decision'] == 'split':

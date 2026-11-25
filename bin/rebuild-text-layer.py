@@ -186,11 +186,31 @@ def main():
                 quotes += replaced
                 for line, text in zip(vertical_lines, texts):
                     line['text'] = text
-        for line in lines:
-            changed_lines += line.pop('original') != line['text']
-            dumped.append(dict(line.pop('dump'), final=line['text']))
         page_results.append({'text_layer_lines': lines, 'img_width': info['img_width'],
                              'img_height': info['img_height']})
+    if args.fix_brackets and len(unpaired_pages) >= 2:
+        # Pair quotes that cross a single page break (adjacent unpaired pages).
+        still_unpaired = []
+        i = 0
+        while i < len(unpaired_pages):
+            if i + 1 < len(unpaired_pages) and unpaired_pages[i + 1] == unpaired_pages[i] + 1:
+                p1, p2 = unpaired_pages[i], unpaired_pages[i + 1]
+                v1 = [line for line in page_results[p1 - 1]['text_layer_lines'] if line['is_vertical']]
+                v2 = [line for line in page_results[p2 - 1]['text_layer_lines'] if line['is_vertical']]
+                texts, replaced = fix_quotes([line['text'] for line in v1 + v2])
+                if replaced is not None:
+                    quotes += replaced
+                    for line, text in zip(v1 + v2, texts):
+                        line['text'] = text
+                    i += 2
+                    continue
+            still_unpaired.append(unpaired_pages[i])
+            i += 1
+        unpaired_pages = still_unpaired
+    for page_entry in page_results:
+        for line in page_entry['text_layer_lines']:
+            changed_lines += line.pop('original') != line['text']
+            dumped.append(dict(line.pop('dump'), final=line['text']))
     if overrides:
         raise ValueError(f'overrides not found in OCR: {list(overrides)}')
     if corrections:

@@ -309,6 +309,8 @@ id="toc-括弧の読みと行頭のの規則2026-11-19">括弧の読みと行頭
 id="toc-処理の流れの図2026-11-18">処理の流れの図（2026-11-18）</a></li>
 <li><a href="#スクリプトの整理2026-11-13"
 id="toc-スクリプトの整理2026-11-13">スクリプトの整理（2026-11-13）</a></li>
+<li><a href="#精度向上の検証と組み込み2026-11-2425"
+id="toc-精度向上の検証と組み込み2026-11-2425">精度向上の検証と組み込み（2026-11-24〜25）</a></li>
 <li><a href="#次の作業" id="toc-次の作業">次の作業</a></li>
 </ul></li>
 </ul>
@@ -1510,6 +1512,94 @@ NDLは相変わらず「」を拾えない。8冊（77,245行）で、元のNDL�
 へ日付付きで移す動きをやめた）。作業ディレクトリと作業履歴で足りるため。残っていた『星を継ぐもの』の2026-11-12版はローカルとDriveから消した。<code>output/trial/old/</code>
 は残した。</li>
 </ul>
+<h2
+id="精度向上の検証と組み込み2026-11-2425">精度向上の検証と組み込み（2026-11-24〜25）</h2>
+<p>抜き取り検査に残った誤り（『星を継ぐもの』機械処理のみの1字
+<code>』→】</code>、『プロテウス・オペレーション（上）』の4行5字：<code>開化されだ</code>、<code>ニューメギシ</code>、<code>るたびに」</code>、<code>息子三人―</code>）を分析し、5つの改善を実装・検証した（作業リストは
+<code>docs/work-plan.md</code>）。</p>
+<ol type="1">
+<li><strong>濁点・半濁点（<code>diacritic</code>）の確率差フィルタと記号脱落（<code>missing-mark</code>）の解放（<code>judge-ocr-disagreements.py</code>）：</strong>
+<ul>
+<li><code>diacritic</code>
+をかな文字の濁点・半濁点のみに限定（ローマ数字 <code>I→Ⅱ</code>
+の誤分類を修正）。</li>
+<li><code>diacritic</code> 全件に対して PARSeq
+3モデルの局所切り出し確率差（<code>margin = log P(NDL) - log P(YomiToku)</code>）を計算し、<code>margin &lt; 5.0</code>
+の箇所だけを判断モデル（規則＋LLM＋レビュー）へ回す（結果は
+<code>judge/diacritic-margins.tsv</code>
+にキャッシュ、CPUで1冊1分弱）。『プロテウス』192件では
+<code>margin &lt; 3.0</code> の16件すべてが本物のNDL誤りだった。</li>
+<li><code>one-sided</code> のうち YomiToku のみに <code>……</code>
+<code>…</code> <code>・</code> <code>「</code> <code>」</code>
+がある脱落候補（隣接重複を除く）を判断モデルへ回す。</li>
+<li>『プロテウス』の抜き取り検査200行（7,161字）で、誤りが
+<strong>5字→1字（99.93%→99.99%、1万字あたり 7.0→1.4）</strong>
+に減少（人の判定なしでも同じ）。</li>
+</ul></li>
+<li><strong>割れた1文字差分・<code>bracket-swap</code> の画像判定（VLM
+vs PARSeq確率差）：</strong>
+<ul>
+<li>『星を継ぐもの』『プロテウス』の割れた差分＋<code>bracket-swap</code>
+91件でローカルVLM（<code>gemma-4-12B</code>、<code>mmproj</code>
+つき、thinking無効）を測ったところ、正答率は
+44/61（72.1%）で漢字の細かい字形に弱かった。</li>
+<li>同じ対象をレビュー済み6冊（218件）で PARSeq
+3モデルの局所切り出し確率差に通すと、<strong><code>margin &lt;= -10.0</code>（局所切り出しでPARSeq自身がNDLを否定しYomiTokuを支持）は
+74/74（100.0%、誤り0）</strong>、<strong><code>bracket-swap</code>
+は同じ括弧組の合計で 16/16（100.0%）</strong> 分離できた。</li>
+<li>これを <code>judge-ocr-disagreements.py</code>
+に組み込んだ結果、『星を継ぐもの』の抜き取り検査200行（7,501字）で、<strong>人の判定なし（機械処理のみ）でも
+200/200行・100.00%（誤り0、上限4.0/1万字）</strong> に達した。</li>
+</ul></li>
+<li><strong>両OCR一致の隠れ誤字検出（<code>margin-outlier</code>）と抜き取り検査の迷い表示：</strong>
+<ul>
+<li>計算済みの <code>margin.tsv</code> で
+<code>saved == margin14 == margin20 != margin30</code> かつ YomiToku
+との差分に出ていない1文字置換を <code>margin-outlier</code>
+として判断モデルへ流す（追加推論ゼロ）。『星を継ぐもの』の
+<code>燃料ベレット→ペレット</code>、<code>プロテウス</code> の
+<code>プロードウェイ→ブロードウェイ</code>
+<code>惚ればれ→惚れぼれ</code> などを自動修正。</li>
+<li>抜き取り検査画面（<code>build-proofread-sample.py</code>）に、PARSeq
+の <code>Top-1 - Top-2 &lt; 1.0</code>
+の迷い文字へ橙の点線と次候補ツールチップを追加（200行あたり約50〜65字）。</li>
+</ul></li>
+<li><strong>引用符のページまたぎ対応と「本の中の語」逆向き20倍比：</strong>
+<ul>
+<li><code>text_layer_utils.fix_quotes</code> で <code>“</code>
+<code>”</code> も <code>〝〟</code>
+の対に含め、<code>rebuild-text-layer.py</code>
+で単独で対にならなかった隣接2ページ（<code>p</code> と
+<code>p+1</code>）を連結して再試行するようにした。『造物主の選択』p.489→p.490、『プロテウス』p.352→p.353、『星を継ぐもの』p.73
+の未変換引用符が解消。</li>
+<li><code>book_word_choice</code>
+に逆向きの20倍比（<code>cb &gt;= 20 * ca</code>）を追加。8冊全体で該当18件すべて（18/18）が本物のNDL誤認識（<code>ダンチニッカー→ダンチェッカー</code>、<code>サーダ／サーゲ→サーグ</code>、<code>テェーリアン→テューリアン</code>、<code>ジュフ→ジェフ</code>、<code>フェルバーダ→フェルバーグ</code>）だった。</li>
+</ul></li>
+<li><strong>NDLOCR-Lite の余白と傾き・アスペクト比の再検証：</strong>
+<ul>
+<li>『星を継ぐもの』『プロテウス』の正解400行（14,662字）で、生の読み（161誤り、CER
+1.098%）、固定
+<code>+25/+30/+35/+40px</code>、文字幅比例（<code>1.6x/1.8x/2.0x</code>）、アスペクト比正規化（<code>w = alpha * h * 24 / W</code>）、強制50字モデル、全行100字モデルを比較。現行の
+<strong>既定カスケード＋固定
+<code>+30px</code>（<code>h &gt;= 400</code>）が 65誤り（CER
+0.443%）で最適点</strong> と確認できた（全行100字モデル
+<code>+30px</code> は64誤りでほぼ同等）。</li>
+<li>傾き別に見ると、400行中390行は傾き0度で、まっすぐなページほど検出枠が文字にピチピチに締まるため
+<code>+30px</code>
+の白余白が効いていた。モデル入力画像（<code>24 × W</code>）の実例比較ページを
+<code>bin/study/build-parseq-guide.py</code>（出力
+<code>review/parseq-padding-guide/index.html</code>）に作成した。</li>
+</ul></li>
+<li><strong>全8冊への反映：</strong>
+<ul>
+<li>シリーズ順に全8冊を再ビルドし、既存の人手判定と衝突なく完走。8冊合計で
+<code>diacritic-low-margin</code> 102件、<code>missing-mark</code>
+79件、<code>margin-outlier</code> 51件、<code>crop-split</code>
+101件、<code>crop-bracket</code>
+36件が機能した。未レビューの『造物主の掟』は要確認が
+57→43か所、『造物主の選択』は 37→22か所へ減少。</li>
+</ul></li>
+</ol>
 <h2 id="次の作業">次の作業</h2>
 <ol type="1">
 <li>ユーザーの通読結果を受けて、両方の順序でBと答えた組（少数派が正しい）を補正に使うか決める。確認済みのテレパシー・ズボン・キャタピラは、暗黒星雲突破！とインフィニティ下巻の辞書補正版へ反映する候補。架空の固有名詞は行画像をLLMに見せる方式を検討する。</li>

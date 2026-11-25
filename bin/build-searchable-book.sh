@@ -238,7 +238,7 @@ CORRECTIONS=
 if [ "$USE_JUDGE" = on ] && [ -z "$GLOSSARY" ]; then
   CORRECTIONS=$WORK/judge/corrections.tsv
   # Rule versions: a new rule reruns both judge steps.
-  JUDGE_RULES=skip-catalog,line-joins,joined-voicing,lookalike,propagate,book-word,save-path,paired-bracket,edge-v1,bracket-swap,forms2,bracket-marks,save-cmd,word-verdicts,book-ratio,start-bracket
+  JUDGE_RULES=skip-catalog,line-joins,joined-voicing,lookalike,propagate,book-word,save-path,paired-bracket,edge-v1,bracket-swap,forms2,bracket-marks,save-cmd,word-verdicts,book-ratio,book-ratio-rev,start-bracket,diacritic-margin,missing-marks,crop-split,crop-bracket2,margin-outlier
   KEY=$(inputs_key "$VOICING_GLOSSARY" "$WORK/voicing-corrections.tsv" "$WORK/vocabulary.tsv" "$WORK/judge-human.tsv" "$WORK/margin.tsv" "$WORK/stages" "$WORK/skip-pages.txt" $SERIES_HUMAN)$JUDGE_RULES
   if [ ! -e "$CORRECTIONS" ] || [ "$(cat "$WORK/judge.key" 2>/dev/null)" != "$KEY$LLM_MODEL$JUDGE_PROMPT" ]; then
     echo "[$(date +%T)] judge"
@@ -247,6 +247,7 @@ if [ "$USE_JUDGE" = on ] && [ -z "$GLOSSARY" ]; then
     "$PY" "$BIN/judge-ocr-disagreements.py" "$ORIGINAL" "$WORK/ocr" "$WORK/yomitoku" "$WORK/judge" \
       "$REVIEW-judge" --ocr-stem "$OCR_STEM" --recognized "$WORK/margin.tsv" \
       --glossary "$VOICING_GLOSSARY" --human "$WORK/judge-human.tsv" $SKIP_ARGS $WORD_ARGS $VOCAB_ARGS \
+      --diacritic-margins "$WORK/judge/diacritic-margins.tsv" \
       --url "$LLM_URL/chat/completions" --model "$LLM_MODEL" --prompt "$JUDGE_PROMPT" \
       --title "$TITLE LLM判断のレビュー" \
       > "$WORK/judge.log" 2>&1 || fail "judge step failed; see $WORK/judge.log"
@@ -260,7 +261,7 @@ set -- --glossary "$VOICING_GLOSSARY" --fix-variants
 [ -z "$WORD_ARGS" ] || set -- "$@" $WORD_ARGS
 [ -z "$CORRECTIONS" ] || set -- "$@" --corrections "$CORRECTIONS"
 [ ! -e "$WORK/char-map.tsv" ] || set -- "$@" --char-map "$WORK/char-map.tsv"
-KEY=$(inputs_key "$VOICING_GLOSSARY" ${WORD_ARGS:+"$WORK/voicing-corrections.tsv"} ${CORRECTIONS:+"$CORRECTIONS"} "$WORK/char-map.tsv" "$WORK/margin.tsv" "$WORK/angles.tsv")line-joins,dump-lines
+KEY=$(inputs_key "$VOICING_GLOSSARY" ${WORD_ARGS:+"$WORK/voicing-corrections.tsv"} ${CORRECTIONS:+"$CORRECTIONS"} "$WORK/char-map.tsv" "$WORK/margin.tsv" "$WORK/angles.tsv")line-joins,dump-lines,quotes-pair2
 echo "[$(date +%T)] text layer"
 if [ ! -e "$TEXT" ] || [ "$(cat "$WORK/text.key" 2>/dev/null)" != "$KEY" ]; then
   [ ! -e "$TEXT" ] || mv -f "$TEXT" "$TEXT.prev"
@@ -295,6 +296,7 @@ if [ -z "$GLOSSARY" ] && [ -e "$M/voicing-glossary.tsv" ]; then
       "$PY" "$BIN/judge-ocr-disagreements.py" "$ORIGINAL" "$WORK/ocr" "$WORK/yomitoku" "$M/judge" "$M/judge-review" \
         --ocr-stem "$OCR_STEM" --recognized "$WORK/margin.tsv" --glossary "$M/voicing-glossary.tsv" \
         --word-corrections "$M/voicing-corrections.tsv" --skip-catalog --history "$WORK/judge/history.tsv" \
+        --diacritic-margins "$WORK/judge/diacritic-margins.tsv" \
         --no-review --url "$LLM_URL/chat/completions" --model "$LLM_MODEL" --prompt "$JUDGE_PROMPT" \
         > "$M/judge.log" 2>&1 || fail "machine-only judge failed; see $M/judge.log"
       echo "$KEY" > "$M/judge.key"
@@ -318,7 +320,7 @@ fi
 # the page is redrawn when the text changes. A saved WORK/proofread-human.tsv
 # is scored for every stage, with and without human input.
 PROOF=$REVIEW-proofread
-KEY=$(inputs_key "$WORK/lines.tsv" "$WORK/proofread-human.tsv" "$M/lines.tsv")proofread
+KEY=$(inputs_key "$WORK/lines.tsv" "$WORK/proofread-human.tsv" "$M/lines.tsv")proofread,low-margin
 if [ -z "$GLOSSARY" ] && { [ ! -e "$PROOF/index.html" ] || [ "$(cat "$WORK/proofread.key" 2>/dev/null)" != "$KEY" ]; }; then
   echo "[$(date +%T)] proofreading sample"
   set -- --human "$WORK/proofread-human.tsv" --ocr-dir "$WORK/ocr" --ocr-stem "$OCR_STEM"

@@ -67,13 +67,106 @@ def distance(a, b):
     return previous[-1]
 
 
-def marked(text, against, cls):
-    # Characters of text that differ from against, wrapped for highlighting.
-    out = []
+def marked(text, against, cls, low_map=None):
+    # Characters of text that differ from against, wrapped for highlighting;
+    # optional low_map ({index: (alt_char, margin)}) underlines low-confidence chars.
+    diff_pos = set()
     for op, i1, i2, _, _ in difflib.SequenceMatcher(None, text, against, autojunk=False).get_opcodes():
-        chunk = html.escape(text[i1:i2])
-        out.append(chunk if op == 'equal' or not chunk else f'<span class="{cls}">{chunk}</span>')
+        if op != 'equal':
+            diff_pos.update(range(i1, i2))
+    out = []
+    for i, ch in enumerate(text):
+        esc = html.escape(ch)
+        classes = []
+        title = ''
+        if i in diff_pos:
+            classes.append(cls)
+        if low_map and i in low_map:
+            alt, margin = low_map[i]
+            classes.append('low')
+            title = f' title="認識モデルが迷った字（次候補: {html.escape(alt)}, 差 {margin:.2f}）"'
+        if classes:
+            out.append(f'<span class="{" ".join(classes)}"{title}>{esc}</span>')
+        else:
+            out.append(esc)
     return ''.join(out)
+
+
+def low_margin_positions(pdf_path, ocr_dir, ocr_stem, picked, threshold=1.0):
+    """{row_id: {pos_in_bare_final: (alt_char, margin)}} for chars where PARSeq's
+    top-1/top-2 log-prob gap is below threshold (CPU, ~5s for 200 lines)."""
+    if not ocr_dir or not ocr_stem:
+        return {}
+    import numpy as np
+    sensitivity = load_module('ocr_sensitivity_pr', ROOT / 'ocr-sensitivity.py')
+    models = sensitivity.recognizers('cpu')
+    IGNORE = set(' 　"<>-―ー・、。「」『』（）()')
+    by_page = {}
+    for row in picked:
+        by_page.setdefault(int(row['page']), []).append(row)
+    result = {}
+    document = pypdfium2.PdfDocument(str(pdf_path))
+    for page, rows in sorted(by_page.items()):
+        xml = ocr_dir / f'{ocr_stem}_{page:05}.xml'
+        if not xml.exists():
+            continue
+        xml_lines = sensitivity.load_lines(xml)
+        pimg = np.array(document[page - 1].render(scale=300 / 72).to_pil().convert('RGB'))
+        for row in rows:
+            lid = int(row['line_id'])
+            if lid >= len(xml_lines):
+                continue
+            line = xml_lines[lid]
+            tight = sensitivity.crop(pimg, line['x'], line['y'], line['w'], line['h'])
+            if not tight.size:
+                continue
+            padded = sensitivity.pad_to_width(tight, tight.shape[1] + 30) if line['h'] > line['w'] and line['h'] >= 400 else tight
+            cnt = line['count']
+            model = models[0] if cnt <= 30 else (models[1] if cnt <= 50 else models[2])
+            logits = model.session.run(model.output_names, {model.input_names[0]: model.preprocess(padded)})[0][0]
+            indices = logits.argmax(axis=1)
+            stop = np.where(indices == 0)[0]
+            n = int(stop[0]) if stop.size else len(indices)
+            if n == 0:
+                continue
+            logp = logits[:n] - np.logaddexp.reduce(logits[:n], axis=1, keepdims=True)
+            part = np.argpartition(logp, -2, axis=1)[:, -2:]
+            read_chars, raw_low = [], {}
+            for pos in range(n):
+                c1, c2 = int(part[pos, 0]), int(part[pos, 1])
+                if logp[pos, c2] > logp[pos, c1]:
+                    c1, c2 = c2, c1
+                if c1 == 0:
+                    continue
+                ch1 = model.charlist[c1 - 1]
+                idx_r = len(read_chars)
+                read_chars.append(ch1)
+                if c2 > 0:
+                    ch2 = model.charlist[c2 - 1]
+                    m = float(logp[pos, c1] - logp[pos, c2])
+                    if m < threshold and ch1 not in IGNORE and ch2 not in IGNORE:
+                        raw_low[idx_r] = (ch2, m)
+            if not raw_low:
+                continue
+            read_bare = bare(''.join(read_chars))
+            # Map non-space positions from read_chars to read_bare, then align to bare(final)
+            nonspace = {}
+            bidx = 0
+            for idx_r, ch in enumerate(read_chars):
+                if not ch.isspace():
+                    if idx_r in raw_low:
+                        nonspace[bidx] = raw_low[idx_r]
+                    bidx += 1
+            final_bare = bare(row['final'])
+            mapped = {}
+            for a, b, size in difflib.SequenceMatcher(None, read_bare, final_bare, autojunk=False).get_matching_blocks():
+                for k in range(size):
+                    if a + k in nonspace:
+                        mapped[b + k] = nonspace[a + k]
+            if mapped:
+                result[row['id']] = mapped
+    document.close()
+    return result
 
 
 def sample(args):
@@ -132,6 +225,7 @@ def build(args):
             images / f'{n}.jpg', quality=88)
     document.close()
 
+    low_maps = low_margin_positions(args.pdf, args.ocr_dir, args.ocr_stem, picked)
     human = {r['id']: r for r in read_tsv(args.human)}
     items, sections = [], []
     for n, row in enumerate(picked):
@@ -143,7 +237,8 @@ def build(args):
                 candidates.setdefault(text, []).append(stage)
         columns = []
         for k, (text, sources) in enumerate(candidates.items()):
-            body = marked(text, bare(row['raw']), 'chg') if k == 0 else marked(text, final, 'diff')
+            body = (marked(text, bare(row['raw']), 'chg', low_maps.get(row['id']))
+                    if k == 0 else marked(text, final, 'diff'))
             columns.append(f'<button class="cand" data-n="{n}" data-k="{k}"><span class="v">{body}</span></button>')
         items.append({'id': row['id'], 'page': int(row['page']), 'line_id': int(row['line_id']),
                       'cands': [[t, ','.join(s)] for t, s in candidates.items()],
@@ -216,7 +311,7 @@ section{{display:flex;gap:10px;align-items:flex-start;border-top:2px solid #999;
 .cand{{writing-mode:vertical-rl;font:{font}px/1 "Noto Serif CJK JP","Noto Serif JP",serif;padding:4px 6px;
   background:#fff;border:2px solid #ccc;border-radius:6px;cursor:pointer;flex:none;text-align:start}}
 .cand:hover{{border-color:#36c}} .cand.on{{border-color:#1a7f37;background:#e6f4ea}}
-.diff{{color:#c00;background:#fde2e2}} .chg{{background:#dbe9ff}}
+.diff{{color:#c00;background:#fde2e2}} .chg{{background:#dbe9ff}} .low{{text-decoration:underline dotted #d97706 2px;text-underline-offset:3px}}
 .more{{display:flex;flex-direction:column;gap:.5em}} .more input{{font-size:{font}px;width:24em}}
 .on.other,.on.skip{{background:#e6f4ea;border-color:#1a7f37}}
 section.done .head{{color:#1a7f37}} section.skipped .head{{color:#999}}
@@ -225,7 +320,7 @@ section.done .head{{color:#1a7f37}} section.skipped .head{{color:#999}}
 </style>
 <h1>{title}</h1>
 <p>本文から無作為に選んだ{count}行（本文の行 {eligible} から、乱数の種 {seed}）。左が原本の行の画像で、右に読みの候補を縦書きで並べた（文字の大きさを画像にそろえてある）。
-<b>原本と1字残らず同じ候補をクリック</b>すると、次の行へ進む。<span class="chg">青</span>は完成版がNDLの生の読みから直した字、<span class="diff">赤</span>はほかの候補が完成版と違う字。
+<b>原本と1字残らず同じ候補をクリック</b>すると、次の行へ進む。<span class="chg">青</span>は完成版がNDLの生の読みから直した字、<span class="diff">赤</span>はほかの候補が完成版と違う字、<span class="low">橙の点線</span>は認識モデルが迷った字（見落とし注意。マウスを乗せると次候補が出る）。
 どれも違えば「どれも違う」で正しい行を書く（Enterで確定）。行の切り出しがおかしいときは「除外」。ルビ、空白、行をまたぐ語は気にしなくていい（空白は数えない）。</p>
 <p>終わったら下の「保存コマンドをコピー」を押して端末に貼る（{human} に保存される）。選択はこのブラウザにも一時保存される。キー: n で次の未確認、p で前。</p>
 {sections}

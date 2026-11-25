@@ -37,29 +37,32 @@ def fix_brackets(text):
 
 
 def fix_quotes(texts):
-    """Turn ASCII double quotes in one page's vertical lines into 〝〟.
+    """Turn ASCII/curly double quotes in vertical lines into 〝〟.
 
     texts are in reading order. Quote marks, including 〝〟 that OCR already got
-    right, must alternate open/close; a page whose marks do not pair up (odd
-    count, or a 〝 or 〟 out of turn) is returned unchanged. Returns the texts and
-    the number of quotes replaced (None when the page was left alone).
+    right, must alternate open/close; texts whose marks do not pair up (odd
+    count, or a directional quote out of turn) are returned unchanged. Returns
+    the texts and the number of quotes replaced (None when left alone).
     """
-    marks = [ch for text in texts for ch in text if ch in '"〝〟']
-    if '"' not in marks:
+    OPEN_OK = {'"', '“', '〝'}
+    CLOSE_OK = {'"', '”', '〟'}
+    ALL_QUOTES = OPEN_OK | CLOSE_OK
+    marks = [ch for text in texts for ch in text if ch in ALL_QUOTES]
+    if not any(ch in '"“”' for ch in marks):
         return texts, 0
-    if len(marks) % 2 or any(ch != '"' and ch != '〝〟'[i % 2] for i, ch in enumerate(marks)):
+    if len(marks) % 2 or any(ch not in (CLOSE_OK if i % 2 else OPEN_OK) for i, ch in enumerate(marks)):
         return texts, None
     index = 0
     result = []
     for text in texts:
         chars = []
         for ch in text:
-            if ch in '"〝〟':
+            if ch in ALL_QUOTES:
                 ch = '〝〟'[index % 2]
                 index += 1
             chars.append(ch)
         result.append(''.join(chars))
-    return result, marks.count('"')
+    return result, sum(ch in '"“”' for ch in marks)
 
 
 VOICING = str.maketrans('バビブベボパピプペポ', 'パピプペポバビブベボ')
