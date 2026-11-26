@@ -14,6 +14,11 @@ WORK=$DATA_ROOT/work/searchable/$SLUG
 EPUB_WORK=$DATA_ROOT/work/epub/$SLUG
 OUT=$DATA_ROOT/output/epub
 JAR=$DATA_ROOT/vendor/AozoraEpub3/AozoraEpub3.jar
+# AozoraEpub3.jar needs Java 21+ (class file 65); the system default may be older.
+if [ -z "${JAVA:-}" ]; then
+  JAVA=java
+  [ -x /usr/lib/jvm/java-21-openjdk/bin/java ] && JAVA=/usr/lib/jvm/java-21-openjdk/bin/java
+fi
 
 [ -e "$WORK/lines.tsv" ] || { echo "missing $WORK/lines.tsv" >&2; exit 1; }
 [ -e "$JAR" ] || { echo "missing $JAR" >&2; exit 1; }
@@ -43,6 +48,6 @@ echo "[$(date +%T)] build aozora text: $TITLE"
 echo "[$(date +%T)] run AozoraEpub3"
 (
   cd "$DATA_ROOT/vendor/AozoraEpub3"
-  java -cp AozoraEpub3.jar AozoraEpub3 -enc UTF-8 -c "$COVER" -of -d "$OUT" "$TXT"
+  "$JAVA" -cp AozoraEpub3.jar AozoraEpub3 -enc UTF-8 -c "$COVER" -of -d "$OUT" "$TXT"
 )
 echo "[$(date +%T)] done: $OUT/$TITLE.epub"

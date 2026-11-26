@@ -564,6 +564,10 @@
    - `build-aozora-text.py` で行またぎ略語空白（`Ｎ ＡＳＡ` 等）を解消し、本文 `《》｜` のエスケープ、ルビ・注記の保護、型番コード（`MB-3076/K2/E`→`ＭＢ—３０７６／Ｋ２／Ｅ` 等）の全角正立化、アンカー部分列による章番号補正、括弧の開き・閉じ不一致チェッカーを追加。
    - `judge-ocr-disagreements.py` で `margin-outlier` を `margin14 == margin20 != margin30` に緩和し YomiToku の `unpaired`/`misaligned` 行も対象化（`rare earth clement`→`element` を自動修正）。あわせて縦書き行頭の縦中横箇条書き記号（`(1)` `(a)` `(b)` 等）を 3 倍拡大してローカル VLM（`gemma-4-12B`）で読み直す `tcy-marker` を追加（p.147〜149 の 12/12 件を完全正解）。
    - `extract-ruby.py` で LLM 用スニペットへルビ物理位置の `⟦⟧` マーカーを導入し、『ガニメデの優しい巨人』の ePub 3（454 ルビ、親文字ひらがな混入 3 件のみ）とルビ検算レビュー（87 件）を生成した。
+6. **『巨人たちの星』ePub 化（2026-11-26）：**
+   - `bin/build-epub.sh 0101-20150604091458299_check.pdf kyojin-tachi-no-hoshi --end-page 471` で `output/epub/巨人たちの星 - ジェイムズ・P・ホーガン.epub` を生成した。終わりのページを指定しないと、473ページの奥付と474〜482ページの出版社の広告目録まで本文に入り、括弧不一致が226件出た。471ページ（訳者あとがきの終わり）までに絞ると6件になった。
+   - 見出しはプロローグ・1〜40章・エピローグ・訳者あとがきの43件で、章番号の補正は22か所。NDL がルビ領域を検出したのは25ページ・63区画だけで、ルビは54か所。ルビ検算レビュー（`review/kyojin-tachi-no-hoshi-ruby/index.html`）は13件で、人の確認はまだ。
+   - システムの既定 Java が 11 だと AozoraEpub3.jar（class file 65）が動かないので、`build-epub.sh` で `/usr/lib/jvm/java-21-openjdk/bin/java` があれば使うようにした（`JAVA` で上書きできる）。
 
 ## 次の作業
 
