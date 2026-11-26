@@ -85,11 +85,14 @@ def format_vertical_text(text):
 
 
 def repair_chapter_numbers(texts):
-    """Repair misread numeric chapter headings without overwriting valid ones when a heading is missed.
+    """Repair misread numeric chapter headings without overwriting valid ones when headings are missed.
 
-    Finds the longest anchor subsequence of parsed numbers where val[j] - val[i] >= j - i,
-    keeps every anchor's value (normalizing format like '3.' -> '3'), and fills non-anchors
-    only where surrounding anchors determine the value uniquely (or before/after end anchors).
+    Finds the longest anchor subsequence of parsed numbers where
+    j - i <= val[j] - val[i] <= j - i + 3 (allowing up to 3 skipped chapters between anchors),
+    keeps every anchor's value (normalizing format like '3.' -> '3'), fills strictly between
+    anchors only when the gap matches the index distance uniquely, and fills before/after end
+    anchors only for values not part of an independent consecutive run (e.g. '8,9,10' or a
+    part-reset '1,2,3').
     """
     n = len(texts)
     if n < 3:
@@ -98,7 +101,7 @@ def repair_chapter_numbers(texts):
     for t in texts:
         m = re.fullmatch(r'([0-9０-９]+)[.・]?', t)
         parsed.append(int(m.group(1)) if m else None)
-    # Longest valid anchor chain: val[j] - val[i] >= j - i (allows skipped chapters, rejects out-of-order/spikes)
+    # Longest valid anchor chain: j - i <= val[j] - val[i] <= j - i + 3
     dp = [1 if v is not None else 0 for v in parsed]
     prev = [-1] * n
     for j in range(n):
@@ -118,12 +121,23 @@ def repair_chapter_numbers(texts):
         cur = prev[cur]
     anchors.reverse()
 
+    def in_consecutive_run(pos):
+        v = parsed[pos]
+        if v is None:
+            return False
+        left_ok = pos > 0 and parsed[pos - 1] is not None and v == parsed[pos - 1] + 1
+        right_ok = pos + 1 < n and parsed[pos + 1] is not None and parsed[pos + 1] == v + 1
+        return left_ok or right_ok
+
     out = list(texts)
     for pos in anchors:
         out[pos] = str(parsed[pos])
-    # Fill before first anchor
+    # Fill before first anchor (preserve independent consecutive runs)
     first = anchors[0]
     for pos in range(first):
+        if in_consecutive_run(pos):
+            out[pos] = str(parsed[pos])
+            continue
         expected = parsed[first] - (first - pos)
         if expected >= 1:
             out[pos] = str(expected)
@@ -132,9 +146,12 @@ def repair_chapter_numbers(texts):
         if parsed[b] - parsed[a] == b - a:
             for pos in range(a + 1, b):
                 out[pos] = str(parsed[a] + (pos - a))
-    # Fill after last anchor
+    # Fill after last anchor (preserve independent consecutive runs)
     last = anchors[-1]
     for pos in range(last + 1, n):
+        if in_consecutive_run(pos):
+            out[pos] = str(parsed[pos])
+            continue
         out[pos] = str(parsed[last] + (pos - last))
 
     repaired = [(pos, texts[pos], out[pos]) for pos in range(n) if out[pos] != texts[pos]]
