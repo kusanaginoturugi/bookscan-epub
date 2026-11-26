@@ -925,10 +925,11 @@ def main():
             text = line['text']
             if index in by_idx:
                 _, _, found = line_hunks[by_idx[index]]
+                end_tcy = len(frm) + len(text[len(frm):]) - len(text[len(frm):].lstrip())
                 kept = []
                 for h in found:
                     s, e, f, t, _ = h
-                    if s < len(frm) and 0 < e:
+                    if s <= end_tcy:
                         left, right = text[max(0, s - CONTEXT):s], text[e:e + CONTEXT]
                         tcy_replaced_ids.add(f'{line["page"]}:{line["line_id"]}:{left}[{f}→{t}]{right}')
                     else:

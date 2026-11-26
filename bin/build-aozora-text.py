@@ -79,7 +79,7 @@ def _format_vertical_segment(text):
         if re.search(r'[A-Z]', tok) and re.search(r'[0-9/\-]', tok):
             return tok.translate(fw_code)
         return tok
-    text = re.sub(r'(?<![A-Za-z0-9])([A-Z0-9]+(?:[/-][A-Z0-9]+)*)(?![A-Za-z0-9])', _code_to_fw, text)
+    text = re.sub(r'(?<![0-9A-Za-z.\-])([A-Z0-9]+(?:[/-][A-Z0-9]+)*)(?![0-9A-Za-z]|[.\-][0-9A-Za-z])', _code_to_fw, text)
     # Standalone 2-digit numbers -> explicit tcy (合字).
     text = re.sub(r'(?<![0-9A-Za-z.\-])([0-9]{2})(?![0-9A-Za-z.\-])', r'\1［＃「\1」は縦中横］', text)
     # Full-width single-digit numbers when standalone in Japanese context.
