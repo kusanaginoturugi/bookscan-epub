@@ -32,7 +32,8 @@ PROMPT = """日本語の縦書き小説の本文の一部と、そこに振ら�
 本文スニペットの中で、このルビが振られている正確な「親文字」と「正しいルビ」を判定してください。
 
 ルール:
-- 親文字は本文スニペットに含まれる連続した部分文字列をそのまま抜き出す。
+- 本文スニペットの【…】はルビの縦方向の位置から推定したおおよその該当範囲（1文字ほど前後する場合あり）。出力の親文字には【】を含めない。
+- 親文字は本文スニペット（【】を除いた本文）に含まれる連続した部分文字列をそのまま抜き出す。
 - 送り仮名や、ルビが掛かっていない隣の漢字・助詞は親文字に含めない（例: 「瞬き」に「まばた」なら 瞬\tまばた、「微かな」に「かす」なら 微\tかす、「装置を潜り抜」に「くぐ」なら 潜\tくぐ、「粘り強く」に「ねば」なら 粘\tねば、「機を窺い」に「うかが」なら 窺\tうかが）。
 - カタカナの当て字ルビ（例: 「手袋」に「ガントレツト」、「背嚢」に「バツクパツク」）はカタカナのまま残す（小書きカナは大きいカナのままでよい）。
 - ルビOCRがゴミや汚れで本文と無関係なら NONE とだけ答える。
@@ -98,6 +99,8 @@ def clean_pair(ans, snippet):
     if not ans or ans.upper().startswith('NONE') or '\t' not in ans:
         return '', ''
     base, ruby = (p.strip() for p in ans.split('\t', 1))
+    if '【' not in snippet and '】' not in snippet:
+        base = base.replace('【', '').replace('】', '')
     if not base or not ruby or base not in snippet:
         return '', ''
     # Ruby must consist only of kana / prolonged sound / middle dot (no kanji or digits)
@@ -123,6 +126,19 @@ def clean_pair(ans, snippet):
     if base == ruby:
         return '', ''
     return base, ruby
+
+
+def mark_snippet(ftext, char_pos, est_chars):
+    """Build plain snippet (for TSV/validation) and position-marked snippet (for LLM prompt)."""
+    m0 = max(0, min(len(ftext) - 1, char_pos))
+    m1 = max(m0 + 1, min(len(ftext), m0 + max(1, est_chars)))
+    i0 = max(0, m0 - 2)
+    i1 = min(len(ftext), m1 + 2)
+    snippet = ftext[i0:i1]
+    if '【' in snippet or '】' in snippet:
+        return snippet, snippet
+    r0, r1 = m0 - i0, m1 - i0
+    return snippet, snippet[:r0] + '【' + snippet[r0:r1] + '】' + snippet[r1:]
 
 
 def main():
@@ -208,14 +224,13 @@ def main():
                 per = ln['h'] / max(len(ftext), 1)
                 est_chars = max(1, round((sub_y1 - sub_y0) / per))
                 char_pos = max(0, int((sub_y0 - ln['y']) / per))
-                i0 = max(0, char_pos - 2)
-                i1 = min(len(ftext), int((sub_y1 - ln['y']) / per) + 3)
-                snippet = ftext[i0:i1]
+                snippet, marked_snippet = mark_snippet(ftext, char_pos, est_chars)
                 segments.append({
                     'id': seg_id, 'page': page, 'line_id': lid,
                     'y0': sub_y0, 'y1': sub_y1, 'char_pos': char_pos,
                     'raw_ruby': raw_rb, 'snippet': snippet,
-                    'base': None, 'ruby': None, 'est_chars': est_chars,
+                    'base': None, 'ruby': None,
+                    'est_chars': est_chars, 'marked_snippet': marked_snippet,
                 })
     doc.close()
 
@@ -232,7 +247,7 @@ def main():
                 if seg['base']:
                     valid += 1
                 continue
-            ans = ask_llm(args.url, args.model, seg['snippet'], seg['raw_ruby'], seg['est_chars'])
+            ans = ask_llm(args.url, args.model, seg['marked_snippet'], seg['raw_ruby'], seg['est_chars'])
             base, ruby = clean_pair(ans, seg['snippet'])
             seg['base'], seg['ruby'] = base, ruby
             writer.writerow(seg)
