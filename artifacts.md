@@ -67,8 +67,8 @@
 
 | 種類 | ファイル | 内容 |
 |---|---|---|
-| 完成品 | [検索可能PDF](output/searchable/ガニメデの優しい巨人%20-%20ジェイムズ・P・ホーガン.pdf) | 340ページ。巻末目録（326〜335ページ）はレビューの対象外 |
-| レビュー | [パ／バ](review/ganymede-no-yasashii-kyojin-voicing/index.html)・[判断モデル](review/ganymede-no-yasashii-kyojin-judge/index.html) | パ／バ4組と自動修正1か所、判断モデルの割れた箇所をすべて確認済み |
+| 完成品 | [検索可能PDF](output/searchable/ガニメデの優しい巨人%20-%20ジェイムズ・P・ホーガン.pdf)・[ePub 3](output/epub/ガニメデの優しい巨人%20-%20ジェイムズ・P・ホーガン.epub) | 340ページ。巻末目録（326〜335ページ）はレビューの対象外。ePub 3 は青空文庫形式経由で454ルビを反映 |
+| レビュー | [パ／バ](review/ganymede-no-yasashii-kyojin-voicing/index.html)・[判断モデル](review/ganymede-no-yasashii-kyojin-judge/index.html)・[ルビ検算](review/ganymede-no-yasashii-kyojin-ruby/index.html) | パ／バ4組と自動修正1か所、判断モデルの割れた箇所をすべて確認済み。ルビ検算87件は未確認 |
 
 ## 星を継ぐもの（2026-11-12）
 

@@ -1660,7 +1660,33 @@ LLM もサイズを見ずに <code>OK</code> にしていたことが原因だ�
 <ul>
 <li><code>.gitignore</code> に <code>/.roborev/</code> を追加し、Claude
 / Codex / Gemini 向けのエージェントスキル・フックと
-<code>AGENTS.md</code> の運用メモを整備した。</li>
+<code>AGENTS.md</code> の運用メモを整備した。レビュー担当を
+<code>claude-code</code>（バックアップ
+<code>gemini</code>）に切り替え、<code>~/.gemini/config/hooks.json</code>
+に <code>Stop</code> フック（未コミット差分の自動レビュー・未解決 Fail
+の通知）を導入。</li>
+</ul></li>
+<li><strong>『星を継ぐもの』通読フィードバック反映と『ガニメデの優しい巨人』ePub
+化：</strong>
+<ul>
+<li><code>build-aozora-text.py</code>
+で行またぎ略語空白（<code>Ｎ ＡＳＡ</code> 等）を解消し、本文
+<code>《》｜</code>
+のエスケープ、ルビ・注記の保護、型番コード（<code>MB-3076/K2/E</code>→<code>ＭＢ—３０７６／Ｋ２／Ｅ</code>
+等）の全角正立化、アンカー部分列による章番号補正、括弧の開き・閉じ不一致チェッカーを追加。</li>
+<li><code>judge-ocr-disagreements.py</code> で
+<code>margin-outlier</code> を
+<code>margin14 == margin20 != margin30</code> に緩和し YomiToku の
+<code>unpaired</code>/<code>misaligned</code>
+行も対象化（<code>rare earth clement</code>→<code>element</code>
+を自動修正）。あわせて縦書き行頭の縦中横箇条書き記号（<code>(1)</code>
+<code>(a)</code> <code>(b)</code> 等）を 3 倍拡大してローカル
+VLM（<code>gemma-4-12B</code>）で読み直す <code>tcy-marker</code>
+を追加（p.147〜149 の 12/12 件を完全正解）。</li>
+<li><code>extract-ruby.py</code> で LLM 用スニペットへルビ物理位置の
+<code>⟦⟧</code> マーカーを導入し、『ガニメデの優しい巨人』の ePub 3（454
+ルビ、親文字ひらがな混入 3 件のみ）とルビ検算レビュー（87
+件）を生成した。</li>
 </ul></li>
 </ol>
 <h2 id="次の作業">次の作業</h2>

@@ -559,7 +559,11 @@
    - `bin/prepare-trial-pdf.py` で全本文ページへ背景クリーニングと外周端線マスク（左右12px・上下10px）を適用し、傾き検出の閾値を `1.35` → `1.15` に調整。
    - `bin/build-searchable-book.sh`・`bin/judge-ocr-disagreements.py` で `work/searchable/SLUG/overrides.tsv` に対応し、手動上書き行の既存人手判定が orphan エラーにならないようにした。
 4. **roborev の設定整備：**
-   - `.gitignore` に `/.roborev/` を追加し、Claude / Codex / Gemini 向けのエージェントスキル・フックと `AGENTS.md` の運用メモを整備した。
+   - `.gitignore` に `/.roborev/` を追加し、Claude / Codex / Gemini 向けのエージェントスキル・フックと `AGENTS.md` の運用メモを整備した。レビュー担当を `claude-code`（バックアップ `gemini`）に切り替え、`~/.gemini/config/hooks.json` に `Stop` フック（未コミット差分の自動レビュー・未解決 Fail の通知）を導入。
+5. **『星を継ぐもの』通読フィードバック反映と『ガニメデの優しい巨人』ePub 化：**
+   - `build-aozora-text.py` で行またぎ略語空白（`Ｎ ＡＳＡ` 等）を解消し、本文 `《》｜` のエスケープ、ルビ・注記の保護、型番コード（`MB-3076/K2/E`→`ＭＢ—３０７６／Ｋ２／Ｅ` 等）の全角正立化、アンカー部分列による章番号補正、括弧の開き・閉じ不一致チェッカーを追加。
+   - `judge-ocr-disagreements.py` で `margin-outlier` を `margin14 == margin20 != margin30` に緩和し YomiToku の `unpaired`/`misaligned` 行も対象化（`rare earth clement`→`element` を自動修正）。あわせて縦書き行頭の縦中横箇条書き記号（`(1)` `(a)` `(b)` 等）を 3 倍拡大してローカル VLM（`gemma-4-12B`）で読み直す `tcy-marker` を追加（p.147〜149 の 12/12 件を完全正解）。
+   - `extract-ruby.py` で LLM 用スニペットへルビ物理位置の `⟦⟧` マーカーを導入し、『ガニメデの優しい巨人』の ePub 3（454 ルビ、親文字ひらがな混入 3 件のみ）とルビ検算レビュー（87 件）を生成した。
 
 ## 次の作業
 
