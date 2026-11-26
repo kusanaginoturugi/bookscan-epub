@@ -238,7 +238,7 @@ CORRECTIONS=
 if [ "$USE_JUDGE" = on ] && [ -z "$GLOSSARY" ]; then
   CORRECTIONS=$WORK/judge/corrections.tsv
   # Rule versions: a new rule reruns both judge steps.
-  JUDGE_RULES=skip-catalog,line-joins,joined-voicing,lookalike,propagate,book-word,save-path,paired-bracket,edge-v1,bracket-swap,forms2,bracket-marks,save-cmd,word-verdicts,book-ratio,book-ratio-rev,start-bracket,diacritic-margin,missing-marks,crop-split,crop-bracket2,margin-outlier
+  JUDGE_RULES=skip-catalog,line-joins,joined-voicing,lookalike,propagate,book-word,save-path,paired-bracket,edge-v1,bracket-swap,forms2,bracket-marks,save-cmd,word-verdicts,book-ratio,book-ratio-rev,start-bracket,diacritic-margin,missing-marks,crop-split,crop-bracket2,margin-outlier,book-ratio-twice,margin-outlier-overlap
   OVR_ARGS=
   [ ! -e "$WORK/overrides.tsv" ] || OVR_ARGS="--overrides $WORK/overrides.tsv"
   KEY=$(inputs_key "$VOICING_GLOSSARY" "$WORK/voicing-corrections.tsv" "$WORK/vocabulary.tsv" "$WORK/judge-human.tsv" "$WORK/overrides.tsv" "$WORK/margin.tsv" "$WORK/stages" "$WORK/skip-pages.txt" $SERIES_HUMAN)$JUDGE_RULES
@@ -323,7 +323,7 @@ fi
 # the page is redrawn when the text changes. A saved WORK/proofread-human.tsv
 # is scored for every stage, with and without human input.
 PROOF=$REVIEW-proofread
-KEY=$(inputs_key "$WORK/lines.tsv" "$WORK/proofread-human.tsv" "$M/lines.tsv")proofread,low-margin
+KEY=$(inputs_key "$WORK/lines.tsv" "$WORK/proofread-human.tsv" "$M/lines.tsv")proofread,low-margin,low-margin-cascade
 if [ -z "$GLOSSARY" ] && { [ ! -e "$PROOF/index.html" ] || [ "$(cat "$WORK/proofread.key" 2>/dev/null)" != "$KEY" ]; }; then
   echo "[$(date +%T)] proofreading sample"
   set -- --human "$WORK/proofread-human.tsv" --ocr-dir "$WORK/ocr" --ocr-stem "$OCR_STEM"
