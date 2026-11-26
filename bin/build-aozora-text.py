@@ -11,7 +11,6 @@ import csv
 import re
 import statistics
 import sys
-from collections import Counter
 from pathlib import Path
 
 import pypdfium2
@@ -83,6 +82,63 @@ def format_vertical_text(text):
     """Format body text while protecting Aozora ruby and annotation tags."""
     parts = PROTECT_RE.split(text)
     return ''.join(part if i % 2 else _format_vertical_segment(part) for i, part in enumerate(parts))
+
+
+def repair_chapter_numbers(texts):
+    """Repair misread numeric chapter headings without overwriting valid ones when a heading is missed.
+
+    Finds the longest anchor subsequence of parsed numbers where val[j] - val[i] >= j - i,
+    keeps every anchor's value (normalizing format like '3.' -> '3'), and fills non-anchors
+    only where surrounding anchors determine the value uniquely (or before/after end anchors).
+    """
+    n = len(texts)
+    if n < 3:
+        return list(texts), []
+    parsed = []
+    for t in texts:
+        m = re.fullmatch(r'([0-9０-９]+)[.・]?', t)
+        parsed.append(int(m.group(1)) if m else None)
+    # Longest valid anchor chain: val[j] - val[i] >= j - i (allows skipped chapters, rejects out-of-order/spikes)
+    dp = [1 if v is not None else 0 for v in parsed]
+    prev = [-1] * n
+    for j in range(n):
+        if parsed[j] is None:
+            continue
+        for i in range(j):
+            if parsed[i] is not None and (j - i) <= parsed[j] - parsed[i] <= (j - i) + 3 and dp[i] + 1 > dp[j]:
+                dp[j] = dp[i] + 1
+                prev[j] = i
+    best_end = max(range(n), key=lambda i: (dp[i], -i))
+    if dp[best_end] < 2:
+        return list(texts), []
+    anchors = []
+    cur = best_end
+    while cur != -1:
+        anchors.append(cur)
+        cur = prev[cur]
+    anchors.reverse()
+
+    out = list(texts)
+    for pos in anchors:
+        out[pos] = str(parsed[pos])
+    # Fill before first anchor
+    first = anchors[0]
+    for pos in range(first):
+        expected = parsed[first] - (first - pos)
+        if expected >= 1:
+            out[pos] = str(expected)
+    # Fill strictly between adjacent anchors only when gap matches index distance uniquely
+    for a, b in zip(anchors, anchors[1:]):
+        if parsed[b] - parsed[a] == b - a:
+            for pos in range(a + 1, b):
+                out[pos] = str(parsed[a] + (pos - a))
+    # Fill after last anchor
+    last = anchors[-1]
+    for pos in range(last + 1, n):
+        out[pos] = str(parsed[last] + (pos - last))
+
+    repaired = [(pos, texts[pos], out[pos]) for pos in range(n) if out[pos] != texts[pos]]
+    return out, repaired
 
 
 def is_chapter_heading(line, med_y0, med_dx, dx_before, dx_after, is_first_on_page, is_last_on_page):
@@ -324,36 +380,14 @@ def main():
 
     # Repair sequential numeric chapter headings (e.g. '11','22','3.','11','5.','66','7.','80','9.','10'..'24')
     if len(chapter_num_indices) >= 3:
-        offsets = Counter()
-        parsed_vals = {}
-        for pos, idx in enumerate(chapter_num_indices):
-            old = stream[idx]['text']
-            m = re.fullmatch(r'([0-9０-９]+)[.・]?', old)
-            if m:
-                val = int(m.group(1))
-                parsed_vals[idx] = val
-                if val - pos >= 1:
-                    offsets[val - pos] += 1
-        top = offsets.most_common(1)
-        start_num = top[0][0] if (top and top[0][1] >= 2) else 1
-        repaired = []
-        val_diff = 0
-        for pos, idx in enumerate(chapter_num_indices):
-            old = stream[idx]['text']
-            expected = start_num + pos
-            new = str(expected)
-            if old != new:
-                repaired.append((idx, old, new))
-            if parsed_vals.get(idx) != expected:
-                val_diff += 1
-        if val_diff <= len(chapter_num_indices) / 2:
-            for idx, old, new in repaired:
-                stream[idx]['text'] = new
-            if repaired:
-                print(f'repaired chapter numbers ({len(repaired)}): ' +
-                      ', '.join(f'p.{stream[idx]["page"]}: {old}->{new}' for idx, old, new in repaired))
-        else:
-            print(f'warning: skipped chapter number repair ({val_diff}/{len(chapter_num_indices)} value mismatches from start={start_num})')
+        orig_nums = [stream[idx]['text'] for idx in chapter_num_indices]
+        fixed_nums, repaired = repair_chapter_numbers(orig_nums)
+        for idx, new in zip(chapter_num_indices, fixed_nums):
+            stream[idx]['text'] = new
+        if repaired:
+            print(f'repaired chapter numbers ({len(repaired)}): ' +
+                  ', '.join(f'p.{stream[chapter_num_indices[pos]]["page"]}: {old}->{new}'
+                            for pos, old, new in repaired))
 
     # Second pass: assemble paragraphs
     out_lines = [title, author_line, '', '']
