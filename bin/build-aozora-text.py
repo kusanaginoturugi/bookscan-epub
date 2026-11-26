@@ -325,27 +325,35 @@ def main():
     # Repair sequential numeric chapter headings (e.g. '11','22','3.','11','5.','66','7.','80','9.','10'..'24')
     if len(chapter_num_indices) >= 3:
         offsets = Counter()
+        parsed_vals = {}
         for pos, idx in enumerate(chapter_num_indices):
             old = stream[idx]['text']
-            if re.fullmatch(r'[0-9０-９]+', old):
-                val = int(old)
+            m = re.fullmatch(r'([0-9０-９]+)[.・]?', old)
+            if m:
+                val = int(m.group(1))
+                parsed_vals[idx] = val
                 if val - pos >= 1:
                     offsets[val - pos] += 1
-        start_num = offsets.most_common(1)[0][0] if offsets else 1
+        top = offsets.most_common(1)
+        start_num = top[0][0] if (top and top[0][1] >= 2) else 1
         repaired = []
+        val_diff = 0
         for pos, idx in enumerate(chapter_num_indices):
             old = stream[idx]['text']
-            new = str(start_num + pos)
+            expected = start_num + pos
+            new = str(expected)
             if old != new:
                 repaired.append((idx, old, new))
-        if len(repaired) <= len(chapter_num_indices) / 2:
+            if parsed_vals.get(idx) != expected:
+                val_diff += 1
+        if val_diff <= len(chapter_num_indices) / 2:
             for idx, old, new in repaired:
                 stream[idx]['text'] = new
             if repaired:
                 print(f'repaired chapter numbers ({len(repaired)}): ' +
                       ', '.join(f'p.{stream[idx]["page"]}: {old}->{new}' for idx, old, new in repaired))
         else:
-            print(f'warning: skipped chapter number repair ({len(repaired)}/{len(chapter_num_indices)} differed from start={start_num})')
+            print(f'warning: skipped chapter number repair ({val_diff}/{len(chapter_num_indices)} value mismatches from start={start_num})')
 
     # Second pass: assemble paragraphs
     out_lines = [title, author_line, '', '']
@@ -409,8 +417,11 @@ def main():
             buf_indent = item['vertical'] and (not starts_bracket)
             buf = t
         else:
-            # Join with previous line; only insert space when a lowercase Latin word continues into a Latin word
-            if buf and re.search(r'[a-z][A-Za-z]*$', buf) and raw_first.isascii() and raw_first.isalpha():
+            # Join with previous line; preserve space between Latin words/digits except split acronyms or split numbers
+            both_alnum = bool(buf and buf[-1].isascii() and buf[-1].isalnum() and raw_first.isascii() and raw_first.isalnum())
+            split_acronym = bool(re.search(r'(?<![a-z])[A-Z]+$', buf) and 'A' <= raw_first <= 'Z')
+            split_number = bool(buf and buf[-1].isdigit() and raw_first.isdigit())
+            if both_alnum and not split_acronym and not split_number:
                 buf += ' ' + t
             else:
                 buf += t
