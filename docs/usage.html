@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="ja" xml:lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc 3.11" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>使用の手引き</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      white-space: pre-wrap;
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: 1.5em;}
+    div.column{flex: auto;}
+    @media screen {
+    div.columns{gap: min(4vw, 1.5em);}
+    div.column{overflow-x: auto;}
+    }
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    /* CSS for syntax highlighting */
+    html { -webkit-text-size-adjust: 100%; }
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {   }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #7d9029; } /* Attribute */
+    code span.bn { color: #40a070; } /* BaseN */
+    code span.bu { color: #008000; } /* BuiltIn */
+    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4070a0; } /* Char */
+    code span.cn { color: #880000; } /* Constant */
+    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code span.dt { color: #902000; } /* DataType */
+    code span.dv { color: #40a070; } /* DecVal */
+    code span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #40a070; } /* Float */
+    code span.fu { color: #06287e; } /* Function */
+    code span.im { color: #008000; font-weight: bold; } /* Import */
+    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code span.op { color: #666666; } /* Operator */
+    code span.ot { color: #007020; } /* Other */
+    code span.pp { color: #bc7a00; } /* Preprocessor */
+    code span.sc { color: #4070a0; } /* SpecialChar */
+    code span.ss { color: #bb6688; } /* SpecialString */
+    code span.st { color: #4070a0; } /* String */
+    code span.va { color: #19177c; } /* Variable */
+    code span.vs { color: #4070a0; } /* VerbatimString */
+    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+  </style>
+</head>
+<body>
+<nav id="TOC" role="doc-toc">
+<ul>
+<li><a href="#使用の手引き" id="toc-使用の手引き">使用の手引き</a>
+<ul>
+<li><a href="#全体の流れ" id="toc-全体の流れ">全体の流れ</a></li>
+<li><a href="#準備" id="toc-準備">準備</a></li>
+<li><a href="#検索可能pdfを作る" id="toc-検索可能pdfを作る">1.
+検索可能PDFを作る</a>
+<ul>
+<li><a href="#レビューして再実行する"
+id="toc-レビューして再実行する">レビューして再実行する</a></li>
+<li><a href="#作業ディレクトリに置く補正ファイル"
+id="toc-作業ディレクトリに置く補正ファイル">作業ディレクトリに置く補正ファイル</a></li>
+<li><a href="#抜き取り検査精度の見積もり"
+id="toc-抜き取り検査精度の見積もり">抜き取り検査（精度の見積もり）</a></li>
+</ul></li>
+<li><a href="#epub-を作る" id="toc-epub-を作る">2. ePub を作る</a>
+<ul>
+<li><a href="#括弧不一致を確認する"
+id="toc-括弧不一致を確認する">括弧不一致を確認する</a></li>
+<li><a href="#ルビ検算レビュー"
+id="toc-ルビ検算レビュー">ルビ検算レビュー</a></li>
+</ul></li>
+<li><a href="#本文の-llm-監査任意" id="toc-本文の-llm-監査任意">3.
+本文の LLM 監査（任意）</a></li>
+<li><a href="#文書を更新する" id="toc-文書を更新する">4.
+文書を更新する</a></li>
+<li><a href="#困ったとき" id="toc-困ったとき">困ったとき</a></li>
+</ul></li>
+</ul>
+</nav>
+<h1 id="使用の手引き">使用の手引き</h1>
+<p>1冊を「検索可能PDF」と「ePub」にするまでの操作を、作業の順にまとめる。各段の考え方と検証の経緯は
+<a href="../README.html">README</a> と <a
+href="progress.html">作業記録</a>
+にある。ここでは、何を実行し、どこに何を保存し、いつ作り直すかだけを書く。</p>
+<h2 id="全体の流れ">全体の流れ</h2>
+<pre class="text"><code>原本PDF ─ build-searchable-book.sh ─┬─ 検索可能PDF（output/searchable/）
+                                    │   ↑ パ／バ・判断モデル・抜き取り検査のレビュー
+                                    │     （保存して再実行）
+                                    └─ lines.tsv ─ build-epub.sh ─ ePub（output/epub/）
+                                                      ↑ ルビ検算レビュー・括弧の確認
+                                                        （保存して再実行）</code></pre>
+<ol type="1">
+<li><code>bin/build-searchable-book.sh</code>
+で検索可能PDFを作る。出てきたレビュー画面で人が判定し、保存して同じコマンドを再実行する。要確認が0になるまで繰り返す。</li>
+<li><code>bin/build-epub.sh</code> で ePub
+を作る。ルビ検算レビューと括弧不一致の一覧を見て、直すものを保存して再実行する。</li>
+<li>本文の誤字を見つけたら <code>overrides.tsv</code> に足して、1
+から作り直す（ePub の本文は検索可能PDFの文字層から作るため）。</li>
+</ol>
+<p>作業名（SLUG）は <code>hoshi-wo-tsugu-mono</code>
+のようなローマ字の名前で、<code>work/searchable/SLUG/</code>、<code>work/epub/SLUG/</code>、<code>review/SLUG-*/</code>
+に使う。原本は <code>data/bookscan-catalog.tsv</code> の
+<code>source</code> 列のファイル名（例
+<code>0101-20150604111029956_check.pdf</code>）で指定する。</p>
+<h2 id="準備">準備</h2>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>もの</th>
+<th>置き場所・確認</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>原本PDF</td>
+<td><code>input/bookscan-downloads/</code>（<code>BOOKSCAN_PDF_DIR</code>
+で変更可）</td>
+</tr>
+<tr>
+<td>書誌</td>
+<td><code>data/bookscan-catalog.tsv</code> に
+<code>source</code>・<code>title</code>・<code>author</code>・<code>translator</code>
+がある</td>
+</tr>
+<tr>
+<td>Python</td>
+<td><code>.venv-ndl/</code>（GPUなら
+<code>onnxruntime-gpu[cuda,cudnn]</code> に入れ替える）</td>
+</tr>
+<tr>
+<td>NDLOCR-Lite</td>
+<td><code>vendor/ndlocr-lite/src</code></td>
+</tr>
+<tr>
+<td>YomiToku</td>
+<td><code>vendor/.venv-yomitoku/bin/yomitoku</code></td>
+</tr>
+<tr>
+<td>ローカルLLM</td>
+<td>llama-server（OpenAI互換）を <code>http://127.0.0.1:8080/v1</code>
+で起動しておく。既定モデルは
+gemma-4-12B（<code>LLM_URL</code>・<code>LLM_MODEL</code>
+で変更可）</td>
+</tr>
+<tr>
+<td>AozoraEpub3</td>
+<td><code>vendor/AozoraEpub3/AozoraEpub3.jar</code>。Java 21
+以上が要る（<code>/usr/lib/jvm/java-21-openjdk</code>
+があれば自動で使う。<code>JAVA</code> で変更可）</td>
+</tr>
+<tr>
+<td>文書のHTML化</td>
+<td><code>pandoc</code>、図を描くなら
+<code>mmdc</code>（mermaid-cli）</td>
+</tr>
+</tbody>
+</table>
+<p>作業ディレクトリ（<code>work/</code>）、完成品（<code>output/</code>）、レビュー画面（<code>review/</code>）は
+Git に入らない。人の判定 TSV など一部だけは <code>.gitignore</code>
+で名前を挙げて入れている。別のマシンへの持ち運びは README
+の「成果物の保管（Google Drive）」。</p>
+<h2 id="検索可能pdfを作る">1. 検索可能PDFを作る</h2>
+<div class="sourceCode" id="cb2"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="va">SOURCE</span><span class="op">=</span>0101-20150604111029956_check.pdf</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="va">NDLOCR_DEVICE</span><span class="op">=</span>cuda <span class="ex">bin/build-searchable-book.sh</span> <span class="st">&quot;</span><span class="va">$SOURCE</span><span class="st">&quot;</span> hoshi-wo-tsugu-mono</span></code></pre></div>
+<ul>
+<li>初回は OCR（NDLOCR-Lite）→ 余白つき再認識 → YomiToku → パ／バ →
+判断モデル → 文字層 → 書誌設定 → 機械処理のみの版 →
+抜き取り検査、の順に全部走る。</li>
+<li>最後にレビュー画面の場所と、まだ人が見ていない箇所の数が出る。</li>
+<li>済んだ段は飛ばす。パ／バ・判断モデル・文字層は、入力の中身が変わったときだけ作り直す。</li>
+<li>1冊は最初と同じデバイス（<code>cpu</code>/<code>cuda</code>）で通す。違うと止まる。</li>
+<li>試運転は <code>MAX_PAGES=8</code> を付ける（作業ディレクトリは
+<code>SLUG-first8</code> になる）。</li>
+</ul>
+<p>よく使う環境変数:</p>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>変数</th>
+<th>意味</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>NDLOCR_DEVICE=cuda</code></td>
+<td>OCR・再認識・YomiToku・語の切り出しを GPU で動かす（既定
+<code>cpu</code>）</td>
+</tr>
+<tr>
+<td><code>VOCAB_FROM=前作のSLUG</code></td>
+<td>同じシリーズの前作のカタカナ語を「本の中の語」の規則に足す（コンマ区切りで複数）</td>
+</tr>
+<tr>
+<td><code>SKIP_YOMITOKU=1</code> / <code>SKIP_JUDGE=1</code></td>
+<td>その段を使わない（最初の実行で決まり、あとから変えられない）</td>
+</tr>
+<tr>
+<td><code>UPGRADE=1</code></td>
+<td>古い作業ディレクトリに新しい段を通す</td>
+</tr>
+</tbody>
+</table>
+<h3 id="レビューして再実行する">レビューして再実行する</h3>
+<p>レビュー画面は Firefox
+などで直接開ける。選んだら次へ自動で進む。<code>n</code>
+で次の未確認、<code>p</code> で戻る。</p>
+<ol type="1">
+<li><strong>パ／バ</strong>（<code>review/SLUG-voicing/index.html</code>）を先に済ませる。辞書が変わると、判断モデルの差分の前後の文字も変わるため。</li>
+<li><strong>判断モデル</strong>（<code>review/SLUG-judge/index.html</code>）。LLM
+の答えが割れた差分だけが本体に並ぶ。</li>
+<li>どちらも、画面の「保存コマンドをコピー」を押して端末に貼って実行する（<code>echo '…' | base64 -d &gt; 保存先</code>
+の1行）。「TSVだけコピー」なら <code>wl-paste &gt; 保存先</code>。</li>
+<li>同じ <code>build-searchable-book.sh</code>
+のコマンドをもう一度実行する。人の判定は自動判定より常に優先される。</li>
+<li>要確認が0になったら終わり。</li>
+</ol>
+<h3
+id="作業ディレクトリに置く補正ファイル">作業ディレクトリに置く補正ファイル</h3>
+<p>すべて <code>work/searchable/SLUG/</code>
+に置く。置いたり書き換えたりしたら、<code>build-searchable-book.sh</code>
+を再実行すると反映される。</p>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>ファイル</th>
+<th>中身</th>
+<th>作り方</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>voicing-human.tsv</code></td>
+<td>パ／バの人の判定</td>
+<td>パ／バのレビュー画面から保存。前作のものを写せば判定を引き継げる</td>
+</tr>
+<tr>
+<td><code>judge-human.tsv</code></td>
+<td>判断モデルの人の判定</td>
+<td>判断モデルのレビュー画面から保存</td>
+</tr>
+<tr>
+<td><code>overrides.tsv</code></td>
+<td>行ごとの個別補正（<code>page</code>・<code>line_id</code>・<code>ocr_text</code>・<code>corrected_text</code>）</td>
+<td>手で追記するか、本文のLLM監査（後述）の画面から追記</td>
+</tr>
+<tr>
+<td><code>char-map.tsv</code></td>
+<td>本全体で置き換える字（<code>from</code>・<code>to</code>。例
+<code>掴</code>→<code>摑</code>）</td>
+<td>手で書く</td>
+</tr>
+<tr>
+<td><code>skip-pages.txt</code></td>
+<td>レビューから外すページ（例 <code>312-322</code>）</td>
+<td>手で書く。巻末の目録は自動で外れる</td>
+</tr>
+<tr>
+<td><code>proofread-human.tsv</code></td>
+<td>抜き取り検査の正解</td>
+<td>抜き取り検査の画面から保存</td>
+</tr>
+</tbody>
+</table>
+<div class="sourceCode" id="cb3"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="bu">printf</span> <span class="st">&#39;from\tto\n掴\t摑\n&#39;</span> <span class="op">&gt;</span> work/searchable/SLUG/char-map.tsv</span></code></pre></div>
+<h3 id="抜き取り検査精度の見積もり">抜き取り検査（精度の見積もり）</h3>
+<p><code>review/SLUG-proofread/index.html</code>
+で、無作為に選んだ200行を原本と照らす。原本と同じ候補をクリックし、どれも違えば書き、行の切り出しがおかしければ除外する。保存して再実行すると、段階ごとの正解率が
+<code>work/searchable/SLUG/proofread-score.txt</code> に出る。選ぶ行は
+<code>sample.tsv</code> に固定され、作り直しても変わらない。</p>
+<h2 id="epub-を作る">2. ePub を作る</h2>
+<div class="sourceCode" id="cb4"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="ex">bin/build-epub.sh</span> <span class="st">&quot;</span><span class="va">$SOURCE</span><span class="st">&quot;</span> hoshi-wo-tsugu-mono</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="co"># 巻末の奥付や広告を外すとき</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="ex">bin/build-epub.sh</span> 0101-20150604091458299_check.pdf kyojin-tachi-no-hoshi <span class="at">--end-page</span> 471</span></code></pre></div>
+<ul>
+<li>中では、ルビの抽出（<code>extract-ruby.py</code>）→
+青空文庫形式のテキスト（<code>build-aozora-text.py</code>）→ AozoraEpub3
+の順に動く。</li>
+<li>完成品は <code>output/epub/書名 - 著者.epub</code>、途中のテキストは
+<code>work/epub/SLUG/書名 - 著者.txt</code>、表紙は原本1ページ目から
+<code>cover.jpg</code> を作る。</li>
+<li>3番目以降の引数は <code>build-aozora-text.py</code>
+に渡る。<code>--start-page</code>・<code>--end-page</code>
+で本文に入れるページを絞る。奥付や出版社の広告目録が入ると、括弧不一致が大量に出る（『巨人たちの星』は
+226件 → 471ページまでに絞って6件）。</li>
+<li>ルビの抽出には、その本の NDLOCR-Lite
+の結果（<code>work/searchable/SLUG/ocr/*.xml</code>）が<strong>全ページ分</strong>要る。消えていたり一部しかなかったりすると、抽出が止まるか、そのページのルビが抜ける。ルビを作り直さずに本文だけ作り直すなら
+<code>SKIP_RUBY=1</code> を付ける（既存の <code>ruby.tsv</code>
+は使われない点に注意）。</li>
+<li><code>ruby.tsv</code>
+は箇所ごとにキャッシュされ、再実行では聞き直さない。</li>
+</ul>
+<h3 id="括弧不一致を確認する">括弧不一致を確認する</h3>
+<p><code>build-aozora-text.py</code>
+は、書き出したテキストで括弧（「」『』（）〈〉【】など）の対応が取れない行を最後に表示する。</p>
+<pre class="text"><code>L1228: unclosed 〈 | ...が引き揚げられて〈シャピアロンＶ号はもう飛び...
+L1421: mismatch close 」 (top=None) | ...　知るものかね」...</code></pre>
+<p><code>L</code> の数字はテキストファイルの行番号。原本を見て、OCR
+の誤りなら <code>overrides.tsv</code>
+に補正を足して検索可能PDFから作り直す。原本どおり（会話が段落をまたぐなど）なら、そのままでよい。</p>
+<h3 id="ルビ検算レビュー">ルビ検算レビュー</h3>
+<p>抽出したルビをローカルLLMで検算し、原本の2倍の切り出しつきで確認する画面を作る。</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="va">S</span><span class="op">=</span>hoshi-wo-tsugu-mono</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="ex">.venv-ndl/bin/python</span> bin/audit-ruby.py work/searchable/<span class="va">$S</span> work/epub/<span class="va">$S</span>/ruby.tsv <span class="dt">\</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  work/epub/<span class="va">$S</span>/ruby-audit.tsv review/<span class="va">$S</span>-ruby/index.html <span class="dt">\</span></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">--source</span> <span class="st">&quot;</span><span class="va">$SOURCE</span><span class="st">&quot;</span> <span class="at">--human</span> work/epub/<span class="va">$S</span>/ruby-human.tsv <span class="at">--title</span> <span class="st">&quot;星を継ぐもの ルビ検算&quot;</span></span></code></pre></div>
+<ul>
+<li>LLM
+が怪しいとした箇所と、親文字にひらがなが混じる・ルビの縦幅が親文字に足りないなど機械的に怪しい箇所が並ぶ。</li>
+<li>選んだら「保存コマンドをコピー」で
+<code>work/epub/SLUG/ruby-human.tsv</code>
+に保存し、<code>build-epub.sh</code>
+を再実行する（<code>ruby-human.tsv</code> があれば自動で使う）。</li>
+<li>画面だけ作り直すなら
+<code>--from-audit</code>（LLMに聞き直さない）。</li>
+</ul>
+<h2 id="本文の-llm-監査任意">3. 本文の LLM 監査（任意）</h2>
+<p>人のレビューが済んだあとも残る誤字を、ローカルLLMにページ単位で探させ、疑わしい箇所を
+VLM（画像）と <code>margin.tsv</code> の別の読みで確かめる。結果は
+<code>overrides.tsv</code> に追記する形で出る。</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="va">S</span><span class="op">=</span>hoshi-wo-tsugu-mono</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="ex">.venv-ndl/bin/python</span> bin/audit-text-llm.py input/bookscan-downloads/<span class="va">$SOURCE</span> <span class="dt">\</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>  work/searchable/<span class="va">$S</span>/lines.tsv review/<span class="va">$S</span>-llm-audit/index.html <span class="dt">\</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">--margin-tsv</span> work/searchable/<span class="va">$S</span>/margin.tsv <span class="at">--overrides</span> work/searchable/<span class="va">$S</span>/overrides.tsv</span></code></pre></div>
+<ul>
+<li><code>--pages 205-224</code>
+でページを絞れる。巻末の目録は自動で外れる（<code>--include-catalog</code>
+で含める、<code>--skip-pages</code> で追加）。</li>
+<li>結果は <code>work/searchable/SLUG/llm-audit.tsv</code>
+に残る。<code>--reuse</code> で LLM に聞かずに画面だけ作り直す。</li>
+<li>画面で採るものを選び、出てきた追記コマンドを端末で実行すると
+<code>overrides.tsv</code> に足される。そのあと
+<code>build-searchable-book.sh</code> → <code>build-epub.sh</code>
+の順に再実行する。</li>
+</ul>
+<h2 id="文書を更新する">4. 文書を更新する</h2>
+<p>README や作業記録、この手引きを書き換えたら、HTML を作り直す。</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="ex">bin/build-docs-html.sh</span></span></code></pre></div>
+<p>成果物の一覧は <code>artifacts.md</code>（→
+<code>artifacts.html</code>）。新しい本やレビュー画面を作ったら、ここに足す。</p>
+<h2 id="困ったとき">困ったとき</h2>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>症状</th>
+<th>対処</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>not in catalog: …</code></td>
+<td><code>data/bookscan-catalog.tsv</code> の <code>source</code>
+列と同じファイル名を渡す</td>
+</tr>
+<tr>
+<td><code>no LLM server at …</code></td>
+<td>llama-server を起動するか、<code>LLM_URL</code>
+を合わせる。使わないなら
+<code>SKIP_JUDGE=1</code>（最初の実行のみ）</td>
+</tr>
+<tr>
+<td><code>OCR fell back to the CPU</code></td>
+<td>GPU が使えていない。<code>.venv-ndl</code> の
+<code>onnxruntime-gpu</code> と CUDA を確認する</td>
+</tr>
+<tr>
+<td>デバイスが違うと言われて止まる</td>
+<td>作業ディレクトリの <code>device</code>
+に記録したデバイスで実行する</td>
+</tr>
+<tr>
+<td>判断モデルの段が止まる（どの差分にも当たらない人の判定）</td>
+<td>パ／バの辞書が変わって前後の文字がずれた。判断モデルの画面を作り直して判定し直す</td>
+</tr>
+<tr>
+<td><code>build-epub.sh</code> が <code>extract-ruby.py</code> の
+<code>IndexError</code> で止まる</td>
+<td><code>work/searchable/SLUG/ocr/</code> が空。OCR
+をやり直すか、<code>SKIP_RUBY=1</code> で本文だけ作る</td>
+</tr>
+<tr>
+<td>AozoraEpub3 が <code>UnsupportedClassVersionError</code></td>
+<td>Java 21 以上を <code>JAVA=…/bin/java</code> で指定する</td>
+</tr>
+<tr>
+<td>括弧不一致が数百件出る</td>
+<td>奥付や広告ページが本文に入っている。<code>--end-page</code>
+で絞る</td>
+</tr>
+</tbody>
+</table>
+</body>
+</html>

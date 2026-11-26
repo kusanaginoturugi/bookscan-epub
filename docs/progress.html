@@ -1688,6 +1688,18 @@ VLM（<code>gemma-4-12B</code>）で読み直す <code>tcy-marker</code>
 ルビ、親文字ひらがな混入 3 件のみ）とルビ検算レビュー（87
 件）を生成した。</li>
 </ul></li>
+<li><strong>『巨人たちの星』ePub 化（2026-11-26）：</strong>
+<ul>
+<li><code>bin/build-epub.sh 0101-20150604091458299_check.pdf kyojin-tachi-no-hoshi --end-page 471</code>
+で <code>output/epub/巨人たちの星 - ジェイムズ・P・ホーガン.epub</code>
+を生成した。終わりのページを指定しないと、473ページの奥付と474〜482ページの出版社の広告目録まで本文に入り、括弧不一致が226件出た。471ページ（訳者あとがきの終わり）までに絞ると6件になった。</li>
+<li>見出しはプロローグ・1〜40章・エピローグ・訳者あとがきの43件で、章番号の補正は22か所。NDL
+がルビ領域を検出したのは25ページ・63区画だけで、ルビは54か所。ルビ検算レビュー（<code>review/kyojin-tachi-no-hoshi-ruby/index.html</code>）は13件で、人の確認はまだ。</li>
+<li>システムの既定 Java が 11 だと AozoraEpub3.jar（class file
+65）が動かないので、<code>build-epub.sh</code> で
+<code>/usr/lib/jvm/java-21-openjdk/bin/java</code>
+があれば使うようにした（<code>JAVA</code> で上書きできる）。</li>
+</ul></li>
 </ol>
 <h2 id="次の作業">次の作業</h2>
 <ol type="1">
