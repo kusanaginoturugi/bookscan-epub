@@ -929,7 +929,7 @@ def main():
                 kept = []
                 for h in found:
                     s, e, f, t, _ = h
-                    if s <= end_tcy:
+                    if s < len(frm) or (s <= end_tcy and s == e and t in (')', '）')):
                         left, right = text[max(0, s - CONTEXT):s], text[e:e + CONTEXT]
                         tcy_replaced_ids.add(f'{line["page"]}:{line["line_id"]}:{left}[{f}→{t}]{right}')
                     else:
