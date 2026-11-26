@@ -90,12 +90,12 @@ def repair_chapter_numbers(texts):
     Finds the longest anchor subsequence of parsed numbers where
     j - i <= val[j] - val[i] <= j - i + 3 (allowing up to 3 skipped chapters between anchors),
     keeps every anchor's value (normalizing format like '3.' -> '3'), fills strictly between
-    anchors only when the gap matches the index distance uniquely, and fills before/after end
-    anchors only for values not part of an independent consecutive run (e.g. '8,9,10' or a
-    part-reset '1,2,3').
+    anchors only when the gap matches the index distance uniquely, and handles slices before
+    the first / after the last anchor recursively if they form their own valid anchor chain
+    (e.g. a part-reset '1,22,3,4' or a large skip '8,9,10').
     """
     n = len(texts)
-    if n < 3:
+    if n < 2:
         return list(texts), []
     parsed = []
     for t in texts:
@@ -121,38 +121,55 @@ def repair_chapter_numbers(texts):
         cur = prev[cur]
     anchors.reverse()
 
-    def in_consecutive_run(pos):
-        v = parsed[pos]
-        if v is None:
-            return False
-        left_ok = pos > 0 and parsed[pos - 1] is not None and v == parsed[pos - 1] + 1
-        right_ok = pos + 1 < n and parsed[pos + 1] is not None and parsed[pos + 1] == v + 1
-        return left_ok or right_ok
-
     out = list(texts)
     for pos in anchors:
         out[pos] = str(parsed[pos])
-    # Fill before first anchor (preserve independent consecutive runs)
+
+    def _has_chain(sub):
+        sub_out, _ = repair_chapter_numbers(sub)
+        sub_parsed = [int(m.group(1)) if (m := re.fullmatch(r'([0-9０-９]+)[.・]?', s)) else None for s in sub]
+        # True when the slice itself contains a valid >=2 anchor chain
+        for j in range(len(sub_parsed)):
+            if sub_parsed[j] is None:
+                continue
+            for i in range(j):
+                if sub_parsed[i] is not None and (j - i) <= sub_parsed[j] - sub_parsed[i] <= (j - i) + 3:
+                    return True, sub_out
+        return False, None
+
+    # Handle prefix before first anchor
     first = anchors[0]
-    for pos in range(first):
-        if in_consecutive_run(pos):
-            out[pos] = str(parsed[pos])
-            continue
-        expected = parsed[first] - (first - pos)
-        if expected >= 1:
-            out[pos] = str(expected)
+    if first > 0:
+        has_sub, sub_out = _has_chain(texts[:first])
+        if has_sub:
+            out[:first] = sub_out
+        else:
+            for pos in range(first):
+                expected = parsed[first] - (first - pos)
+                if expected >= 1:
+                    out[pos] = str(expected)
+
     # Fill strictly between adjacent anchors only when gap matches index distance uniquely
     for a, b in zip(anchors, anchors[1:]):
         if parsed[b] - parsed[a] == b - a:
             for pos in range(a + 1, b):
                 out[pos] = str(parsed[a] + (pos - a))
-    # Fill after last anchor (preserve independent consecutive runs)
+
+    # Handle suffix after last anchor
     last = anchors[-1]
-    for pos in range(last + 1, n):
-        if in_consecutive_run(pos):
-            out[pos] = str(parsed[pos])
-            continue
-        out[pos] = str(parsed[last] + (pos - last))
+    if last + 1 < n:
+        has_sub, sub_out = _has_chain(texts[last + 1:])
+        if has_sub:
+            out[last + 1:] = sub_out
+        else:
+            for pos in range(last + 1, n):
+                v = parsed[pos]
+                expected = parsed[last] + (pos - last)
+                # Preserve a plausible monotonic skip (e.g. 1..5, 10); fix non-monotonic or spike misreads
+                if v is not None and parsed[last] < v <= expected + 10:
+                    out[pos] = str(v)
+                else:
+                    out[pos] = str(expected)
 
     repaired = [(pos, texts[pos], out[pos]) for pos in range(n) if out[pos] != texts[pos]]
     return out, repaired
