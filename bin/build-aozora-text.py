@@ -72,6 +72,17 @@ def _format_vertical_segment(text):
     # Full-width single-digit numbers when standalone in Japanese context.
     fw_digits = str.maketrans('0123456789', '０１２３４５６７８９')
     text = re.sub(r'(?<![0-9A-Za-z.\-])([0-9])(?![0-9A-Za-z.\-])', lambda m: m.group(1).translate(fw_digits), text)
+    # Full-width alphanumeric/code tokens without lowercase (e.g. MB-3076/K2/E, 730289C/EX, 5T, 6G).
+    fw_code = str.maketrans(
+        'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/-',
+        'ＡＢＣＤＥＦＧＨＩＪＫＬＭＮＯＰＱＲＳＴＵＶＷＸＹＺ０１２３４５６７８９／\u2014',
+    )
+    def _code_to_fw(m):
+        tok = m.group(1)
+        if re.search(r'[A-Z]', tok) and re.search(r'[0-9/\-]', tok):
+            return tok.translate(fw_code)
+        return tok
+    text = re.sub(r'(?<![A-Za-z0-9])([A-Z0-9]+(?:[/-][A-Z0-9]+)*)(?![A-Za-z0-9])', _code_to_fw, text)
     # Full-width short all-caps acronyms (1-4 chars, e.g. SF, P, UNSA, IDCC) not touching lowercase.
     fw_upper = str.maketrans('ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'ＡＢＣＤＥＦＧＨＩＪＫＬＭＮＯＰＱＲＳＴＵＶＷＸＹＺ')
     text = re.sub(r'(?<![A-Za-z0-9])([A-Z]{1,4})(?![A-Za-z0-9])', lambda m: m.group(1).translate(fw_upper), text)

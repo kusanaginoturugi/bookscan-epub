@@ -710,7 +710,7 @@ render();
 
 
 TCY_MARKER_RE = re.compile(
-    r'^[(（](?:[0-9a-zA-Z０-９ａ-ｚＡ-Ｚ]{1,2}[)）]|[(（][)）]|[0-9a-zA-Z０-９ａ-ｚＡ-Ｚ]{1,2}(?=\s|$|[^\x00-\x7f]))'
+    r'^[(（](?:[0-9a-zA-Z０-９ａ-ｚＡ-Ｚ]{1,2}[)）]|[(（][)）]|[0-9a-zA-Z０-９ａ-ｚＡ-Ｚ]{1,2}(?=\s|$))'
 )
 TCY_MARKER_PROMPT = (
     'この画像は日本語縦書き書籍の行頭にある1マス分の箇条書き記号'
@@ -723,6 +723,7 @@ def recognize_tcy_markers(pdf_path, lines, candidates, cache_path, url, model):
     """Read vertical-line leading tate-chu-yoko list markers like (1), (a), (b) with a local VLM."""
     import base64
     import io
+    import urllib.error
     import urllib.request
     from PIL import Image
     import pypdfium2
@@ -739,49 +740,61 @@ def recognize_tcy_markers(pdf_path, lines, candidates, cache_path, url, model):
         for idx, frm in missing:
             by_page.setdefault(lines[idx]['page'], []).append((idx, frm))
         doc = pypdfium2.PdfDocument(str(pdf_path))
-        new_rows = []
-        for page, page_items in sorted(by_page.items()):
-            pimg = doc[page - 1].render(scale=300 / 72).to_pil().convert('RGB')
-            for idx, frm in page_items:
-                line = lines[idx]
-                x0, y0, x1, _ = (int(round(v)) for v in line['box'])
-                w = max(x1 - x0, 20)
-                crop = pimg.crop((max(0, x0 - 8), max(0, y0 - 8),
-                                  min(pimg.width, x1 + 8), min(pimg.height, y0 + int(w * 1.2) + 8)))
-                crop3 = crop.resize((crop.width * 3, crop.height * 3), Image.Resampling.BICUBIC)
-                buf = io.BytesIO()
-                crop3.save(buf, format='PNG')
-                b64 = base64.b64encode(buf.getvalue()).decode('ascii')
-                body = {
-                    'model': model,
-                    'temperature': 0,
-                    'max_tokens': 16,
-                    'chat_template_kwargs': {'enable_thinking': False},
-                    'messages': [{
-                        'role': 'user',
-                        'content': [
-                            {'type': 'image_url', 'image_url': {'url': 'data:image/png;base64,' + b64}},
-                            {'type': 'text', 'text': TCY_MARKER_PROMPT},
-                        ],
-                    }],
-                }
-                req = urllib.request.Request(url, json.dumps(body, ensure_ascii=False).encode(),
-                                             {'Content-Type': 'application/json'})
-                with urllib.request.urlopen(req, timeout=120) as resp:
-                    ans = json.load(resp)['choices'][0]['message']['content'].strip().splitlines()[0].strip()
-                marker = ans if re.fullmatch(r'\([0-9a-zA-Z]{1,3}\)', ans) else ''
-                key = (page, line['line_id'], frm)
-                cache[key] = marker
-                new_rows.append({'page': page, 'line_id': line['line_id'], 'frm': frm, 'marker': marker})
-        doc.close()
-        if cache_path and new_rows:
-            cache_path.parent.mkdir(parents=True, exist_ok=True)
-            write_header = not cache_path.exists()
-            with cache_path.open('a', newline='') as handle:
+        writer = None
+        handle = None
+        try:
+            if cache_path:
+                cache_path.parent.mkdir(parents=True, exist_ok=True)
+                write_header = not cache_path.exists()
+                handle = cache_path.open('a', newline='')
                 writer = csv.DictWriter(handle, ['page', 'line_id', 'frm', 'marker'], delimiter='\t', lineterminator='\n')
                 if write_header:
                     writer.writeheader()
-                writer.writerows(new_rows)
+            for page, page_items in sorted(by_page.items()):
+                pimg = doc[page - 1].render(scale=300 / 72).to_pil().convert('RGB')
+                for idx, frm in page_items:
+                    line = lines[idx]
+                    x0, y0, x1, _ = (int(round(v)) for v in line['box'])
+                    w = max(x1 - x0, 20)
+                    crop = pimg.crop((max(0, x0 - 8), max(0, y0 - 8),
+                                      min(pimg.width, x1 + 8), min(pimg.height, y0 + int(w * 1.2) + 8)))
+                    crop3 = crop.resize((crop.width * 3, crop.height * 3), Image.Resampling.BICUBIC)
+                    buf = io.BytesIO()
+                    crop3.save(buf, format='PNG')
+                    b64 = base64.b64encode(buf.getvalue()).decode('ascii')
+                    body = {
+                        'model': model,
+                        'temperature': 0,
+                        'max_tokens': 16,
+                        'chat_template_kwargs': {'enable_thinking': False},
+                        'messages': [{
+                            'role': 'user',
+                            'content': [
+                                {'type': 'image_url', 'image_url': {'url': 'data:image/png;base64,' + b64}},
+                                {'type': 'text', 'text': TCY_MARKER_PROMPT},
+                            ],
+                        }],
+                    }
+                    req = urllib.request.Request(url, json.dumps(body, ensure_ascii=False).encode(),
+                                                 {'Content-Type': 'application/json'})
+                    try:
+                        with urllib.request.urlopen(req, timeout=120) as resp:
+                            content = json.load(resp)['choices'][0]['message'].get('content') or ''
+                    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+                        print(f'warning: tcy-marker VLM failed on p.{page}:{line["line_id"]}: {exc}', file=sys.stderr)
+                        continue
+                    ans_lines = content.strip().splitlines()
+                    ans = ans_lines[0].strip() if ans_lines else ''
+                    marker = ans if re.fullmatch(r'\([0-9a-zA-Z]{1,2}\)', ans) else ''
+                    key = (page, line['line_id'], frm)
+                    cache[key] = marker
+                    if writer is not None:
+                        writer.writerow({'page': page, 'line_id': line['line_id'], 'frm': frm, 'marker': marker})
+                        handle.flush()
+        finally:
+            if handle is not None:
+                handle.close()
+            doc.close()
     return cache
 
 
@@ -860,18 +873,9 @@ def main():
             m = TCY_MARKER_RE.match(line['text'])
             if m:
                 tcy_candidates.append((index, m.group(0)))
-    tcy_cache_path = args.tcy_markers or (args.output / 'tcy-markers.tsv')
-    tcy_map = (recognize_tcy_markers(args.pdf, lines, tcy_candidates, tcy_cache_path, args.url, args.model)
-               if tcy_candidates else {})
-    tcy_by_index = {}
-    for index, frm in tcy_candidates:
-        marker = tcy_map.get((lines[index]['page'], lines[index]['line_id'], frm), '')
-        if marker and marker != frm:
-            tcy_by_index[index] = (frm, marker)
 
     line_hunks = []
     diacritic_candidates = []
-    tcy_keys = set()
     for index, line in enumerate(lines):
         words = [text for box, text in yomitoku.get(line['page'], []) if iou(line['box'], box) > 0.5]
         if len(words) != 1:
@@ -882,11 +886,6 @@ def main():
             if found is None:
                 counts['misaligned lines'] += 1
                 found = []
-        if index in tcy_by_index:
-            frm, marker = tcy_by_index[index]
-            found = [h for h in found if not (h[0] < len(frm) and 0 < h[1])]
-            found.insert(0, (0, len(frm), frm, marker, 'tcy-marker'))
-            tcy_keys.add((line['page'], line['line_id']))
         # 3-A: catch hidden errors where margin30 differs from agreeing margin14 == margin20
         # by a single character (even when YomiToku agreed with margin30 or failed to align).
         if line.get('margin_alt'):
@@ -896,19 +895,49 @@ def main():
                     overlaps = any(s < fe and fs < e for fs, fe, _, _, _ in found)
                     if not overlaps and len(f) == 1 and len(t) == 1 and c not in ('quote', 'bracket', 'dash', 'ndl-old-form'):
                         found.append((s, e, f, t, 'margin-outlier'))
-        if not found:
-            continue
-        line_hunks.append((index, line, found))
-        text = line['text']
-        for start, end, frm, to, category in found:
-            if category == 'diacritic':
-                left, right = text[max(0, start - CONTEXT):start], text[end:end + CONTEXT]
-                hunk_id = f'{line["page"]}:{line["line_id"]}:{left}[{frm}→{to}]{right}'
-                diacritic_candidates.append((hunk_id, index, start, end, frm, to))
+        if found:
+            line_hunks.append((index, line, found))
+            text = line['text']
+            for start, end, frm, to, category in found:
+                if category == 'diacritic':
+                    left, right = text[max(0, start - CONTEXT):start], text[end:end + CONTEXT]
+                    hunk_id = f'{line["page"]}:{line["line_id"]}:{left}[{frm}→{to}]{right}'
+                    diacritic_candidates.append((hunk_id, index, start, end, frm, to))
 
     margin_cache = args.diacritic_margins or (args.output / 'diacritic-margins.tsv')
     diacritic_scores = (compute_diacritic_margins(args.pdf, lines, diacritic_candidates, margin_cache, args.device)
                         if diacritic_candidates else {})
+
+    # Run VLM tcy-marker recognition after ONNX PARSeq finishes so GPU memory is not shared.
+    tcy_cache_path = args.tcy_markers or (args.output / 'tcy-markers.tsv')
+    tcy_map = (recognize_tcy_markers(args.pdf, lines, tcy_candidates, tcy_cache_path, args.url, args.model)
+               if tcy_candidates else {})
+    tcy_by_index = {}
+    for index, frm in tcy_candidates:
+        marker = tcy_map.get((lines[index]['page'], lines[index]['line_id'], frm), '')
+        if marker and marker != frm:
+            tcy_by_index[index] = (frm, marker)
+    tcy_replaced_ids = set()
+    if tcy_by_index:
+        by_idx = {idx: pos for pos, (idx, _, _) in enumerate(line_hunks)}
+        for index, (frm, marker) in sorted(tcy_by_index.items()):
+            line = lines[index]
+            text = line['text']
+            if index in by_idx:
+                _, _, found = line_hunks[by_idx[index]]
+                kept = []
+                for h in found:
+                    s, e, f, t, _ = h
+                    if s < len(frm) and 0 < e:
+                        left, right = text[max(0, s - CONTEXT):s], text[e:e + CONTEXT]
+                        tcy_replaced_ids.add(f'{line["page"]}:{line["line_id"]}:{left}[{f}→{t}]{right}')
+                    else:
+                        kept.append(h)
+                kept.insert(0, (0, len(frm), frm, marker, 'tcy-marker'))
+                line_hunks[by_idx[index]] = (index, line, kept)
+            else:
+                line_hunks.append((index, line, [(0, len(frm), frm, marker, 'tcy-marker')]))
+        line_hunks.sort(key=lambda x: x[0])
 
     for index, line, found in line_hunks:
         for start, end, frm, to, category in found:
@@ -1090,9 +1119,10 @@ def main():
     # A human verdict that no longer matches a hunk (the text before it changed,
     # e.g. after a new voicing glossary) would be dropped silently; stop instead.
     overridden_keys = ({(int(r['page']), int(r['line_id'])) for r in read_tsv(args.overrides)}
-                       if args.overrides else set()) | tcy_keys
+                       if args.overrides else set())
     orphans = sorted(hid for hid in (set(human) - {item['id'] for item in items})
-                     if (int(human[hid]['page']), int(human[hid]['line_id'])) not in overridden_keys)
+                     if hid not in tcy_replaced_ids
+                     and (int(human[hid]['page']), int(human[hid]['line_id'])) not in overridden_keys)
     # The same name or phrase recurs (フォーサイス＝スコット): a verdict on one hunk
     # applies to unreviewed hunks with the same readings and the same 4 characters
     # on each side, unless verdicts on such hunks disagree.
