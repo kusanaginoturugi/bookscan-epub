@@ -238,7 +238,7 @@ CORRECTIONS=
 if [ "$USE_JUDGE" = on ] && [ -z "$GLOSSARY" ]; then
   CORRECTIONS=$WORK/judge/corrections.tsv
   # Rule versions: a new rule reruns both judge steps.
-  JUDGE_RULES=skip-catalog,line-joins,joined-voicing,lookalike,propagate,book-word,save-path,paired-bracket,edge-v1,bracket-swap,forms2,bracket-marks,save-cmd,word-verdicts,book-ratio,book-ratio-rev,start-bracket,diacritic-margin,missing-marks,crop-split,crop-bracket2,margin-outlier,book-ratio-twice,margin-outlier-overlap
+  JUDGE_RULES=skip-catalog,line-joins,joined-voicing,lookalike,propagate,book-word,save-path,paired-bracket,edge-v1,bracket-swap,forms2,bracket-marks,save-cmd,word-verdicts,book-ratio,book-ratio-rev,start-bracket,diacritic-margin,missing-marks,crop-split,crop-bracket2,margin-outlier,book-ratio-twice,margin-outlier-overlap,margin-outlier-unpaired
   OVR_ARGS=
   [ ! -e "$WORK/overrides.tsv" ] || OVR_ARGS="--overrides $WORK/overrides.tsv"
   KEY=$(inputs_key "$VOICING_GLOSSARY" "$WORK/voicing-corrections.tsv" "$WORK/vocabulary.tsv" "$WORK/judge-human.tsv" "$WORK/overrides.tsv" "$WORK/margin.tsv" "$WORK/stages" "$WORK/skip-pages.txt" $SERIES_HUMAN)$JUDGE_RULES

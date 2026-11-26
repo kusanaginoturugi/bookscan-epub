@@ -16,7 +16,7 @@
 
 - [x] 1. `diacritic`（濁点の付け外し）・`small-kana`・記号の `one-sided`（`……` `「` `」` `・` 等）の一律スキップ見直し：PARSeq 3モデルの確率差（`margin < 5.0`）で `diacritic` をフィルタし、記号 `one-sided` と合わせて判断モデルへ回す実装を完了。『プロテウス・オペレーション（上）』で抜き取り検査の誤りが 5字→1字（1万字あたり 7.0→1.4、機械処理のみでも 99.99%）に改善
 - [x] 2. 割れた差分・`bracket-swap` の画像判定：Gemma-4-12B VLM（72.1%）より PARSeq 3モデルの局所切り出し確率差が圧倒的に強く（6冊218件で `margin <= -10.0` は 74/74 = 100.0%、`bracket-swap` は組合計で 16/16 = 100.0%）、PARSeq確率差による自動決定を `judge-ocr-disagreements.py` に組み込み済み
-- [x] 3. 両OCR一致の「隠れ誤字」掘り起こし：`saved == margin14 == margin20 != margin30` の孤立1文字差分（追加推論ゼロ）を `margin-outlier` として判断モデルへ流す実装を完了
+- [x] 3. 両OCR一致の「隠れ誤字」掘り起こし：`margin14 == margin20 != margin30` の孤立1文字差分（追加推論ゼロ、YomiToku の `unpaired`/`misaligned` 行も含む）を `margin-outlier` として判断モデルへ流す実装を完了
 - [x] 4. 本全体・ページまたぎの構造チェック：引用符 `〝〟` の `“` `”` 対応と隣接2ページまたぎ対応、`book_word_choice` の逆向き20倍比（8冊18/18正解）を実装。ダッシュ長は8冊すべて `―` 1文字統一方針だったため現行維持
 - [x] 5. 抜き取り検査の見落とし低減：PARSeq の `Top-1 - Top-2 < 1.0` の迷い文字に橙の点線（ホバーで次候補表示）を `build-proofread-sample.py` へ追加
 - [x] 6. NDLOCR-Lite の縦横比潰れ対策：400行（14,662字）で可変余白・文字幅比例・全行100字モデルを比較した結果、現行の「既定カスケード＋固定 `+30px`（`h >= 400`）」（65誤り・CER 0.443%）が最適点だったため現行維持。実例画像ガイドを `review/parseq-padding-guide/index.html`（`bin/study/build-parseq-guide.py`）に作成

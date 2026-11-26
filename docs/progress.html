@@ -1558,8 +1558,11 @@ vs PARSeq確率差）：</strong>
 <li><strong>両OCR一致の隠れ誤字検出（<code>margin-outlier</code>）と抜き取り検査の迷い表示：</strong>
 <ul>
 <li>計算済みの <code>margin.tsv</code> で
-<code>saved == margin14 == margin20 != margin30</code> かつ YomiToku
-との差分に出ていない1文字置換を <code>margin-outlier</code>
+<code>margin14 == margin20 != margin30</code>（当初は <code>saved</code>
+一致も要求していたが、2026-11-26 に緩和し YomiToku の
+<code>unpaired</code>/<code>misaligned</code>
+行も対象化）かつ既存差分と重ならない1文字置換を
+<code>margin-outlier</code>
 として判断モデルへ流す（追加推論ゼロ）。『星を継ぐもの』の
 <code>燃料ベレット→ペレット</code>、<code>プロテウス</code> の
 <code>プロードウェイ→ブロードウェイ</code>

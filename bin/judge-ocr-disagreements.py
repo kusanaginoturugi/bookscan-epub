@@ -402,11 +402,10 @@ def load_lines(args, glossary):
             row = recognized.get(key)
             if row and int(row['height']) >= args.min_height:
                 text = row[args.column]
-                s0 = row.get('saved', '')
                 s14 = row.get('margin14', '')
                 s20 = row.get('margin20', '')
-                if s0 and s0.replace(' ', '') == s14.replace(' ', '') == s20.replace(' ', '') and s0.replace(' ', '') != text.replace(' ', ''):
-                    margin_alt = s0
+                if s14 and s14.replace(' ', '') == s20.replace(' ', '') and s14.replace(' ', '') != text.replace(' ', ''):
+                    margin_alt = s14
             vertical = item['isVertical'] == 'true'
             def normalize_line(s):
                 if vertical:
@@ -783,13 +782,14 @@ def main():
         words = [text for box, text in yomitoku.get(line['page'], []) if iou(line['box'], box) > 0.5]
         if len(words) != 1:
             counts['unpaired lines'] += 1
-            continue
-        found = hunks(line['text'], words[0], args.max_hunks)
-        if found is None:
-            counts['misaligned lines'] += 1
-            continue
-        # 3-A: catch hidden errors where both margin30 and YomiToku agree, yet
-        # saved == margin14 == margin20 all read a different single character.
+            found = []
+        else:
+            found = hunks(line['text'], words[0], args.max_hunks)
+            if found is None:
+                counts['misaligned lines'] += 1
+                found = []
+        # 3-A: catch hidden errors where margin30 differs from agreeing margin14 == margin20
+        # by a single character (even when YomiToku agreed with margin30 or failed to align).
         if line.get('margin_alt'):
             alt_hunks = hunks(line['text'], line['margin_alt'], 2)
             if alt_hunks:
@@ -797,6 +797,8 @@ def main():
                     overlaps = any(s < fe and fs < e for fs, fe, _, _, _ in found)
                     if not overlaps and len(f) == 1 and len(t) == 1 and c not in ('quote', 'bracket', 'dash', 'ndl-old-form'):
                         found.append((s, e, f, t, 'margin-outlier'))
+        if not found:
+            continue
         line_hunks.append((index, line, found))
         text = line['text']
         for start, end, frm, to, category in found:
