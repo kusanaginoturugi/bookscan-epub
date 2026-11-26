@@ -80,6 +80,14 @@ def _format_vertical_segment(text):
 
 def format_vertical_text(text):
     """Format body text while protecting Aozora ruby and annotation tags."""
+    # Leading list markers like (1), (a), (b) -> explicit tate-chu-yoko followed by full-width space.
+    m = re.match(r'^(\([0-9a-zA-Z]{1,2}\))[ \u3000]*', text)
+    if m:
+        marker = m.group(1)
+        rest = text[m.end():]
+        prefix = f'{marker}［＃「{marker}」は縦中横］' + ('　' if rest else '')
+        parts = PROTECT_RE.split(rest)
+        return prefix + ''.join(part if i % 2 else _format_vertical_segment(part) for i, part in enumerate(parts))
     parts = PROTECT_RE.split(text)
     return ''.join(part if i % 2 else _format_vertical_segment(part) for i, part in enumerate(parts))
 

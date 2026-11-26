@@ -238,7 +238,7 @@ CORRECTIONS=
 if [ "$USE_JUDGE" = on ] && [ -z "$GLOSSARY" ]; then
   CORRECTIONS=$WORK/judge/corrections.tsv
   # Rule versions: a new rule reruns both judge steps.
-  JUDGE_RULES=skip-catalog,line-joins,joined-voicing,lookalike,propagate,book-word,save-path,paired-bracket,edge-v1,bracket-swap,forms2,bracket-marks,save-cmd,word-verdicts,book-ratio,book-ratio-rev,start-bracket,diacritic-margin,missing-marks,crop-split,crop-bracket2,margin-outlier,book-ratio-twice,margin-outlier-overlap,margin-outlier-unpaired
+  JUDGE_RULES=skip-catalog,line-joins,joined-voicing,lookalike,propagate,book-word,save-path,paired-bracket,edge-v1,bracket-swap,forms2,bracket-marks,save-cmd,word-verdicts,book-ratio,book-ratio-rev,start-bracket,diacritic-margin,missing-marks,crop-split,crop-bracket2,margin-outlier,book-ratio-twice,margin-outlier-overlap,margin-outlier-unpaired,tcy-marker
   OVR_ARGS=
   [ ! -e "$WORK/overrides.tsv" ] || OVR_ARGS="--overrides $WORK/overrides.tsv"
   KEY=$(inputs_key "$VOICING_GLOSSARY" "$WORK/voicing-corrections.tsv" "$WORK/vocabulary.tsv" "$WORK/judge-human.tsv" "$WORK/overrides.tsv" "$WORK/margin.tsv" "$WORK/stages" "$WORK/skip-pages.txt" $SERIES_HUMAN)$JUDGE_RULES
@@ -250,6 +250,7 @@ if [ "$USE_JUDGE" = on ] && [ -z "$GLOSSARY" ]; then
       "$REVIEW-judge" --ocr-stem "$OCR_STEM" --recognized "$WORK/margin.tsv" \
       --glossary "$VOICING_GLOSSARY" --human "$WORK/judge-human.tsv" $SKIP_ARGS $WORD_ARGS $VOCAB_ARGS $OVR_ARGS \
       --diacritic-margins "$WORK/judge/diacritic-margins.tsv" \
+      --tcy-markers "$WORK/judge/tcy-markers.tsv" \
       --url "$LLM_URL/chat/completions" --model "$LLM_MODEL" --prompt "$JUDGE_PROMPT" \
       --title "$TITLE LLM判断のレビュー" \
       > "$WORK/judge.log" 2>&1 || fail "judge step failed; see $WORK/judge.log"
@@ -300,6 +301,7 @@ if [ -z "$GLOSSARY" ] && [ -e "$M/voicing-glossary.tsv" ]; then
         --ocr-stem "$OCR_STEM" --recognized "$WORK/margin.tsv" --glossary "$M/voicing-glossary.tsv" \
         --word-corrections "$M/voicing-corrections.tsv" --skip-catalog --history "$WORK/judge/history.tsv" \
         --diacritic-margins "$WORK/judge/diacritic-margins.tsv" \
+        --tcy-markers "$WORK/judge/tcy-markers.tsv" \
         --no-review --url "$LLM_URL/chat/completions" --model "$LLM_MODEL" --prompt "$JUDGE_PROMPT" \
         > "$M/judge.log" 2>&1 || fail "machine-only judge failed; see $M/judge.log"
       echo "$KEY" > "$M/judge.key"
