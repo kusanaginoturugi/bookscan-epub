@@ -11,6 +11,7 @@ import csv
 import re
 import statistics
 import sys
+from collections import Counter
 from pathlib import Path
 
 import pypdfium2
@@ -32,18 +33,38 @@ def load_catalog(source_pdf):
     return {}
 
 
-def format_vertical_text(text):
+PROTECT_RE = re.compile(r'(｜[^《]+《[^》]+》|※?［＃[^］]+］)')
+
+
+def escape_aozora(text):
+    """Escape literal Aozora ruby delimiters in body text."""
+    return (text.replace('｜', '※［＃縦線、1-1-35］')
+                .replace('《', '※［＃始め二重山括弧、1-1-52］')
+                .replace('》', '※［＃終わり二重山括弧、1-1-53］'))
+
+
+def _format_vertical_segment(text):
     """Adjust ASCII punctuation and Latin/digit runs for AozoraEpub3 vertical layout."""
     # Remove spaces between Japanese characters, keep spaces between Latin words.
-    text = re.sub(r'(?<![A-Za-z0-9,.:;!?\'"])[ \u3000]+', '', text)
+    text = re.sub(r'(?<![A-Za-z0-9,.:;!?\'"\)])[ \u3000]+', '', text)
     text = re.sub(r'[ \u3000]+(?![A-Za-z0-9(\'"“])', '', text)
     # Single ? or ! -> full-width; 2-char combos like !? -> explicit tcy.
     text = re.sub(r'(?<![!?])\?(?![!?])', '？', text)
     text = re.sub(r'(?<![!?])!(?![!?])', '！', text)
     text = re.sub(r'(?<![!?])([!?]{2})(?![!?])', r'\1［＃「\1」は縦中横］', text)
-    # Parentheses and slashes outside pure Latin/digit runs -> full-width.
-    text = re.sub(r'\((?=[^A-Za-z])|(?<=[^A-Za-z])\(', '（', text)
-    text = re.sub(r'\)(?=[^A-Za-z])|(?<=[^A-Za-z])\)', '）', text)
+    # Parentheses: keep half-width only when paired around ASCII inside Latin context.
+    def _paren(m):
+        inner = m.group(1)
+        start, end = m.span()
+        before = text[start - 1] if start > 0 else ''
+        after = text[end] if end < len(text) else ''
+        latin_ctx = (before.isascii() and (before.isalpha() or before == ' ')) or (
+            after.isascii() and (after.isalpha() or after == ' '))
+        if inner and inner.isascii() and re.search(r'[A-Za-z]', inner) and latin_ctx:
+            return f'\x00{inner}\x01'
+        return f'（{inner}）'
+    text = re.sub(r'\(([^()]*)\)', _paren, text)
+    text = text.replace('(', '（').replace(')', '）').replace('\x00', '(').replace('\x01', ')')
     text = re.sub(r'(?<![0-9A-Za-z])/(?![0-9A-Za-z])', '／', text)
     # Use U+2014 EM DASH instead of U+2015 HORIZONTAL BAR so vertical 'vert' glyph centers cleanly.
     text = text.replace('\u2015', '\u2014')
@@ -56,6 +77,12 @@ def format_vertical_text(text):
     fw_upper = str.maketrans('ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'ＡＢＣＤＥＦＧＨＩＪＫＬＭＮＯＰＱＲＳＴＵＶＷＸＹＺ')
     text = re.sub(r'(?<![A-Za-z0-9])([A-Z]{1,4})(?![A-Za-z0-9])', lambda m: m.group(1).translate(fw_upper), text)
     return text
+
+
+def format_vertical_text(text):
+    """Format body text while protecting Aozora ruby and annotation tags."""
+    parts = PROTECT_RE.split(text)
+    return ''.join(part if i % 2 else _format_vertical_segment(part) for i, part in enumerate(parts))
 
 
 def is_chapter_heading(line, med_y0, med_dx, dx_before, dx_after, is_first_on_page, is_last_on_page):
@@ -88,24 +115,26 @@ def extract_cover(pdf_path, out_jpg):
 
 
 def apply_ruby(text, entries):
-    """Insert Aozora ruby ｜base《ruby》 at the occurrence closest to each entry's char_pos."""
+    """Insert Aozora ruby ｜base《ruby》 at the occurrence closest to each entry's char_pos,
+    and escape literal Aozora delimiters outside inserted ruby tags."""
     if not entries:
-        return text
+        return escape_aozora(text)
     placements = []
     used = [False] * len(text)
-    for char_pos, base, ruby in sorted(entries, key=lambda e: e[0]):
-        # Trim leading hiragana on pure-hiragana ruby (e.g. てて屯/たむろ -> 屯/たむろ)
-        if re.fullmatch(r'[ぁ-ゖー]+', ruby):
-            while len(base) >= 2 and ('\u3041' <= base[0] <= '\u3096') and not ruby.startswith(base[0]):
-                base = base[1:]
-        # Trim common trailing hiragana okurigana (e.g. 掻いた/かいた -> 掻/か) and stray trailing hiragana
-        while len(base) >= 2 and len(ruby) >= 2 and ('\u3041' <= base[-1] <= '\u3096') and base[-1] == ruby[-1]:
-            base, ruby = base[:-1], ruby[:-1]
-        while len(base) >= 2 and ('\u3041' <= base[-1] <= '\u3096') and not ruby.endswith(base[-1]):
-            base = base[:-1]
-        # Skip likely misaligned rubies whose base has no kanji or Latin letter
-        if not any(('\u4e00' <= c <= '\u9fff') or c in '々〆ヶ' or ('A' <= c <= 'Z') or ('a' <= c <= 'z') for c in base):
-            continue
+    for char_pos, base, ruby, is_human in sorted(entries, key=lambda e: e[0]):
+        if not is_human:
+            # Trim leading hiragana on pure-hiragana ruby (e.g. てて屯/たむろ -> 屯/たむろ)
+            if re.fullmatch(r'[ぁ-ゖー]+', ruby):
+                while len(base) >= 2 and ('\u3041' <= base[0] <= '\u3096') and not ruby.startswith(base[0]):
+                    base = base[1:]
+            # Trim common trailing hiragana okurigana (e.g. 掻いた/かいた -> 掻/か) and stray trailing hiragana
+            while len(base) >= 2 and len(ruby) >= 2 and ('\u3041' <= base[-1] <= '\u3096') and base[-1] == ruby[-1]:
+                base, ruby = base[:-1], ruby[:-1]
+            while len(base) >= 2 and ('\u3041' <= base[-1] <= '\u3096') and not ruby.endswith(base[-1]):
+                base = base[:-1]
+            # Skip likely misaligned rubies whose base has no kanji or Latin letter
+            if not any(('\u4e00' <= c <= '\u9fff') or c in '々〆ヶ' or ('A' <= c <= 'Z') or ('a' <= c <= 'z') for c in base):
+                continue
         best_idx, best_dist = None, 10**9
         start = 0
         while True:
@@ -122,9 +151,14 @@ def apply_ruby(text, entries):
             for k in range(best_idx, best_idx + len(base)):
                 used[k] = True
             placements.append((best_idx, best_idx + len(base), base, ruby))
-    for i0, i1, base, ruby in sorted(placements, key=lambda p: -p[0]):
-        text = text[:i0] + f'｜{base}《{ruby}》' + text[i1:]
-    return text
+    out = []
+    pos = 0
+    for i0, i1, base, ruby in sorted(placements, key=lambda p: p[0]):
+        out.append(escape_aozora(text[pos:i0]))
+        out.append(f'｜{escape_aozora(base)}《{ruby}》')
+        pos = i1
+    out.append(escape_aozora(text[pos:]))
+    return ''.join(out)
 
 
 def main():
@@ -153,12 +187,12 @@ def main():
                 if h:
                     if h['choice'] == 'drop':
                         continue
-                    base, ruby = h['base'], h['ruby']
+                    base, ruby, is_human = h['base'], h['ruby'], True
                 else:
-                    base, ruby = r.get('base', ''), r.get('ruby', '')
+                    base, ruby, is_human = r.get('base', ''), r.get('ruby', ''), False
                 if base and ruby:
                     ruby_by_line.setdefault((int(r['page']), int(r['line_id'])), []).append(
-                        (int(r['char_pos']), base, ruby))
+                        (int(r['char_pos']), base, ruby, is_human))
 
     meta = load_catalog(args.source)
     title = meta.get('title') or args.work_dir.name
@@ -181,13 +215,13 @@ def main():
             p = int(r['page'])
             lid = int(r['line_id'])
             x0, y0, x1, y1 = (float(v) for v in r['box'].split(','))
-            text = r['final'].strip()
+            raw_text = r['final'].strip()
             entries = ruby_by_line.get((p, lid))
             if entries:
-                before = text
-                text = apply_ruby(text, entries)
-                if text != before:
-                    ruby_applied += text.count('《') - before.count('《')
+                text = apply_ruby(raw_text, entries)
+                ruby_applied += text.count('《')
+            else:
+                text = escape_aozora(raw_text)
             by_page.setdefault(p, []).append({
                 'page': p,
                 'line_id': lid,
@@ -195,6 +229,7 @@ def main():
                 'x0': x0, 'y0': y0, 'x1': x1, 'y1': y1,
                 'w': x1 - x0, 'h': y1 - y0,
                 'text': text,
+                'raw_text': raw_text,
             })
 
     all_pages = sorted(by_page)
@@ -281,21 +316,36 @@ def main():
                 dy1 = l['y1'] - page_y1
                 stream.append({
                     'type': 'line', 'page': p, 'text': l['text'],
+                    'raw_first': l['raw_text'][0] if l['raw_text'] else '',
+                    'raw_last': l['raw_text'][-1] if l['raw_text'] else '',
                     'vertical': l['vertical'], 'dy0': dy0, 'dy1': dy1,
                     'first_on_page': i == 0,
                 })
 
     # Repair sequential numeric chapter headings (e.g. '11','22','3.','11','5.','66','7.','80','9.','10'..'24')
     if len(chapter_num_indices) >= 3:
-        repaired = []
-        for expected, idx in enumerate(chapter_num_indices, 1):
+        offsets = Counter()
+        for pos, idx in enumerate(chapter_num_indices):
             old = stream[idx]['text']
-            new = str(expected)
+            if re.fullmatch(r'[0-9０-９]+', old):
+                val = int(old)
+                if val - pos >= 1:
+                    offsets[val - pos] += 1
+        start_num = offsets.most_common(1)[0][0] if offsets else 1
+        repaired = []
+        for pos, idx in enumerate(chapter_num_indices):
+            old = stream[idx]['text']
+            new = str(start_num + pos)
             if old != new:
-                repaired.append(f'p.{stream[idx]["page"]}: {old}->{new}')
+                repaired.append((idx, old, new))
+        if len(repaired) <= len(chapter_num_indices) / 2:
+            for idx, old, new in repaired:
                 stream[idx]['text'] = new
-        if repaired:
-            print(f'repaired chapter numbers ({len(repaired)}): ' + ', '.join(repaired))
+            if repaired:
+                print(f'repaired chapter numbers ({len(repaired)}): ' +
+                      ', '.join(f'p.{stream[idx]["page"]}: {old}->{new}' for idx, old, new in repaired))
+        else:
+            print(f'warning: skipped chapter number repair ({len(repaired)}/{len(chapter_num_indices)} differed from start={start_num})')
 
     # Second pass: assemble paragraphs
     out_lines = [title, author_line, '', '']
@@ -333,7 +383,8 @@ def main():
             continue
 
         t = item['text']
-        starts_bracket = t[0] in OPEN_BRACKETS
+        raw_first = item['raw_first']
+        starts_bracket = raw_first in OPEN_BRACKETS
         # Paragraph start heuristics:
         # 1. No previous line (after heading / blank)
         # 2. Previous line ended clearly short of bottom margin (slack >= 1.3 chars)
@@ -349,7 +400,7 @@ def main():
             new_para = True
         elif (not starts_bracket) and item['dy0'] >= 0.55 * char_h:
             new_para = True
-        elif t[0] in '「『' and (prev_line['text'][-1] in END_PUNCT or prev_line['dy1'] <= -0.8 * char_h):
+        elif raw_first in '「『' and (prev_line['raw_last'] in END_PUNCT or prev_line['dy1'] <= -0.8 * char_h):
             new_para = True
 
         if new_para:
@@ -358,8 +409,8 @@ def main():
             buf_indent = item['vertical'] and (not starts_bracket)
             buf = t
         else:
-            # Join with previous line; preserve space if Latin word continues across line break
-            if buf and buf[-1].isascii() and buf[-1].isalnum() and t[0].isascii() and t[0].isalnum():
+            # Join with previous line; only insert space when a lowercase Latin word continues into a Latin word
+            if buf and re.search(r'[a-z][A-Za-z]*$', buf) and raw_first.isascii() and raw_first.isalpha():
                 buf += ' ' + t
             else:
                 buf += t

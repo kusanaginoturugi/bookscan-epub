@@ -27,17 +27,18 @@ TXT=$EPUB_WORK/$TITLE.txt
 COVER=$EPUB_WORK/cover.jpg
 RUBY=$EPUB_WORK/ruby.tsv
 RUBY_HUMAN=$EPUB_WORK/ruby-human.tsv
-RUBY_ARGS=
 if [ -z "${SKIP_RUBY:-}" ]; then
   echo "[$(date +%T)] extract ruby: $TITLE"
   "$PY" "$BIN/extract-ruby.py" "$WORK" "$RUBY" --source "$SOURCE"
-  RUBY_ARGS="--ruby $RUBY"
-  [ ! -e "$RUBY_HUMAN" ] || RUBY_ARGS="$RUBY_ARGS --ruby-human $RUBY_HUMAN"
+  if [ -e "$RUBY_HUMAN" ]; then
+    set -- --ruby "$RUBY" --ruby-human "$RUBY_HUMAN" "$@"
+  else
+    set -- --ruby "$RUBY" "$@"
+  fi
 fi
 
 echo "[$(date +%T)] build aozora text: $TITLE"
-# shellcheck disable=SC2086
-"$PY" "$BIN/build-aozora-text.py" "$WORK" "$TXT" --source "$SOURCE" --cover-out "$COVER" $RUBY_ARGS "$@"
+"$PY" "$BIN/build-aozora-text.py" "$WORK" "$TXT" --source "$SOURCE" --cover-out "$COVER" "$@"
 
 echo "[$(date +%T)] run AozoraEpub3"
 (

@@ -109,9 +109,11 @@ section.done{{opacity:.55}} section.done h2{{color:#1a7f37}}
 </div>
 <script>
 const ITEMS = {items};
+const PASSTHROUGH = {passthrough};
 const SAVE_PATH = {save_path};
 const KEY = 'ruby-review:' + document.title;
 let saved = {{}};
+const autoCustom = {{}};
 try {{ saved = JSON.parse(localStorage.getItem(KEY) || '{{}}'); }} catch (e) {{}}
 
 function render() {{
@@ -132,6 +134,9 @@ function render() {{
     else if (v === 'drop') {{ b = ''; rb = ''; }}
     else if (v === 'custom') {{ b = cb; rb = cr; }}
     out.push([it.id, it.page, it.line_id, v, b, rb].join('\\t'));
+  }});
+  PASSTHROUGH.forEach(r => {{
+    out.push([r.id, r.page, r.line_id, r.choice, r.base, r.ruby].join('\\t'));
   }});
   try {{ localStorage.setItem(KEY, JSON.stringify(store)); }} catch (e) {{}}
   document.getElementById('tsv').value = out.join('\\n') + '\\n';
@@ -170,17 +175,13 @@ document.addEventListener('change', e => {{
   if (m) {{
     const i = +m[1];
     const v = e.target.value;
-    // Propagate identical (base, ruby) pair choices to unanswered items
-    if (v !== 'undecided') {{
-      const cb = document.getElementById('cb' + i).value;
-      const cr = document.getElementById('cr' + i).value;
+    delete autoCustom[i];
+    // Propagate identical (base, ruby) pair choices to unanswered items (defer custom until edited)
+    if (v !== 'undecided' && v !== 'custom') {{
       ITEMS.forEach((it, j) => {{
         if (j === i || it.sig !== ITEMS[i].sig || !isOpen(j)) return;
         const el = document.querySelector('input[name="r' + j + '"][value="' + v + '"]');
-        if (el) {{
-          el.checked = true;
-          if (v === 'custom') {{ document.getElementById('cb' + j).value = cb; document.getElementById('cr' + j).value = cr; }}
-        }}
+        if (el) el.checked = true;
       }});
     }}
     render();
@@ -195,8 +196,22 @@ document.addEventListener('input', e => {{
   const m = e.target.id && e.target.id.match(/^c[br](\\d+)$/);
   if (m) {{
     const i = +m[1];
+    delete autoCustom[i];
     const el = document.querySelector('input[name="r' + i + '"][value="custom"]');
     if (el) el.checked = true;
+    const cb = document.getElementById('cb' + i).value;
+    const cr = document.getElementById('cr' + i).value;
+    ITEMS.forEach((it, j) => {{
+      if (j === i || it.sig !== ITEMS[i].sig) return;
+      if (!isOpen(j) && autoCustom[j] !== i) return;
+      const cel = document.querySelector('input[name="r' + j + '"][value="custom"]');
+      if (cel) {{
+        cel.checked = true;
+        document.getElementById('cb' + j).value = cb;
+        document.getElementById('cr' + j).value = cr;
+        autoCustom[j] = i;
+      }}
+    }});
   }}
   render();
 }});
@@ -311,9 +326,13 @@ def main():
 
     human_path = args.human or (args.ruby_tsv.parent / 'ruby-human.tsv')
     human = {}
+    human_rows = []
     if human_path.exists():
         for r in csv.DictReader(human_path.open(newline=''), delimiter='\t'):
             human[r['id']] = {'v': r['choice'], 'cb': r['base'], 'cr': r['ruby']}
+            human_rows.append(r)
+    flagged_ids = {it['id'] for it in flagged}
+    passthrough = [r for r in human_rows if r['id'] not in flagged_ids]
 
     by_page = defaultdict(list)
     for i, item in enumerate(flagged):
@@ -379,6 +398,7 @@ def main():
         save_path=json.dumps(shlex.quote(str(human_path.resolve()))),
         sections='\n'.join(sections),
         items=json.dumps(data, ensure_ascii=False),
+        passthrough=json.dumps(passthrough, ensure_ascii=False),
         header='\\t'.join(HUMAN_COLS),
     ), encoding='utf-8')
     print(f'Interactive ruby review ({len(flagged)} items) -> {args.review_html}')
