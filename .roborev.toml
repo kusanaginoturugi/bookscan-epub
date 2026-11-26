@@ -1,8 +1,8 @@
 # roborev（コミットごとの自動レビュー）の設定
 
-# work/ と eval/ の TSV は本の文字を含むデータで、コードではない。
+# work/、eval/、data/ の TSV は本の文字を含むデータで、コードではない。
 # レビューの対象にもしないし、レビュー用エージェントにも送らない。
-exclude_patterns = ["work/**", "eval/**", "*.html"]
+exclude_patterns = ["work/**", "eval/**", "data/*.tsv", "*.html"]
 
 review_guidelines = """
 bookscan-epub は、自炊した本の画像PDFに透明テキスト層を重ねる個人用の実験リポジトリ。
