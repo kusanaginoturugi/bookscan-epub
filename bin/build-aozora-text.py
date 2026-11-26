@@ -161,14 +161,18 @@ def repair_chapter_numbers(texts):
     # Handle prefix before first anchor
     first = anchors[0]
     if first > 0:
-        has_sub, sub_out = _has_chain(texts[:first])
-        if has_sub:
-            out[:first] = sub_out
-        else:
+        if parsed[first] - first == 1:
             for pos in range(first):
-                expected = parsed[first] - (first - pos)
-                if expected >= 1:
-                    out[pos] = str(expected)
+                out[pos] = str(pos + 1)
+        else:
+            has_sub, sub_out = _has_chain(texts[:first])
+            if has_sub:
+                out[:first] = sub_out
+            else:
+                for pos in range(first):
+                    expected = parsed[first] - (first - pos)
+                    if expected >= 1:
+                        out[pos] = str(expected)
 
     # Fill strictly between adjacent anchors only when gap matches index distance uniquely
     for a, b in zip(anchors, anchors[1:]):
@@ -194,6 +198,41 @@ def repair_chapter_numbers(texts):
 
     repaired = [(pos, texts[pos], out[pos]) for pos in range(n) if out[pos] != texts[pos]]
     return out, repaired
+
+
+BRACKET_PAIRS = {'「': '」', '『': '』', '（': '）', '【': '】', '〖': '〗', '〈': '〉', '〔': '〕', '〝': '〟'}
+BRACKET_CLOSE = {v: k for k, v in BRACKET_PAIRS.items()}
+
+
+def check_brackets(out_lines):
+    """Return list of (lineno, msg, context) for unmatched brackets (skipping multi-paragraph 「/【)."""
+    issues = []
+    cleaned = [re.sub(r'※?［＃[^］]+］', '', re.sub(r'｜([^《]+)《[^》]+》', r'\1', ln)) for ln in out_lines]
+    for idx, clean in enumerate(cleaned):
+        next_clean = cleaned[idx + 1] if idx + 1 < len(cleaned) else ''
+        stack = []
+        for pos, ch in enumerate(clean):
+            if ch in BRACKET_PAIRS:
+                stack.append((ch, pos))
+            elif ch in BRACKET_CLOSE:
+                if stack and stack[-1][0] == BRACKET_CLOSE[ch]:
+                    stack.pop()
+                else:
+                    found = next((k for k in range(len(stack) - 1, -1, -1) if stack[k][0] == BRACKET_CLOSE[ch]), None)
+                    if found is not None:
+                        for u_ch, u_pos in stack[found + 1:]:
+                            issues.append((idx + 1, f'unclosed {u_ch} before {ch}', clean[max(0, u_pos - 8):u_pos + 12]))
+                        stack = stack[:found]
+                    else:
+                        top = stack[-1][0] if stack else None
+                        issues.append((idx + 1, f'mismatch close {ch} (top={top})', clean[max(0, pos - 12):pos + 8]))
+                        if stack and stack[-1][0] != '「':
+                            stack.pop()
+        for ch, pos in stack:
+            if ch in ('「', '【') and next_clean.startswith(ch):
+                continue
+            issues.append((idx + 1, f'unclosed {ch}', clean[max(0, pos - 8):pos + 14]))
+    return issues
 
 
 def is_chapter_heading(line, med_y0, med_dx, dx_before, dx_after, is_first_on_page, is_last_on_page):
@@ -529,6 +568,13 @@ def main():
     headings = [it['text'] for it in stream if it['type'] == 'heading']
     print(f'wrote {args.output_txt}: pages {start_page}-{end_page}, {len(out_lines)} lines, '
           f'{len(headings)} headings, {ruby_applied} rubies')
+    bracket_issues = check_brackets(out_lines)
+    if bracket_issues:
+        print(f'warning: {len(bracket_issues)} bracket mismatch(es):')
+        for ln, msg, ctx in bracket_issues[:10]:
+            print(f'  L{ln}: {msg} | ...{ctx}...')
+        if len(bracket_issues) > 10:
+            print(f'  ... ({len(bracket_issues) - 10} more)')
 
 
 if __name__ == '__main__':
