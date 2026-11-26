@@ -67,12 +67,9 @@ def _format_vertical_segment(text):
     text = re.sub(r'(?<![0-9A-Za-z])/(?![0-9A-Za-z])', '／', text)
     # Use U+2014 EM DASH instead of U+2015 HORIZONTAL BAR so vertical 'vert' glyph centers cleanly.
     text = text.replace('\u2015', '\u2014')
-    # Standalone 2-digit numbers -> explicit tcy (合字).
-    text = re.sub(r'(?<![0-9A-Za-z.\-])([0-9]{2})(?![0-9A-Za-z.\-])', r'\1［＃「\1」は縦中横］', text)
-    # Full-width single-digit numbers when standalone in Japanese context.
-    fw_digits = str.maketrans('0123456789', '０１２３４５６７８９')
-    text = re.sub(r'(?<![0-9A-Za-z.\-])([0-9])(?![0-9A-Za-z.\-])', lambda m: m.group(1).translate(fw_digits), text)
     # Full-width alphanumeric/code tokens without lowercase (e.g. MB-3076/K2/E, 730289C/EX, 5T, 6G).
+    # Must run before 2-digit tcy and 1-digit full-width rules so 'K2/12' and 'A/5' stay intact.
+    # Map '-' to U+2014 to match the centered vertical bar printed in Japanese paperbacks (e.g. ＭＢ―３０７６).
     fw_code = str.maketrans(
         'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/-',
         'ＡＢＣＤＥＦＧＨＩＪＫＬＭＮＯＰＱＲＳＴＵＶＷＸＹＺ０１２３４５６７８９／\u2014',
@@ -83,6 +80,11 @@ def _format_vertical_segment(text):
             return tok.translate(fw_code)
         return tok
     text = re.sub(r'(?<![A-Za-z0-9])([A-Z0-9]+(?:[/-][A-Z0-9]+)*)(?![A-Za-z0-9])', _code_to_fw, text)
+    # Standalone 2-digit numbers -> explicit tcy (合字).
+    text = re.sub(r'(?<![0-9A-Za-z.\-])([0-9]{2})(?![0-9A-Za-z.\-])', r'\1［＃「\1」は縦中横］', text)
+    # Full-width single-digit numbers when standalone in Japanese context.
+    fw_digits = str.maketrans('0123456789', '０１２３４５６７８９')
+    text = re.sub(r'(?<![0-9A-Za-z.\-])([0-9])(?![0-9A-Za-z.\-])', lambda m: m.group(1).translate(fw_digits), text)
     # Full-width short all-caps acronyms (1-4 chars, e.g. SF, P, UNSA, IDCC) not touching lowercase.
     fw_upper = str.maketrans('ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'ＡＢＣＤＥＦＧＨＩＪＫＬＭＮＯＰＱＲＳＴＵＶＷＸＹＺ')
     text = re.sub(r'(?<![A-Za-z0-9])([A-Z]{1,4})(?![A-Za-z0-9])', lambda m: m.group(1).translate(fw_upper), text)
