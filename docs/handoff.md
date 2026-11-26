@@ -15,3 +15,10 @@
   - 機械処理のみの抜き取り検査スコアは、『星を継ぐもの』100.00%（200/200行）、『プロテウス・オペレーション（上）』99.99%（199/200行）。
   - 未レビューの2冊（『造物主の掟』『造物主の選択』）も要確認がそれぞれ 43か所・22か所まで減少。
 - 次のフェーズは [docs/epub-plan.md](file:///home/onoue/src/bookscan-epub/docs/epub-plan.md) に沿った青空文庫形式→AozoraEpub3 による ePub 化。
+
+## ePub化とルビ修正・roborev設定（2026-11-26）
+
+- `bin/build-epub.sh`（`extract-ruby.py` → `build-aozora-text.py` → `AozoraEpub3`）およびルビ検算レビュー（`bin/audit-ruby.py`）を実装し、『星を継ぐもの』の ePub 3（`output/epub/星を継ぐもの - ジェイムズ・P・ホーガン.epub`、Git管理外、835ルビ）を生成した。
+- 複合語や前後の助詞・漢字まで親文字が広がる誤り（例: `潜り抜《くぐ》`、`粘り強《ねば》`、`異星文明局《エイリアン》`）への対策を `extract-ruby.py`・`audit-ruby.py`・`build-aozora-text.py` へ反映し、『星を継ぐもの』の該当14箇所も元画像確認のうえ `work/epub/hoshi-wo-tsugu-mono/ruby-human.tsv` で修正・再生成済み。
+- `prepare-trial-pdf.py`（全本文ページの背景クリーニング、傾き閾値 1.15、外周端線マスク）と `overrides.tsv` 対応（`build-searchable-book.sh` / `judge-ocr-disagreements.py`）も反映済み。
+- `roborev` は `.roborev.toml`（書籍由来 TSV・`work/**`・`eval/**` を差分から除外）、`.gitignore`（`/.roborev/`）、git フック（`post-commit` / `pre-push`）、エージェントスキル・フック（Claude / Codex / Gemini）まで設定済み。

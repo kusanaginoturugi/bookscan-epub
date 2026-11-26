@@ -310,7 +310,11 @@ id="toc-処理の流れの図2026-11-18">処理の流れの図（2026-11-18）</
 <li><a href="#スクリプトの整理2026-11-13"
 id="toc-スクリプトの整理2026-11-13">スクリプトの整理（2026-11-13）</a></li>
 <li><a href="#精度向上の検証と組み込み2026-11-2425"
-id="toc-精度向上の検証と組み込み2026-11-2425">精度向上の検証と組み込み（2026-11-24〜25）</a></li>
+id="toc-精度向上の検証と組み込み2026-11-2425">精度向上の検証と組み込み（2026-11-24〜25）</a>
+<ul>
+<li><a href="#epub化パイプライン実装ルビ修正背景補正とroborev整備"
+id="toc-epub化パイプライン実装ルビ修正背景補正とroborev整備">2026-11-25〜26：ePub化パイプライン実装・ルビ修正・背景補正とroborev整備</a></li>
+</ul></li>
 <li><a href="#次の作業" id="toc-次の作業">次の作業</a></li>
 </ul></li>
 </ul>
@@ -1598,6 +1602,62 @@ vs PARSeq確率差）：</strong>
 101件、<code>crop-bracket</code>
 36件が機能した。未レビューの『造物主の掟』は要確認が
 57→43か所、『造物主の選択』は 37→22か所へ減少。</li>
+</ul></li>
+</ol>
+<h3
+id="epub化パイプライン実装ルビ修正背景補正とroborev整備">2026-11-25〜26：ePub化パイプライン実装・ルビ修正・背景補正とroborev整備</h3>
+<ol type="1">
+<li><strong>青空文庫形式→AozoraEpub3 による ePub 3
+生成パイプライン実装：</strong>
+<ul>
+<li><code>bin/build-epub.sh</code>・<code>bin/build-aozora-text.py</code>・<code>bin/extract-ruby.py</code>・<code>bin/audit-ruby.py</code>
+を新規作成。</li>
+<li><code>extract-ruby.py</code> は NDLOCR-Lite XML の <code>ルビ</code>
+ブロックを白余白で分割し、PARSeq 30字モデルで認識したうえでローカル LLM
+に親文字・ルビを対応付け（<code>work/epub/SLUG/ruby.tsv</code>
+へキャッシュ）。</li>
+<li><code>audit-ruby.py</code> は抽出したルビをローカル LLM
+で検算し、元画像 2 倍切り出し付きの対話レビュー HTML を生成する（回答は
+<code>ruby-human.tsv</code> に保存）。</li>
+<li>『星を継ぐもの』で ePub
+3（<code>output/epub/星を継ぐもの - ジェイムズ・P・ホーガン.epub</code>、835ルビ）を生成した。</li>
+</ul></li>
+<li><strong>複合語・前後巻き込みルビの原因調査と修正：</strong>
+<ul>
+<li>リーダー表示で <code>潜り抜《くぐ》</code> や
+<code>粘り強《ねば》</code>
+のようにルビが3文字に間延びする不具合を調査。抽出 LLM
+にルビ縦幅の手がかりがなく複合語ごと返していたこと、後処理が末尾ひらがなしか削らなかったこと、検算
+LLM もサイズを見ずに <code>OK</code> にしていたことが原因だった。</li>
+<li>対策として、<code>extract-ruby.py</code>
+のプロンプトへ複合語・前側巻き込みの NG
+例とルビ縦幅からの推定親文字数（<code>est_chars</code>）を追加し、<code>clean_pair</code>
+/ <code>norm_pair</code> / <code>apply_ruby</code>
+へひらがなルビ時の先頭ひらがなトリムを追加。さらに
+<code>audit-ruby.py</code> へ <code>suspicious_reason()</code>
+を追加し、LLM が <code>OK</code>
+としても「親文字にひらがなが混じる」「親文字長に対してルビ縦幅が
+<code>per * len(base) * 0.55</code>
+未満」のものは機械的に要確認へ上げるようにした。</li>
+<li>『星を継ぐもの』で見つかった 14
+箇所（<code>潜《くぐ》</code>×2、<code>粘《ねば》</code>、<code>窺《うかが》</code>、<code>咎《とが》</code>、<code>籠《こも》</code>、<code>度《たび》</code>、<code>掻《か》</code>、<code>聳《そび》</code>、<code>術《すべ》</code>、<code>淋巴《リンパ》</code>、<code>異星《エイリアン》</code>、<code>珊瑚《さんご》</code>、<code>溝と畝《みぞ　うね》</code>）を元画像目視で修正し、ePub
+を再生成した。</li>
+</ul></li>
+<li><strong>検索可能PDF側の調整（<code>prepare-trial-pdf.py</code>・<code>overrides.tsv</code>）：</strong>
+<ul>
+<li><code>bin/prepare-trial-pdf.py</code>
+で全本文ページへ背景クリーニングと外周端線マスク（左右12px・上下10px）を適用し、傾き検出の閾値を
+<code>1.35</code> → <code>1.15</code> に調整。</li>
+<li><code>bin/build-searchable-book.sh</code>・<code>bin/judge-ocr-disagreements.py</code>
+で <code>work/searchable/SLUG/overrides.tsv</code>
+に対応し、手動上書き行の既存人手判定が orphan
+エラーにならないようにした。</li>
+</ul></li>
+<li><strong>roborev の設定整備：</strong>
+<ul>
+<li><code>.gitignore</code> に <code>/.roborev/</code> を追加し、Claude
+/ Codex / Gemini 向けのエージェントスキル・フックと
+<code>AGENTS.md</code> の運用メモを整備した。</li>
 </ul></li>
 </ol>
 <h2 id="次の作業">次の作業</h2>

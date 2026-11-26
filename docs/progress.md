@@ -544,6 +544,23 @@
 6. **全8冊への反映：**
    - シリーズ順に全8冊を再ビルドし、既存の人手判定と衝突なく完走。8冊合計で `diacritic-low-margin` 102件、`missing-mark` 79件、`margin-outlier` 51件、`crop-split` 101件、`crop-bracket` 36件が機能した。未レビューの『造物主の掟』は要確認が 57→43か所、『造物主の選択』は 37→22か所へ減少。
 
+### 2026-11-25〜26：ePub化パイプライン実装・ルビ修正・背景補正とroborev整備
+
+1. **青空文庫形式→AozoraEpub3 による ePub 3 生成パイプライン実装：**
+   - `bin/build-epub.sh`・`bin/build-aozora-text.py`・`bin/extract-ruby.py`・`bin/audit-ruby.py` を新規作成。
+   - `extract-ruby.py` は NDLOCR-Lite XML の `ルビ` ブロックを白余白で分割し、PARSeq 30字モデルで認識したうえでローカル LLM に親文字・ルビを対応付け（`work/epub/SLUG/ruby.tsv` へキャッシュ）。
+   - `audit-ruby.py` は抽出したルビをローカル LLM で検算し、元画像 2 倍切り出し付きの対話レビュー HTML を生成する（回答は `ruby-human.tsv` に保存）。
+   - 『星を継ぐもの』で ePub 3（`output/epub/星を継ぐもの - ジェイムズ・P・ホーガン.epub`、835ルビ）を生成した。
+2. **複合語・前後巻き込みルビの原因調査と修正：**
+   - リーダー表示で `潜り抜《くぐ》` や `粘り強《ねば》` のようにルビが3文字に間延びする不具合を調査。抽出 LLM にルビ縦幅の手がかりがなく複合語ごと返していたこと、後処理が末尾ひらがなしか削らなかったこと、検算 LLM もサイズを見ずに `OK` にしていたことが原因だった。
+   - 対策として、`extract-ruby.py` のプロンプトへ複合語・前側巻き込みの NG 例とルビ縦幅からの推定親文字数（`est_chars`）を追加し、`clean_pair` / `norm_pair` / `apply_ruby` へひらがなルビ時の先頭ひらがなトリムを追加。さらに `audit-ruby.py` へ `suspicious_reason()` を追加し、LLM が `OK` としても「親文字にひらがなが混じる」「親文字長に対してルビ縦幅が `per * len(base) * 0.55` 未満」のものは機械的に要確認へ上げるようにした。
+   - 『星を継ぐもの』で見つかった 14 箇所（`潜《くぐ》`×2、`粘《ねば》`、`窺《うかが》`、`咎《とが》`、`籠《こも》`、`度《たび》`、`掻《か》`、`聳《そび》`、`術《すべ》`、`淋巴《リンパ》`、`異星《エイリアン》`、`珊瑚《さんご》`、`溝と畝《みぞ　うね》`）を元画像目視で修正し、ePub を再生成した。
+3. **検索可能PDF側の調整（`prepare-trial-pdf.py`・`overrides.tsv`）：**
+   - `bin/prepare-trial-pdf.py` で全本文ページへ背景クリーニングと外周端線マスク（左右12px・上下10px）を適用し、傾き検出の閾値を `1.35` → `1.15` に調整。
+   - `bin/build-searchable-book.sh`・`bin/judge-ocr-disagreements.py` で `work/searchable/SLUG/overrides.tsv` に対応し、手動上書き行の既存人手判定が orphan エラーにならないようにした。
+4. **roborev の設定整備：**
+   - `.gitignore` に `/.roborev/` を追加し、Claude / Codex / Gemini 向けのエージェントスキル・フックと `AGENTS.md` の運用メモを整備した。
+
 ## 次の作業
 
 1. ユーザーの通読結果を受けて、両方の順序でBと答えた組（少数派が正しい）を補正に使うか決める。確認済みのテレパシー・ズボン・キャタピラは、暗黒星雲突破！とインフィニティ下巻の辞書補正版へ反映する候補。架空の固有名詞は行画像をLLMに見せる方式を検討する。

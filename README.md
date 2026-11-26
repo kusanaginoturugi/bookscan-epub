@@ -6,7 +6,7 @@
 
 『虎よ、虎よ！』『インフィニティ・リミテッド（上）』『夏への扉』の検索可能PDFを作成した。続けて傾き補正込みの手順で『時間泥棒』『暗黒星雲突破！』『天の光はすべて星』『インフィニティ・リミテッド（下）』を作り、ローカルLLMで作った濁点・半濁点の辞書で補正した版も作った。YomiToku、パ／バの読み直し、判断モデル、人のレビューまでを通す `bin/build-searchable-book.sh` で、ホーガンの『星を継ぐもの』『ガニメデの優しい巨人』『巨人たちの星』『内なる宇宙（上・下）』を作り、レビューを済ませた。『造物主の掟』『造物主の選択』も作った（人のレビュー前）。[成果物の目次](artifacts.html)から完成PDF、辞書、レビューを開ける。目次の原稿は `artifacts.md` で、`bin/build-docs-html.sh` がこのREADMEや作業記録と一緒にHTMLにする（mdへのリンクはhtmlへのリンクになり、mermaidの図は mermaid-cli の `mmdc` でSVGにして埋め込む。`mmdc` がなければ図はコードのまま）。原本・抽出画像・OCR結果は `.gitignore` で管理対象から外す。
 
-次の段階はePub化。検索可能PDFの文字を青空文庫形式（縦中横などの注記つきテキスト）で書き出し、AozoraEpub3 でePubにする方針で、青空文庫の注記と AozoraEpub3 の調査結果、進め方の案、未調査の課題（段落の組み立て、ルビなど）を [docs/epub-plan.md](docs/epub-plan.md) にまとめた。
+次の段階のePub化は、検索可能PDFの文字層（`lines.tsv`）とNDLOCR-Liteのルビ領域から青空文庫形式（縦中横・見出し・ルビ注記つきテキスト）を書き出し、AozoraEpub3 でePub 3にするパイプライン（`bin/build-epub.sh`）を実装した。まず『星を継ぐもの』でルビ抽出・検算レビューを含めたePub 3を作成済み。設計メモは [docs/epub-plan.md](docs/epub-plan.md)。
 
 ### 現時点の成果（『星を継ぐもの』の抜き取り検査、2026-11-25更新）
 
@@ -35,7 +35,7 @@ NDLの生の読みの誤り83字のうち43字は、長い行の後半を丸ご�
 
 ### スクリプトの置き場所
 
-- `bin/`：今の本作りで使うもの。入口は `build-searchable-book.sh` で、そこから `prepare-trial-pdf.py`、`margin-recognize.py`、`build-voicing-review.py`、`judge-ocr-disagreements.py`、`rebuild-text-layer.py`、`finalize-trial-pdf.py`、`build-proofread-sample.py` を呼ぶ。`text_layer_utils.py`、`ocr-sensitivity.py`、`deskew-study.py`、`auto-variant-glossary.py` は、これらが読み込む部品（`deskew-study.py` は試験用でもある）。ほかに、閲覧用コピーを作る `prepare-books.py` と、文書をHTMLにする `build-docs-html.sh`（`md-links-to-html.lua`、`mermaid-svg.lua`）。
+- `bin/`：今の本作りで使うもの。検索可能PDFの入口は `build-searchable-book.sh` で、そこから `prepare-trial-pdf.py`、`margin-recognize.py`、`build-voicing-review.py`、`judge-ocr-disagreements.py`、`rebuild-text-layer.py`、`finalize-trial-pdf.py`、`build-proofread-sample.py` を呼ぶ。ePub化の入口は `build-epub.sh` で、`extract-ruby.py`、`build-aozora-text.py` を呼び、ルビの検算レビューには `audit-ruby.py` を使う。`text_layer_utils.py`、`ocr-sensitivity.py`、`deskew-study.py`、`auto-variant-glossary.py` は、これらが読み込む部品（`deskew-study.py` は試験用でもある）。ほかに、閲覧用コピーを作る `prepare-books.py` と、文書をHTMLにする `build-docs-html.sh`（`md-links-to-html.lua`、`mermaid-svg.lua`）。
 - `bin/study/`：OCRエンジンや設定を比べた試験と評価のスクリプト（`ocr-sample-pages.py`、`score-ocr-engines.py`、`check-voicing-judges.py` など）。作業記録の数字を出し直すときに使う。
 - `bin/annotate/`：『夏への扉』の読書注釈の試作（`generate-summer-door-glossary.py`、`build-summer-door-annotated-pdf.py` など）。
 

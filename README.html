@@ -291,10 +291,11 @@ href="artifacts.html">成果物の目次</a>から完成PDF、辞書、レビュ
 mermaid-cli の <code>mmdc</code> でSVGにして埋め込む。<code>mmdc</code>
 がなければ図はコードのまま）。原本・抽出画像・OCR結果は
 <code>.gitignore</code> で管理対象から外す。</p>
-<p>次の段階はePub化。検索可能PDFの文字を青空文庫形式（縦中横などの注記つきテキスト）で書き出し、AozoraEpub3
-でePubにする方針で、青空文庫の注記と AozoraEpub3
-の調査結果、進め方の案、未調査の課題（段落の組み立て、ルビなど）を <a
-href="docs/epub-plan.html">docs/epub-plan.md</a> にまとめた。</p>
+<p>次の段階のePub化は、検索可能PDFの文字層（<code>lines.tsv</code>）とNDLOCR-Liteのルビ領域から青空文庫形式（縦中横・見出し・ルビ注記つきテキスト）を書き出し、AozoraEpub3
+でePub
+3にするパイプライン（<code>bin/build-epub.sh</code>）を実装した。まず『星を継ぐもの』でルビ抽出・検算レビューを含めたePub
+3を作成済み。設計メモは <a
+href="docs/epub-plan.html">docs/epub-plan.md</a>。</p>
 <h3
 id="現時点の成果星を継ぐものの抜き取り検査2026-11-25更新">現時点の成果（『星を継ぐもの』の抜き取り検査、2026-11-25更新）</h3>
 <p>本全体の正解テキストはないので、本文から無作為に選んだ200行（7501字）を人が原本と照らして正解を決め、その行で数えた（手順は「抜き取り検査」の節）。空白と、英数・記号の全角／半角の違いは数えない。</p>
@@ -395,10 +396,13 @@ id="現時点の成果星を継ぐものの抜き取り検査2026-11-25更新">�
 <p>NDLの生の読みの誤り83字のうち43字は、長い行の後半を丸ごと落とした2行で、余白つき再認識で直る。人の判定なしで作り直した版でも、規則の段までは同じ8字で、判断モデルの段で7字、完成で1字になる。</p>
 <h3 id="スクリプトの置き場所">スクリプトの置き場所</h3>
 <ul>
-<li><code>bin/</code>：今の本作りで使うもの。入口は
+<li><code>bin/</code>：今の本作りで使うもの。検索可能PDFの入口は
 <code>build-searchable-book.sh</code> で、そこから
 <code>prepare-trial-pdf.py</code>、<code>margin-recognize.py</code>、<code>build-voicing-review.py</code>、<code>judge-ocr-disagreements.py</code>、<code>rebuild-text-layer.py</code>、<code>finalize-trial-pdf.py</code>、<code>build-proofread-sample.py</code>
-を呼ぶ。<code>text_layer_utils.py</code>、<code>ocr-sensitivity.py</code>、<code>deskew-study.py</code>、<code>auto-variant-glossary.py</code>
+を呼ぶ。ePub化の入口は <code>build-epub.sh</code>
+で、<code>extract-ruby.py</code>、<code>build-aozora-text.py</code>
+を呼び、ルビの検算レビューには <code>audit-ruby.py</code>
+を使う。<code>text_layer_utils.py</code>、<code>ocr-sensitivity.py</code>、<code>deskew-study.py</code>、<code>auto-variant-glossary.py</code>
 は、これらが読み込む部品（<code>deskew-study.py</code>
 は試験用でもある）。ほかに、閲覧用コピーを作る
 <code>prepare-books.py</code> と、文書をHTMLにする
