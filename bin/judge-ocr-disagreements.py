@@ -981,7 +981,10 @@ def main():
 
     # A human verdict that no longer matches a hunk (the text before it changed,
     # e.g. after a new voicing glossary) would be dropped silently; stop instead.
-    orphans = sorted(set(human) - {item['id'] for item in items})
+    overridden_keys = ({(int(r['page']), int(r['line_id'])) for r in read_tsv(args.overrides)}
+                       if args.overrides else set())
+    orphans = sorted(hid for hid in (set(human) - {item['id'] for item in items})
+                     if (int(human[hid]['page']), int(human[hid]['line_id'])) not in overridden_keys)
     # The same name or phrase recurs (フォーサイス＝スコット): a verdict on one hunk
     # applies to unreviewed hunks with the same readings and the same 4 characters
     # on each side, unless verdicts on such hunks disagree.

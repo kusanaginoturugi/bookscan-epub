@@ -31,3 +31,5 @@
 /.cache/
 __pycache__/
 /AGENTS.md
+# roborev snapshots
+/.roborev/

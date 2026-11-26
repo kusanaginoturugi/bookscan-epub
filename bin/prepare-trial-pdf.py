@@ -34,7 +34,7 @@ def classify(image):
     bright = rgb[brightness > 180]
     paper = np.median(bright, axis=0) if len(bright) else np.array([0, 0, 0])
     text_page = 0.012 < np.mean(dark) < 0.16 and colored_ink < 0.018 and midtones < 0.18
-    needs_cleaning = text_page and (min(paper) < 245 or max(paper) - min(paper) > 9)
+    needs_cleaning = text_page
     return sample, text_page, needs_cleaning, paper
 
 
@@ -58,20 +58,25 @@ def skew_angle(sample):
         scores.append(float(np.var(columns)))
     best = int(np.argmax(scores))
     zero = len(angles) // 2
-    if abs(angles[best]) < .5 or scores[best] < scores[zero] * 1.35:
+    if abs(angles[best]) < .5 or scores[best] < scores[zero] * 1.15:
         return 0.0
     return float(angles[best])
 
 
-def clean_image(image, paper, angle):
+def clean_image(image, clean, angle):
     image = image.convert('RGB')
-    if min(paper) < 245 or max(paper) - min(paper) > 9:
+    if clean:
         gray = image.convert('L')
         background = gray.filter(ImageFilter.GaussianBlur(radius=35))
         difference = np.asarray(background, dtype=np.int16) - np.asarray(gray, dtype=np.int16)
         strength = np.clip((difference - 25) * 2, 0, 255).astype(np.uint8)
         cleaned = 255 - strength
         cleaned[cleaned > 225] = 255
+        # Mask scan-edge lines/shadows on outer borders (~1% margin, well outside text).
+        cleaned[:, :12] = 255
+        cleaned[:, -12:] = 255
+        cleaned[:10, :] = 255
+        cleaned[-10:, :] = 255
         image = Image.fromarray(cleaned, 'L')
     if angle:
         image = image.rotate(angle, resample=Image.Resampling.BICUBIC, fillcolor=255)
@@ -125,7 +130,7 @@ def main():
         if not needs_cleaning and not angle:
             counts['preserved'] += 1
             continue
-        updated = clean_image(image, paper if needs_cleaning else np.array([255] * 3), angle)
+        updated = clean_image(image, needs_cleaning, angle)
         images[0].replace(updated, quality=90, subsampling=0)
         counts['cleaned'] += bool(needs_cleaning)
         counts['deskewed'] += bool(angle)

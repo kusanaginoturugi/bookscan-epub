@@ -239,14 +239,16 @@ if [ "$USE_JUDGE" = on ] && [ -z "$GLOSSARY" ]; then
   CORRECTIONS=$WORK/judge/corrections.tsv
   # Rule versions: a new rule reruns both judge steps.
   JUDGE_RULES=skip-catalog,line-joins,joined-voicing,lookalike,propagate,book-word,save-path,paired-bracket,edge-v1,bracket-swap,forms2,bracket-marks,save-cmd,word-verdicts,book-ratio,book-ratio-rev,start-bracket,diacritic-margin,missing-marks,crop-split,crop-bracket2,margin-outlier
-  KEY=$(inputs_key "$VOICING_GLOSSARY" "$WORK/voicing-corrections.tsv" "$WORK/vocabulary.tsv" "$WORK/judge-human.tsv" "$WORK/margin.tsv" "$WORK/stages" "$WORK/skip-pages.txt" $SERIES_HUMAN)$JUDGE_RULES
+  OVR_ARGS=
+  [ ! -e "$WORK/overrides.tsv" ] || OVR_ARGS="--overrides $WORK/overrides.tsv"
+  KEY=$(inputs_key "$VOICING_GLOSSARY" "$WORK/voicing-corrections.tsv" "$WORK/vocabulary.tsv" "$WORK/judge-human.tsv" "$WORK/overrides.tsv" "$WORK/margin.tsv" "$WORK/stages" "$WORK/skip-pages.txt" $SERIES_HUMAN)$JUDGE_RULES
   if [ ! -e "$CORRECTIONS" ] || [ "$(cat "$WORK/judge.key" 2>/dev/null)" != "$KEY$LLM_MODEL$JUDGE_PROMPT" ]; then
     echo "[$(date +%T)] judge"
     curl -sf -m 10 "$LLM_URL/models" > /dev/null ||
       fail "no LLM server at $LLM_URL (start llama-server, set LLM_URL, or SKIP_JUDGE=1)"
     "$PY" "$BIN/judge-ocr-disagreements.py" "$ORIGINAL" "$WORK/ocr" "$WORK/yomitoku" "$WORK/judge" \
       "$REVIEW-judge" --ocr-stem "$OCR_STEM" --recognized "$WORK/margin.tsv" \
-      --glossary "$VOICING_GLOSSARY" --human "$WORK/judge-human.tsv" $SKIP_ARGS $WORD_ARGS $VOCAB_ARGS \
+      --glossary "$VOICING_GLOSSARY" --human "$WORK/judge-human.tsv" $SKIP_ARGS $WORD_ARGS $VOCAB_ARGS $OVR_ARGS \
       --diacritic-margins "$WORK/judge/diacritic-margins.tsv" \
       --url "$LLM_URL/chat/completions" --model "$LLM_MODEL" --prompt "$JUDGE_PROMPT" \
       --title "$TITLE LLM判断のレビュー" \
@@ -261,7 +263,8 @@ set -- --glossary "$VOICING_GLOSSARY" --fix-variants
 [ -z "$WORD_ARGS" ] || set -- "$@" $WORD_ARGS
 [ -z "$CORRECTIONS" ] || set -- "$@" --corrections "$CORRECTIONS"
 [ ! -e "$WORK/char-map.tsv" ] || set -- "$@" --char-map "$WORK/char-map.tsv"
-KEY=$(inputs_key "$VOICING_GLOSSARY" ${WORD_ARGS:+"$WORK/voicing-corrections.tsv"} ${CORRECTIONS:+"$CORRECTIONS"} "$WORK/char-map.tsv" "$WORK/margin.tsv" "$WORK/angles.tsv")line-joins,dump-lines,quotes-pair2
+[ ! -e "$WORK/overrides.tsv" ] || set -- "$@" --overrides "$WORK/overrides.tsv"
+KEY=$(inputs_key "$VOICING_GLOSSARY" ${WORD_ARGS:+"$WORK/voicing-corrections.tsv"} ${CORRECTIONS:+"$CORRECTIONS"} "$WORK/char-map.tsv" "$WORK/overrides.tsv" "$WORK/margin.tsv" "$WORK/angles.tsv" "$WORK/prepare.log")line-joins,dump-lines,quotes-pair2
 echo "[$(date +%T)] text layer"
 if [ ! -e "$TEXT" ] || [ "$(cat "$WORK/text.key" 2>/dev/null)" != "$KEY" ]; then
   [ ! -e "$TEXT" ] || mv -f "$TEXT" "$TEXT.prev"
