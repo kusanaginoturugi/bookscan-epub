@@ -130,6 +130,7 @@ def main():
                 override = overrides.pop(key)
                 if override['ocr_text'] != original:
                     raise ValueError(f'OCR changed for override: {key}')
+                word_corrections.pop(key, None)
                 text = override['corrected_text']
                 stages['rules'] = stages['judged'] = text
             else:

@@ -122,11 +122,21 @@ def low_margin_positions(pdf_path, ocr_dir, ocr_stem, picked, threshold=1.0):
                 continue
             padded = sensitivity.pad_to_width(tight, tight.shape[1] + 30) if line['h'] > line['w'] and line['h'] >= 400 else tight
             cnt = line['count']
-            model = models[0] if cnt <= 30 else (models[1] if cnt <= 50 else models[2])
-            logits = model.session.run(model.output_names, {model.input_names[0]: model.preprocess(padded)})[0][0]
-            indices = logits.argmax(axis=1)
-            stop = np.where(indices == 0)[0]
-            n = int(stop[0]) if stop.size else len(indices)
+            # Mirror vendor/ndlocr-lite/src/ocr.py process_cascade: PRED_CHAR_CNT is tier 3 (30), 2 (50), else 100.
+            tier = 0 if cnt == 3 else (1 if cnt == 2 else 2)
+            while True:
+                model = models[tier]
+                logits = model.session.run(model.output_names, {model.input_names[0]: model.preprocess(padded)})[0][0]
+                indices = logits.argmax(axis=1)
+                stop = np.where(indices == 0)[0]
+                n = int(stop[0]) if stop.size else len(indices)
+                if tier == 0 and n >= 25:
+                    tier = 1
+                    continue
+                if tier == 1 and n >= 45:
+                    tier = 2
+                    continue
+                break
             if n == 0:
                 continue
             logp = logits[:n] - np.logaddexp.reduce(logits[:n], axis=1, keepdims=True)

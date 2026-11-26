@@ -264,7 +264,7 @@ set -- --glossary "$VOICING_GLOSSARY" --fix-variants
 [ -z "$CORRECTIONS" ] || set -- "$@" --corrections "$CORRECTIONS"
 [ ! -e "$WORK/char-map.tsv" ] || set -- "$@" --char-map "$WORK/char-map.tsv"
 [ ! -e "$WORK/overrides.tsv" ] || set -- "$@" --overrides "$WORK/overrides.tsv"
-KEY=$(inputs_key "$VOICING_GLOSSARY" ${WORD_ARGS:+"$WORK/voicing-corrections.tsv"} ${CORRECTIONS:+"$CORRECTIONS"} "$WORK/char-map.tsv" "$WORK/overrides.tsv" "$WORK/margin.tsv" "$WORK/angles.tsv" "$WORK/prepare.log")line-joins,dump-lines,quotes-pair2
+KEY=$(inputs_key "$VOICING_GLOSSARY" ${WORD_ARGS:+"$WORK/voicing-corrections.tsv"} ${CORRECTIONS:+"$CORRECTIONS"} "$WORK/char-map.tsv" "$WORK/overrides.tsv" "$WORK/margin.tsv" "$WORK/angles.tsv" "$SANITIZED")line-joins,dump-lines,quotes-pair2
 echo "[$(date +%T)] text layer"
 if [ ! -e "$TEXT" ] || [ "$(cat "$WORK/text.key" 2>/dev/null)" != "$KEY" ]; then
   [ ! -e "$TEXT" ] || mv -f "$TEXT" "$TEXT.prev"
@@ -306,7 +306,7 @@ if [ -z "$GLOSSARY" ] && [ -e "$M/voicing-glossary.tsv" ]; then
     fi
     set -- "$@" --corrections "$M/judge/corrections.tsv"
   fi
-  KEY=$(inputs_key "$M/voicing-glossary.tsv" "$M/voicing-corrections.tsv" "$M/judge/corrections.tsv" "$WORK/margin.tsv" "$WORK/angles.tsv")dump-lines
+  KEY=$(inputs_key "$M/voicing-glossary.tsv" "$M/voicing-corrections.tsv" "$M/judge/corrections.tsv" "$WORK/margin.tsv" "$WORK/angles.tsv")dump-lines,quotes-pair2
   if [ ! -e "$M/lines.tsv" ] || [ "$(cat "$M/text.key" 2>/dev/null)" != "$KEY" ]; then
     echo "[$(date +%T)] text layer (machine only)"
     rm -f "$M/text.pdf"

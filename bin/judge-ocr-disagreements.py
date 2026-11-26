@@ -212,7 +212,7 @@ def book_word_choice(lines, index, start, end, ndl, yomi, word_counts):
     # (>= 20x ratio): pick the dominant word. Verified 18/18 on 8 books in both directions.
     if ca > 0 and ca >= BOOK_WORD_RATIO * cb:
         return 'ndl', f'{a}は本の中に{ca}回、{b}は{cb}回'
-    if cb > 0 and cb >= BOOK_WORD_RATIO * ca:
+    if ca > 0 and cb >= BOOK_WORD_RATIO * ca:
         return 'yomitoku', f'{b}は本の中に{cb}回、{a}は{ca}回'
     return None, ''
 
@@ -793,9 +793,9 @@ def main():
         if line.get('margin_alt'):
             alt_hunks = hunks(line['text'], line['margin_alt'], 2)
             if alt_hunks:
-                covered = {(s, e) for s, e, _, _, _ in found}
                 for s, e, f, t, c in alt_hunks:
-                    if (s, e) not in covered and len(f) == 1 and len(t) == 1 and c not in ('quote', 'bracket', 'dash', 'ndl-old-form'):
+                    overlaps = any(s < fe and fs < e for fs, fe, _, _, _ in found)
+                    if not overlaps and len(f) == 1 and len(t) == 1 and c not in ('quote', 'bracket', 'dash', 'ndl-old-form'):
                         found.append((s, e, f, t, 'margin-outlier'))
         line_hunks.append((index, line, found))
         text = line['text']
