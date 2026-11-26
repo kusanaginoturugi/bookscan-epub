@@ -88,6 +88,10 @@ def _format_vertical_segment(text):
     # Full-width short all-caps acronyms (1-4 chars, e.g. SF, P, UNSA, IDCC) not touching lowercase.
     fw_upper = str.maketrans('ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'ＡＢＣＤＥＦＧＨＩＪＫＬＭＮＯＰＱＲＳＴＵＶＷＸＹＺ')
     text = re.sub(r'(?<![A-Za-z0-9])([A-Z]{1,4})(?![A-Za-z0-9])', lambda m: m.group(1).translate(fw_upper), text)
+    # Full-width standalone single lowercase letters in Japanese context (e.g. xは2, 底e, x軸, h—リンク).
+    fw_lower = str.maketrans('abcdefghijklmnopqrstuvwxyz', 'ａｂｃｄｅｆｇｈｉｊｋｌｍｎｏｐｑｒｓｔｕｖｗｘｙｚ')
+    text = re.sub(r'(?<![A-Za-z0-9\s(\'\"“.\-])([a-z])(?![A-Za-z0-9\s)\'\"”.\-])',
+                  lambda m: m.group(1).translate(fw_lower), text)
     return text
 
 
@@ -350,13 +354,6 @@ def main():
     translator = meta.get('translator', '')
     author_line = f'{author}　{translator}訳' if (author and translator) else (author or translator)
 
-    ocr_dir = args.work_dir / 'ocr'
-    ocr_stem = sorted(ocr_dir.glob('*.json'))[0].stem.rsplit('_', 1)[0]
-    skip = catalog_pages(ocr_dir, ocr_stem)
-    skip_file = args.work_dir / 'skip-pages.txt'
-    if skip_file.exists():
-        skip |= parse_pages(skip_file.read_text().strip())
-
     # Load all lines from lines.tsv
     by_page = {}
     ruby_applied = 0
@@ -383,6 +380,19 @@ def main():
             })
 
     all_pages = sorted(by_page)
+    ocr_dir = args.work_dir / 'ocr'
+    ocr_jsons = sorted(ocr_dir.glob('*.json')) if ocr_dir.exists() else []
+    if ocr_jsons:
+        ocr_stem = ocr_jsons[0].stem.rsplit('_', 1)[0]
+        skip = catalog_pages(ocr_dir, ocr_stem)
+    else:
+        skip = {
+            p for p in all_pages[-20:]
+            if len(by_page[p]) >= 30 and (sum(len(l['raw_text']) for l in by_page[p]) / len(by_page[p])) < 16
+        }
+    skip_file = args.work_dir / 'skip-pages.txt'
+    if skip_file.exists():
+        skip |= parse_pages(skip_file.read_text().strip())
     # Estimate body geometry from middle pages
     mid_lo = all_pages[len(all_pages) // 10]
     mid_hi = all_pages[len(all_pages) * 9 // 10]
