@@ -27,13 +27,14 @@ RUBY_COLS = ['id', 'page', 'line_id', 'y0', 'y1', 'char_pos', 'raw_ruby', 'snipp
 VALID_RUBY = re.compile(r'^[ぁ-ゖァ-ヺー・＝]+$')
 HIRAGANA_RUBY = re.compile(r'^[ぁ-ゖー]+$')
 
+PROMPT_MARK_RULE = '- 本文スニペットの【…】はルビの縦方向の位置から推定したおおよその該当範囲（1文字ほど前後する場合あり）。出力の親文字には【】を含めない。\n'
+
 PROMPT = """日本語の縦書き小説の本文の一部と、そこに振られたルビ（振り仮名）のOCR読み取り結果です。
 ルビのOCRは字が小さいため、濁点・半濁点や細かい誤字を含むことがあります。
 本文スニペットの中で、このルビが振られている正確な「親文字」と「正しいルビ」を判定してください。
 
 ルール:
-- 本文スニペットの【…】はルビの縦方向の位置から推定したおおよその該当範囲（1文字ほど前後する場合あり）。出力の親文字には【】を含めない。
-- 親文字は本文スニペット（【】を除いた本文）に含まれる連続した部分文字列をそのまま抜き出す。
+{mark_rule}- 親文字は本文スニペット（【】を除いた本文）に含まれる連続した部分文字列をそのまま抜き出す。
 - 送り仮名や、ルビが掛かっていない隣の漢字・助詞は親文字に含めない（例: 「瞬き」に「まばた」なら 瞬\tまばた、「微かな」に「かす」なら 微\tかす、「装置を潜り抜」に「くぐ」なら 潜\tくぐ、「粘り強く」に「ねば」なら 粘\tねば、「機を窺い」に「うかが」なら 窺\tうかが）。
 - カタカナの当て字ルビ（例: 「手袋」に「ガントレツト」、「背嚢」に「バツクパツク」）はカタカナのまま残す（小書きカナは大きいカナのままでよい）。
 - ルビOCRがゴミや汚れで本文と無関係なら NONE とだけ答える。
@@ -51,13 +52,14 @@ def load_mod(name, path):
     return m
 
 
-def ask_llm(url, model, snippet, raw_ruby, est_chars):
+def ask_llm(url, model, snippet, raw_ruby, est_chars, marked=True):
     body = {
         'model': model,
         'temperature': 0,
         'max_tokens': 32,
         'chat_template_kwargs': {'enable_thinking': False},
         'messages': [{'role': 'user', 'content': PROMPT.format(
+            mark_rule=PROMPT_MARK_RULE if marked else '',
             snippet=snippet, raw_ruby=raw_ruby, est_chars=est_chars)}],
     }
     req = urllib.request.Request(url, json.dumps(body, ensure_ascii=False).encode(),
@@ -247,7 +249,8 @@ def main():
                 if seg['base']:
                     valid += 1
                 continue
-            ans = ask_llm(args.url, args.model, seg['marked_snippet'], seg['raw_ruby'], seg['est_chars'])
+            ans = ask_llm(args.url, args.model, seg['marked_snippet'], seg['raw_ruby'], seg['est_chars'],
+                          marked=seg['marked_snippet'] != seg['snippet'])
             base, ruby = clean_pair(ans, seg['snippet'])
             seg['base'], seg['ruby'] = base, ruby
             writer.writerow(seg)
