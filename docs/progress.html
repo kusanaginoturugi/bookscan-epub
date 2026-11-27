@@ -1746,6 +1746,82 @@ OCR を一般的な読みへ書き換えない」ルールを追加した。</li
 で閉じずに次段落を <code>「</code>
 なしで続ける組み方なので、本文は直さない。</li>
 </ul></li>
+<li><strong>レビュー済み4冊の ePub 化（gallsk、全ページの OCR
+結果あり）：</strong>
+<ul>
+<li><p><code>bin/build-epub.sh</code> のあと
+<code>bin/audit-ruby.py</code>
+でルビ検算レビュー（<code>review/SLUG-ruby/index.html</code>）まで作った。終わりのページは奥付・著作リスト・広告の手前で切った。</p>
+<table style="width:100%;">
+<colgroup>
+<col style="width: 16%" />
+<col style="width: 16%" />
+<col style="width: 16%" />
+<col style="width: 16%" />
+<col style="width: 16%" />
+<col style="width: 16%" />
+</colgroup>
+<thead>
+<tr>
+<th>本</th>
+<th>範囲（PDFページ）</th>
+<th>見出し</th>
+<th>ルビ</th>
+<th>ルビ検算</th>
+<th>括弧不一致</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>巨人たちの星</td>
+<td>8〜471</td>
+<td>プロローグ・1〜40・エピローグ・訳者あとがき</td>
+<td>742</td>
+<td>15 件</td>
+<td>6 件</td>
+</tr>
+<tr>
+<td>内なる宇宙（上）</td>
+<td>19〜386</td>
+<td>プロローグ・1〜33</td>
+<td>623</td>
+<td>19 件</td>
+<td>4 件</td>
+</tr>
+<tr>
+<td>内なる宇宙（下）</td>
+<td>13〜374</td>
+<td>34〜63・エピローグ</td>
+<td>632</td>
+<td>14 件</td>
+<td>4 件</td>
+</tr>
+<tr>
+<td>プロテウス・オペレーション（上）</td>
+<td>15〜338</td>
+<td>プロローグ・1〜24</td>
+<td>88</td>
+<td>14 件</td>
+<td>27 件</td>
+</tr>
+</tbody>
+</table></li>
+<li><p>『巨人たちの星』は 2026-11-26 に別のマシンで作ったときルビが 54
+か所だけだった（OCR 結果が 1〜34 ページ分しかなかった）。全ページの OCR
+結果で作り直して 742 か所になった。</p></li>
+<li><p>『内なる宇宙（下）』は最初の章が「33」と読まれていて、始まりのページの自動検出（<code>プロローグ</code>・<code>1</code>
+などを探す）が効かず、カバーの文章や版権ページから本文に入っていた。p.13
+の章番号を原本で「34」と確かめて <code>overrides.tsv</code>
+で直し、<code>--start-page 13</code>
+を付けた（上巻も登場人物は入れずプロローグから）。</p></li>
+<li><p>『内なる宇宙（下）』の巻末の解説（p.365〜、題「ルーペの向こうの「情報宇宙」」）は、見出しを決まった単語（<code>HEADING_WORDS</code>）でしか拾わないため見出しにならず、エピローグの続きになっている。</p></li>
+<li><p>括弧不一致には、本ごとに共通の OCR の癖が見える。<code>言</code>
+の前に余計な <code>（</code>
+が入る（<code>何も（言わず</code>、<code>ナチの（言動</code>、<code>日付への（言及</code>、<code>ブローヒリオの（言う</code>。『ガニメデ』の
+<code>何か（言いかけた</code> も同じ）。<code>〈</code> を
+<code>ヘ</code>
+と読む（<code>ヘシャピアロン〉号</code>、<code>ヘヴィシニュウ〉号</code>）。残りの多くは段落をまたぐ台詞（原本どおり）。</p></li>
+</ul></li>
 </ol>
 <h2 id="次の作業">次の作業</h2>
 <ol type="1">
