@@ -119,7 +119,8 @@ def clean_pair(ans, snippet):
     # Trim common trailing hiragana okurigana from both base and ruby (e.g. 掻いた/かいた -> 掻/か, 穿った/うがつた -> 穿/うが)
     trimmed_tail = False
     while (len(base) >= 2 and len(ruby) >= 2 and ('\u3041' <= base[-1] <= '\u3096') and
-           (base[-1] == ruby[-1] or (trimmed_tail and base[-1] == 'っ' and ruby[-1] == 'つ'))):
+           (base[-1] == ruby[-1] or (base[-1] != 'っ' and normalize_ruby(base[-1]) == ruby[-1]) or
+            (trimmed_tail and base[-1] == 'っ' and ruby[-1] == 'つ'))):
         base, ruby = base[:-1], ruby[:-1]
         trimmed_tail = True
     # Trim trailing hiragana okurigana from base if it is not present at the end of ruby

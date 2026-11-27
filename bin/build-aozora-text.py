@@ -286,7 +286,8 @@ def apply_ruby(text, entries, missed_human=None):
             # Trim common trailing hiragana okurigana (e.g. 掻いた/かいた -> 掻/か, 穿った/うがつた -> 穿/うが) and stray trailing hiragana
             trimmed_tail = False
             while (len(base) >= 2 and len(ruby) >= 2 and ('\u3041' <= base[-1] <= '\u3096') and
-                   (base[-1] == ruby[-1] or (trimmed_tail and base[-1] == 'っ' and ruby[-1] == 'つ'))):
+                   (base[-1] == ruby[-1] or (base[-1] != 'っ' and normalize_ruby(base[-1]) == ruby[-1]) or
+                    (trimmed_tail and base[-1] == 'っ' and ruby[-1] == 'つ'))):
                 base, ruby = base[:-1], ruby[:-1]
                 trimmed_tail = True
             while len(base) >= 2 and ('\u3041' <= base[-1] <= '\u3096') and not ruby.endswith(base[-1]):
@@ -377,8 +378,11 @@ def main():
             raw_text = r['final'].strip()
             entries = ruby_by_line.get((p, lid))
             if entries:
-                text = apply_ruby(raw_text, entries, missed_human=ruby_human_missed)
+                line_missed = []
+                text = apply_ruby(raw_text, entries, missed_human=line_missed)
                 ruby_applied += text.count('《')
+                for item in line_missed:
+                    ruby_human_missed.append((p, *item))
             else:
                 text = escape_aozora(raw_text)
             by_page.setdefault(p, []).append({
@@ -590,9 +594,10 @@ def main():
     headings = [it['text'] for it in stream if it['type'] == 'heading']
     print(f'wrote {args.output_txt}: pages {start_page}-{end_page}, {len(out_lines)} lines, '
           f'{len(headings)} headings, {ruby_applied} rubies')
+    ruby_human_missed = [m for m in ruby_human_missed if start_page <= m[0] <= end_page and m[0] not in skip]
     if ruby_human_missed:
         print(f'warning: {len(ruby_human_missed)} ruby-human entry(s) not applied:')
-        for rid, base, ruby, line_text in ruby_human_missed:
+        for _, rid, base, ruby, line_text in ruby_human_missed:
             print(f'  {rid}: {base}《{ruby}》 not found in "{line_text}"')
     bracket_issues = check_brackets(out_lines)
     if bracket_issues:

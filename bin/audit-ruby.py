@@ -53,7 +53,8 @@ def norm_pair(b, rb):
             b = b[1:]
     trimmed_tail = False
     while (len(b) >= 2 and len(rb) >= 2 and ('\u3041' <= b[-1] <= '\u3096') and
-           (b[-1] == rb[-1] or (trimmed_tail and b[-1] == 'っ' and rb[-1] == 'つ'))):
+           (b[-1] == rb[-1] or (b[-1] != 'っ' and normalize_ruby(b[-1]) == rb[-1]) or
+            (trimmed_tail and b[-1] == 'っ' and rb[-1] == 'つ'))):
         b, rb = b[:-1], rb[:-1]
         trimmed_tail = True
     while len(b) >= 2 and ('\u3041' <= b[-1] <= '\u3096') and not rb.endswith(b[-1]):
