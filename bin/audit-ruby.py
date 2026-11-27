@@ -11,6 +11,7 @@ import io
 import json
 import re
 import shlex
+import sys
 import urllib.request
 from collections import defaultdict
 from pathlib import Path
@@ -18,18 +19,23 @@ from pathlib import Path
 import pypdfium2
 
 ROOT = Path(__file__).resolve().parent.parent
-SMALL = str.maketrans('ァィゥェォッャュョヮヵヶぁぃぅぇぉっゃゅょゎ', 'アイウエオツヤユヨワカケあいうえおつやゆよわ')
+sys.path.insert(0, str(ROOT / 'bin'))
+from text_layer_utils import normalize_ruby  # noqa: E402
+
 HUMAN_COLS = ['id', 'page', 'line_id', 'choice', 'base', 'ruby']
 HIRAGANA_RE = re.compile(r'[ぁ-ゖ]')
 HIRAGANA_RUBY = re.compile(r'^[ぁ-ゖー]+$')
 
 PROMPT = """日本語小説のルビ（振り仮名）の検算です。
+小説のルビには「難読漢字の読み」だけでなく、「一般的な読みとは異なる表外訓・熟字訓・文語読み・当て字（例: 穿→は、傾→かし、解→ほど、詰→なじ、敵→かな、刷→は、猛者→もさ、手袋→ガントレツト、微子→ニユートリノ）」も多く使われます。
 本文スニペット中の親文字「{base}」に、ルビ「{ruby}」が振られています（元のルビOCRは「{raw}」）。
 
 判定ルール:
-- この文脈で親文字「{base}」に対する読みとして「{ruby}」が正しければ OK とだけ答える。
-- SFのカタカナ当て字ルビ（例: 手袋→ガントレツト、微子→ニユートリノ）や、ルビ内の大きいカタカナ（ツ・ヤ・ユ・ヨ等）は正しければ OK。
-- 読みが明らかに誤っている（例: 飽→あつ、湧→わか）、または親文字が隣の字・送り仮名・助詞まで広がっている／ズレている場合（例: 潜り抜→くぐ は 潜→くぐ、粘り強→ねば は 粘→ねば、機を窺→うかが は 窺→うかが）は、
+- 親文字「{base}」に対する読みとして「{ruby}」が、難読漢字の読み・表外訓・熟字訓・文語読み・当て字のいずれかとしてこの文脈で成立すれば OK とだけ答える。
+- 特に、現在のルビが元ルビOCRと一致しており、その漢字・文脈の特殊な読みや当て字としてあり得るなら、一般的な読みに書き直さず必ず OK にする。
+- ルビはひらがな・カタカナとも小書き仮名（ぁぃぅぇぉっゃゅょゎ・ァィゥェォッャュョヮヵヶ）を使わず、すべて大きい仮名（あいうえおつやゆよわ・アイウエオツヤユヨワカケ）で統一する。FIX を返すときもルビはすべて大きい仮名で書く（例: フィギュア→フイギユア、きょうく→きようく）。
+- FIX にするのは次の場合に限る: (1) 親文字の範囲ズレ・過不足（熟語の一部だけに切れている、隣の字・送り仮名・助詞を含んでいる等。例: 潜り抜→くぐ は 潜→くぐ、粘り強→ねば は 粘→ねば、機を窺→うかが は 窺→うかが）、(2) 元OCRの濁点・1文字誤認が残っている、(3) 読みが文脈と明らかに無関係・誤り（例: 飽→あつ、湧→わか）。
+  その場合は
   FIX\t正しい親文字\t正しいルビ
   の1行で答える（正しい親文字は本文スニペット内の連続した文字列。送り仮名は含めない）。
 - ルビOCRがゴミで本来ルビ不要なら DROP とだけ答える。
@@ -45,11 +51,14 @@ def norm_pair(b, rb):
     if HIRAGANA_RUBY.fullmatch(rb):
         while len(b) >= 2 and ('\u3041' <= b[0] <= '\u3096') and not rb.startswith(b[0]):
             b = b[1:]
-    while len(b) >= 2 and len(rb) >= 2 and ('\u3041' <= b[-1] <= '\u3096') and b[-1] == rb[-1]:
+    trimmed_tail = False
+    while (len(b) >= 2 and len(rb) >= 2 and ('\u3041' <= b[-1] <= '\u3096') and
+           (b[-1] == rb[-1] or (trimmed_tail and b[-1] == 'っ' and rb[-1] == 'つ'))):
         b, rb = b[:-1], rb[:-1]
+        trimmed_tail = True
     while len(b) >= 2 and ('\u3041' <= b[-1] <= '\u3096') and not rb.endswith(b[-1]):
         b = b[:-1]
-    return b, rb
+    return b, normalize_ruby(rb)
 
 
 def suspicious_reason(b, y0, y1, per):
@@ -95,7 +104,7 @@ section.done{{opacity:.55}} section.done h2{{color:#1a7f37}}
 #tsv{{display:none}}
 </style>
 <h1>{title}（{count}件）</h1>
-<p>原本の2倍拡大画像を見て、ルビの正誤を選ぶ。同じ <code>(親文字, ルビ)</code> の別箇所にも自動で同じ選択が入る。キー: <b>n</b> 次の未確認 / <b>p</b> 前。
+<p>原本の2倍拡大画像を見て、ルビの正誤を選ぶ。同じ <code>(親文字, ルビ)</code> の別箇所にも自動で同じ選択が入る。ルビの小書き仮名は保存時に自動で大きい仮名に統一される。キー: <b>n</b> 次の未確認 / <b>p</b> 前。
 終わったら下の「保存コマンドをコピー」を押して端末に貼ると <code>{human}</code> に保存される。</p>
 {sections}
 <div id="out">
@@ -112,6 +121,11 @@ const ITEMS = {items};
 const PASSTHROUGH = {passthrough};
 const SAVE_PATH = {save_path};
 const KEY = 'ruby-review:' + document.title;
+const SMALL_FROM = 'ァィゥェォッャュョヮヵヶぁぃぅぇぉっゃゅょゎゕゖ';
+const SMALL_TO   = 'アイウエオツヤユヨワカケあいうえおつやゆよわかけ';
+function normRuby(s) {{
+  return s ? s.replace(/[ァィゥェォッャュョヮヵヶぁぃぅぇぉっゃゅょゎゕゖ]/g, c => SMALL_TO[SMALL_FROM.indexOf(c)]) : s;
+}}
 let saved = {{}};
 const autoCustom = {{}};
 try {{ saved = JSON.parse(localStorage.getItem(KEY) || '{{}}'); }} catch (e) {{}}
@@ -124,7 +138,7 @@ function render() {{
     const el = document.querySelector('input[name="r' + i + '"]:checked');
     const v = el ? el.value : 'undecided';
     const cb = document.getElementById('cb' + i).value.trim();
-    const cr = document.getElementById('cr' + i).value.trim();
+    const cr = normRuby(document.getElementById('cr' + i).value.trim());
     document.getElementById('s' + i).classList.toggle('done', v !== 'undecided');
     if (v === 'undecided') return;
     done++;
@@ -133,10 +147,10 @@ function render() {{
     if (v === 'fix') {{ b = it.new_base; rb = it.new_ruby; }}
     else if (v === 'drop') {{ b = ''; rb = ''; }}
     else if (v === 'custom') {{ b = cb; rb = cr; }}
-    out.push([it.id, it.page, it.line_id, v, b, rb].join('\\t'));
+    out.push([it.id, it.page, it.line_id, v, b, normRuby(rb)].join('\\t'));
   }});
   PASSTHROUGH.forEach(r => {{
-    out.push([r.id, r.page, r.line_id, r.choice, r.base, r.ruby].join('\\t'));
+    out.push([r.id, r.page, r.line_id, r.choice, r.base, normRuby(r.ruby)].join('\\t'));
   }});
   try {{ localStorage.setItem(KEY, JSON.stringify(store)); }} catch (e) {{}}
   document.getElementById('tsv').value = out.join('\\n') + '\\n';
@@ -148,8 +162,10 @@ ITEMS.forEach((it, i) => {{
   if (!s) return;
   const el = document.querySelector('input[name="r' + i + '"][value="' + s.v + '"]');
   if (el) el.checked = true;
-  if (s.cb !== undefined) document.getElementById('cb' + i).value = s.cb;
-  if (s.cr !== undefined) document.getElementById('cr' + i).value = s.cr;
+  if (s.v === 'custom') {{
+    if (s.cb !== undefined) document.getElementById('cb' + i).value = s.cb;
+    if (s.cr !== undefined) document.getElementById('cr' + i).value = normRuby(s.cr);
+  }}
 }});
 
 function isOpen(i) {{
@@ -272,6 +288,9 @@ def main():
 
     if args.from_audit and args.audit_tsv.exists():
         flagged = list(csv.DictReader(args.audit_tsv.open(newline=''), delimiter='\t'))
+        for it in flagged:
+            it['ruby'] = normalize_ruby(it.get('ruby', ''))
+            it['new_ruby'] = normalize_ruby(it.get('new_ruby', ''))
     else:
         rows = list(csv.DictReader(args.ruby_tsv.open(newline=''), delimiter='\t'))
         groups = defaultdict(list)
@@ -298,7 +317,7 @@ def main():
                     if len(parts) >= 3:
                         action = 'FIX'
                         new_b, new_rb = norm_pair(parts[1].strip(), parts[2].strip())
-                        if new_b == b and new_rb.translate(SMALL) == rb.translate(SMALL):
+                        if new_b == b and new_rb == rb:
                             llm_ok = True
                             action, new_b, new_rb = 'FLAG', '', ''
             for idx, r in entries:
@@ -329,6 +348,7 @@ def main():
     human_rows = []
     if human_path.exists():
         for r in csv.DictReader(human_path.open(newline=''), delimiter='\t'):
+            r['ruby'] = normalize_ruby(r.get('ruby', ''))
             human[r['id']] = {'v': r['choice'], 'cb': r['base'], 'cr': r['ruby']}
             human_rows.append(r)
     flagged_ids = {it['id'] for it in flagged}

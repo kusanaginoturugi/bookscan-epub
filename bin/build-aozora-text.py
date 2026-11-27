@@ -17,7 +17,7 @@ import pypdfium2
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / 'bin'))
-from text_layer_utils import catalog_pages, parse_pages  # noqa: E402
+from text_layer_utils import catalog_pages, normalize_ruby, parse_pages  # noqa: E402
 
 OPEN_BRACKETS = set('「『（〝〈《【〔')
 END_PUNCT = set('。！？?!」』）〟〉》】〕…―')
@@ -268,27 +268,33 @@ def extract_cover(pdf_path, out_jpg):
     doc.close()
 
 
-def apply_ruby(text, entries):
+def apply_ruby(text, entries, missed_human=None):
     """Insert Aozora ruby ｜base《ruby》 at the occurrence closest to each entry's char_pos,
     and escape literal Aozora delimiters outside inserted ruby tags."""
     if not entries:
         return escape_aozora(text)
     placements = []
     used = [False] * len(text)
-    for char_pos, base, ruby, is_human in sorted(entries, key=lambda e: e[0]):
+    for entry in sorted(entries, key=lambda e: e[0]):
+        char_pos, base, ruby, is_human = entry[:4]
+        entry_id = entry[4] if len(entry) > 4 else ''
         if not is_human:
             # Trim leading hiragana on pure-hiragana ruby (e.g. てて屯/たむろ -> 屯/たむろ)
             if re.fullmatch(r'[ぁ-ゖー]+', ruby):
                 while len(base) >= 2 and ('\u3041' <= base[0] <= '\u3096') and not ruby.startswith(base[0]):
                     base = base[1:]
-            # Trim common trailing hiragana okurigana (e.g. 掻いた/かいた -> 掻/か) and stray trailing hiragana
-            while len(base) >= 2 and len(ruby) >= 2 and ('\u3041' <= base[-1] <= '\u3096') and base[-1] == ruby[-1]:
+            # Trim common trailing hiragana okurigana (e.g. 掻いた/かいた -> 掻/か, 穿った/うがつた -> 穿/うが) and stray trailing hiragana
+            trimmed_tail = False
+            while (len(base) >= 2 and len(ruby) >= 2 and ('\u3041' <= base[-1] <= '\u3096') and
+                   (base[-1] == ruby[-1] or (trimmed_tail and base[-1] == 'っ' and ruby[-1] == 'つ'))):
                 base, ruby = base[:-1], ruby[:-1]
+                trimmed_tail = True
             while len(base) >= 2 and ('\u3041' <= base[-1] <= '\u3096') and not ruby.endswith(base[-1]):
                 base = base[:-1]
             # Skip likely misaligned rubies whose base has no kanji or Latin letter
             if not any(('\u4e00' <= c <= '\u9fff') or c in '々〆ヶ' or ('A' <= c <= 'Z') or ('a' <= c <= 'z') for c in base):
                 continue
+        ruby = normalize_ruby(ruby)
         best_idx, best_dist = None, 10**9
         start = 0
         while True:
@@ -305,6 +311,11 @@ def apply_ruby(text, entries):
             for k in range(best_idx, best_idx + len(base)):
                 used[k] = True
             placements.append((best_idx, best_idx + len(base), base, ruby))
+        elif is_human and missed_human is not None:
+            already = any(p_base == base and p_ruby == ruby and abs(i0 - char_pos) <= 8
+                          for i0, _, p_base, p_ruby in placements)
+            if not already:
+                missed_human.append((entry_id, base, ruby, text))
     out = []
     pos = 0
     for i0, i1, base, ruby in sorted(placements, key=lambda p: p[0]):
@@ -341,12 +352,12 @@ def main():
                 if h:
                     if h['choice'] == 'drop':
                         continue
-                    base, ruby, is_human = h['base'], h['ruby'], True
+                    base, ruby, is_human = h['base'], normalize_ruby(h['ruby']), True
                 else:
                     base, ruby, is_human = r.get('base', ''), r.get('ruby', ''), False
                 if base and ruby:
                     ruby_by_line.setdefault((int(r['page']), int(r['line_id'])), []).append(
-                        (int(r['char_pos']), base, ruby, is_human))
+                        (int(r['char_pos']), base, ruby, is_human, r.get('id', '')))
 
     meta = load_catalog(args.source)
     title = meta.get('title') or args.work_dir.name
@@ -357,6 +368,7 @@ def main():
     # Load all lines from lines.tsv
     by_page = {}
     ruby_applied = 0
+    ruby_human_missed = []
     with (args.work_dir / 'lines.tsv').open(newline='') as handle:
         for r in csv.DictReader(handle, delimiter='\t'):
             p = int(r['page'])
@@ -365,7 +377,7 @@ def main():
             raw_text = r['final'].strip()
             entries = ruby_by_line.get((p, lid))
             if entries:
-                text = apply_ruby(raw_text, entries)
+                text = apply_ruby(raw_text, entries, missed_human=ruby_human_missed)
                 ruby_applied += text.count('《')
             else:
                 text = escape_aozora(raw_text)
@@ -578,6 +590,10 @@ def main():
     headings = [it['text'] for it in stream if it['type'] == 'heading']
     print(f'wrote {args.output_txt}: pages {start_page}-{end_page}, {len(out_lines)} lines, '
           f'{len(headings)} headings, {ruby_applied} rubies')
+    if ruby_human_missed:
+        print(f'warning: {len(ruby_human_missed)} ruby-human entry(s) not applied:')
+        for rid, base, ruby, line_text in ruby_human_missed:
+            print(f'  {rid}: {base}《{ruby}》 not found in "{line_text}"')
     bracket_issues = check_brackets(out_lines)
     if bracket_issues:
         print(f'warning: {len(bracket_issues)} bracket mismatch(es):')

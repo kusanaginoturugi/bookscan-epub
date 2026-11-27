@@ -10,6 +10,7 @@ import argparse
 import csv
 import importlib.util
 import json
+import math
 import re
 import sys
 import urllib.request
@@ -21,7 +22,7 @@ import pypdfium2
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / 'bin'))
-from text_layer_utils import catalog_pages, parse_pages  # noqa: E402
+from text_layer_utils import catalog_pages, normalize_ruby, parse_pages  # noqa: E402
 
 RUBY_COLS = ['id', 'page', 'line_id', 'y0', 'y1', 'char_pos', 'raw_ruby', 'snippet', 'base', 'ruby']
 VALID_RUBY = re.compile(r'^[ぁ-ゖァ-ヺー・＝]+$')
@@ -30,19 +31,21 @@ HIRAGANA_RUBY = re.compile(r'^[ぁ-ゖー]+$')
 PROMPT_MARK_RULE = '- 本文スニペットの⟦…⟧はルビの縦方向の位置から推定したおおよその該当範囲（1文字ほど前後する場合あり）。出力の親文字には⟦⟧を含めない。\n'
 
 PROMPT = """日本語の縦書き小説の本文の一部と、そこに振られたルビ（振り仮名）のOCR読み取り結果です。
-ルビのOCRは字が小さいため、濁点・半濁点や細かい誤字を含むことがあります。
+小説のルビには「難読漢字の読み（例: 恐懼→きようく、僥倖→ぎようこう）」だけでなく、「一般的な読みとは異なる表外訓・熟字訓・文語読み・当て字（例: 穿いた→は、傾げた→かし、解いて→ほど、詰る→なじ、敵わない→かな、刷いた→は、猛者→もさ、手袋→ガントレツト、背嚢→バツクパツク）」も多く使われます。
 本文スニペットの中で、このルビが振られている正確な「親文字」と「正しいルビ」を判定してください。
 
 ルール:
 {mark_rule}- 親文字は本文スニペット{base_scope}に含まれる連続した部分文字列をそのまま抜き出す。
+- 元ルビOCRの読み全体に対応する親文字（熟語）を丸ごと選び、熟語の一部だけに切り詰めたり、元ルビの読みを途中で削ったりしない。
 - 送り仮名や、ルビが掛かっていない隣の漢字・助詞は親文字に含めない（例: 「瞬き」に「まばた」なら 瞬\tまばた、「微かな」に「かす」なら 微\tかす、「装置を潜り抜」に「くぐ」なら 潜\tくぐ、「粘り強く」に「ねば」なら 粘\tねば、「機を窺い」に「うかが」なら 窺\tうかが）。
-- カタカナの当て字ルビ（例: 「手袋」に「ガントレツト」、「背嚢」に「バツクパツク」）はカタカナのまま残す（小書きカナは大きいカナのままでよい）。
+- 元ルビOCRを尊重する。その漢字・文脈の特殊な読み・表外訓・熟字訓・当て字として成立するなら、一般的な読みに書き換えず元ルビOCRの読みをそのまま採用する。修正してよいのは濁点・半濁点や1文字程度の明らかなOCR誤認だけ。
+- カタカナの当て字ルビはカタカナのまま残す。
+- ルビはひらがな・カタカナとも小書き仮名（ぁぃぅぇぉっゃゅょゎ・ァィゥェォッャュョヮヵヶ）を使わず、すべて大きい仮名（あいうえおつやゆよわ・アイウエオツヤユヨワカケ）で書く（例: フィギュア→フイギユア、きょうく→きようく）。
 - ルビOCRがゴミや汚れで本文と無関係なら NONE とだけ答える。
 - 出力は必ず「親文字\tルビ」の1行のみ（説明不要）。
 
 本文スニペット: {snippet}
-ルビOCR: {raw_ruby}
-目安の親文字数: 約{est_chars}文字"""
+ルビOCR: {raw_ruby}"""
 
 
 def load_mod(name, path):
@@ -52,7 +55,7 @@ def load_mod(name, path):
     return m
 
 
-def ask_llm(url, model, snippet, raw_ruby, est_chars, marked=True):
+def ask_llm(url, model, snippet, raw_ruby, marked=True):
     body = {
         'model': model,
         'temperature': 0,
@@ -61,7 +64,7 @@ def ask_llm(url, model, snippet, raw_ruby, est_chars, marked=True):
         'messages': [{'role': 'user', 'content': PROMPT.format(
             mark_rule=PROMPT_MARK_RULE if marked else '',
             base_scope='（⟦⟧を除いた本文）' if marked else '',
-            snippet=snippet, raw_ruby=raw_ruby, est_chars=est_chars)}],
+            snippet=snippet, raw_ruby=raw_ruby)}],
     }
     req = urllib.request.Request(url, json.dumps(body, ensure_ascii=False).encode(),
                                  {'Content-Type': 'application/json'})
@@ -113,15 +116,19 @@ def clean_pair(ans, snippet):
     if HIRAGANA_RUBY.fullmatch(ruby):
         while len(base) >= 2 and ('\u3041' <= base[0] <= '\u3096') and not ruby.startswith(base[0]):
             base = base[1:]
-    # Trim common trailing hiragana okurigana from both base and ruby (e.g. 掻いた/かいた -> 掻/か)
-    while len(base) >= 2 and len(ruby) >= 2 and ('\u3041' <= base[-1] <= '\u3096') and base[-1] == ruby[-1]:
+    # Trim common trailing hiragana okurigana from both base and ruby (e.g. 掻いた/かいた -> 掻/か, 穿った/うがつた -> 穿/うが)
+    trimmed_tail = False
+    while (len(base) >= 2 and len(ruby) >= 2 and ('\u3041' <= base[-1] <= '\u3096') and
+           (base[-1] == ruby[-1] or (trimmed_tail and base[-1] == 'っ' and ruby[-1] == 'つ'))):
         base, ruby = base[:-1], ruby[:-1]
+        trimmed_tail = True
     # Trim trailing hiragana okurigana from base if it is not present at the end of ruby
     while len(base) >= 2 and ('\u3041' <= base[-1] <= '\u3096') and not ruby.endswith(base[-1]):
         if ('\u4e00' <= base[-2] <= '\u9fff') or base[-2] in '々〆ヶ' or ('\u3041' <= base[-2] <= '\u3096'):
             base = base[:-1]
         else:
             break
+    ruby = normalize_ruby(ruby)
     # Base must contain at least one kanji or Latin letter (never pure kana/symbols)
     if not any(('\u4e00' <= c <= '\u9fff') or c in '々〆ヶ' or ('A' <= c <= 'Z') or ('a' <= c <= 'z') for c in base):
         return '', ''
@@ -225,8 +232,11 @@ def main():
                 if not raw_rb or not re.search(r'[ぁ-ゖァ-ヺ]', raw_rb):
                     continue
                 per = ln['h'] / max(len(ftext), 1)
-                est_chars = max(1, round((sub_y1 - sub_y0) / per))
-                char_pos = max(0, int((sub_y0 - ln['y']) / per))
+                p0 = (sub_y0 - ln['y']) / per
+                p1 = (sub_y1 - ln['y']) / per
+                char_pos = max(0, min(len(ftext) - 1, math.floor(p0 + 0.25)))
+                end_pos = min(len(ftext), max(char_pos + 1, math.ceil(p1 - 0.25)))
+                est_chars = end_pos - char_pos
                 snippet, marked_snippet = mark_snippet(ftext, char_pos, est_chars)
                 segments.append({
                     'id': seg_id, 'page': page, 'line_id': lid,
@@ -250,7 +260,7 @@ def main():
                 if seg['base']:
                     valid += 1
                 continue
-            ans = ask_llm(args.url, args.model, seg['marked_snippet'], seg['raw_ruby'], seg['est_chars'],
+            ans = ask_llm(args.url, args.model, seg['marked_snippet'], seg['raw_ruby'],
                           marked=seg['marked_snippet'] != seg['snippet'])
             base, ruby = clean_pair(ans, seg['snippet'])
             seg['base'], seg['ruby'] = base, ruby

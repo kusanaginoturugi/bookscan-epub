@@ -314,6 +314,10 @@ id="toc-精度向上の検証と組み込み2026-11-2425">精度向上の検証�
 <ul>
 <li><a href="#epub化パイプライン実装ルビ修正背景補正とroborev整備"
 id="toc-epub化パイプライン実装ルビ修正背景補正とroborev整備">2026-11-25〜26：ePub化パイプライン実装・ルビ修正・背景補正とroborev整備</a></li>
+<li><a
+href="#ルビ並字統一スパン計算プロンプト改善ガニメデの優しい巨人epub-再生成"
+id="toc-ルビ並字統一スパン計算プロンプト改善ガニメデの優しい巨人epub-再生成">2026-11-27：ルビ並字統一・スパン計算＆プロンプト改善・『ガニメデの優しい巨人』ePub
+再生成</a></li>
 </ul></li>
 <li><a href="#次の作業" id="toc-次の作業">次の作業</a></li>
 </ul></li>
@@ -1699,6 +1703,48 @@ VLM（<code>gemma-4-12B</code>）で読み直す <code>tcy-marker</code>
 65）が動かないので、<code>build-epub.sh</code> で
 <code>/usr/lib/jvm/java-21-openjdk/bin/java</code>
 があれば使うようにした（<code>JAVA</code> で上書きできる）。</li>
+</ul></li>
+</ol>
+<h3
+id="ルビ並字統一スパン計算プロンプト改善ガニメデの優しい巨人epub-再生成">2026-11-27：ルビ並字統一・スパン計算＆プロンプト改善・『ガニメデの優しい巨人』ePub
+再生成</h3>
+<ol type="1">
+<li><strong>ルビの小書き仮名を大きい仮名（並字）へ統一：</strong>
+<ul>
+<li><code>bin/text_layer_utils.py</code> に <code>SMALL_KANA</code> と
+<code>normalize_ruby()</code>
+を追加し、<code>extract-ruby.py</code>・<code>audit-ruby.py</code>（Python
+側・レビュー HTML の JS 側とも）・<code>build-aozora-text.py</code>
+の全段で小書き仮名を大きい仮名にそろえるようにした。送り仮名トリムは元の文字どうしで比較し、末尾送り仮名を1文字以上削った直後の
+<code>っ/つ</code> だけ促音便として両方削る。</li>
+</ul></li>
+<li><strong>ルビ親文字スパン計算とプロンプトの改善：</strong>
+<ul>
+<li>『ガニメデ』の検算87件中47件が熟語の1文字切り詰め（<code>雛壇→雛</code>、<code>面子→面</code>
+等）だった原因を調査し、<code>extract-ruby.py</code> のスパン計算を
+<code>[floor(p0 + 0.25), ceil(p1 - 0.25)]</code>
+に変更（ガニメデ全472件での <code>⟦⟧</code> 包含率 77.8% →
+94.9%）。</li>
+<li>誤誘導になっていた抽出プロンプトの <code>目安の親文字数</code>
+行を削除し（範囲は <code>⟦⟧</code>
+のみで伝達）、<code>extract-ruby.py</code>・<code>audit-ruby.py</code>
+の両プロンプトに「難読漢字だけでなく表外訓・熟字訓・文語読み・当て字を尊重し、元ルビ
+OCR を一般的な読みへ書き換えない」ルールを追加した。</li>
+</ul></li>
+<li><strong><code>ruby-human</code>
+未適用警告と『ガニメデの優しい巨人』ePub 再生成：</strong>
+<ul>
+<li><code>build-aozora-text.py</code> で <code>ruby-human</code>
+の親文字が本文に配置できなかった場合（同位置の重複配置済みを除く）に
+<code>id</code> つきで warning を出力するようにした。</li>
+<li>『ガニメデの優しい巨人』のルビ検算（<code>ruby-human.tsv</code>）と本文補正（<code>overrides.tsv</code>
+10行：<code>齣</code>・<code>逸</code>・<code>〉</code>→<code>V</code>
+化け・余計な <code>(</code>・p.252 行12 の抜けた
+<code>「</code>）を反映して ePub 3 を再生成（453 ルビ、未適用 warning 0
+件、括弧不一致 10→1 件）。残る1件（p.278 行12
+からのガルースの演説）は、原本でも段落をまたぐ台詞を <code>」</code>
+で閉じずに次段落を <code>「</code>
+なしで続ける組み方なので、本文は直さない。</li>
 </ul></li>
 </ol>
 <h2 id="次の作業">次の作業</h2>

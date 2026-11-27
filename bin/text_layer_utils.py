@@ -66,6 +66,15 @@ def fix_quotes(texts):
 
 
 VOICING = str.maketrans('バビブベボパピプペポ', 'パピプペポバビブベボ')
+SMALL_KANA = str.maketrans(
+    'ァィゥェォッャュョヮヵヶぁぃぅぇぉっゃゅょゎゕゖ',
+    'アイウエオツヤユヨワカケあいうえおつやゆよわかけ',
+)
+
+
+def normalize_ruby(ruby):
+    """Normalize small kana in ruby text to full-size kana."""
+    return ruby.translate(SMALL_KANA) if ruby else ruby
 
 
 KATAKANA = re.compile(r'[ァ-ヴー]')
