@@ -481,6 +481,11 @@ id="作業ディレクトリに置く補正ファイル">作業ディレクト�
 <li>中では、ルビの抽出（<code>extract-ruby.py</code>）→
 青空文庫形式のテキスト（<code>build-aozora-text.py</code>）→ AozoraEpub3
 の順に動く。</li>
+<li>AozoraEpub3 の XHTML テンプレートは <code>xml:lang="ja"</code>
+しか出さないので、<code>build-epub.sh</code> が実行のたびに
+<code>vendor/AozoraEpub3/template/item/xhtml/*.vm</code> へ
+<code>lang="ja"</code> を足す。<code>lang</code>
+しか見ないリーダーでも中国語の字形にならないようにするため。</li>
 <li>完成品は <code>output/epub/書名 - 著者.epub</code>、途中のテキストは
 <code>work/epub/SLUG/書名 - 著者.txt</code>、表紙は原本1ページ目から
 <code>cover.jpg</code> を作る。</li>

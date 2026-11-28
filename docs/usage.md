@@ -96,6 +96,7 @@ bin/build-epub.sh 0101-20150604091458299_check.pdf kyojin-tachi-no-hoshi --end-p
 ```
 
 - 中では、ルビの抽出（`extract-ruby.py`）→ 青空文庫形式のテキスト（`build-aozora-text.py`）→ AozoraEpub3 の順に動く。
+- AozoraEpub3 の XHTML テンプレートは `xml:lang="ja"` しか出さないので、`build-epub.sh` が実行のたびに `vendor/AozoraEpub3/template/item/xhtml/*.vm` へ `lang="ja"` を足す。`lang` しか見ないリーダーでも中国語の字形にならないようにするため。
 - 完成品は `output/epub/書名 - 著者.epub`、途中のテキストは `work/epub/SLUG/書名 - 著者.txt`、表紙は原本1ページ目から `cover.jpg` を作る。
 - 3番目以降の引数は `build-aozora-text.py` に渡る。`--start-page`・`--end-page` で本文に入れるページを絞る。奥付や出版社の広告目録が入ると、括弧不一致が大量に出る（『巨人たちの星』は 226件 → 471ページまでに絞って6件）。
 - ルビの抽出には、その本の NDLOCR-Lite の結果（`work/searchable/SLUG/ocr/*.xml`）が**全ページ分**要る。消えていたり一部しかなかったりすると、抽出が止まるか、そのページのルビが抜ける。ルビを作り直さずに本文だけ作り直すなら `SKIP_RUBY=1` を付ける（既存の `ruby.tsv` は使われない点に注意）。

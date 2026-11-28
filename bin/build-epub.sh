@@ -45,6 +45,12 @@ fi
 echo "[$(date +%T)] build aozora text: $TITLE"
 "$PY" "$BIN/build-aozora-text.py" "$WORK" "$TXT" --source "$SOURCE" --cover-out "$COVER" "$@"
 
+# AozoraEpub3's XHTML templates set only xml:lang; add lang="ja" too so readers that check
+# only lang pick Japanese glyphs over Chinese ones. vendor/ is untracked, so patch on each build.
+for vm in "$DATA_ROOT"/vendor/AozoraEpub3/template/item/xhtml/*.vm; do
+  sed -i -E 's/^( ?)xml:lang="ja"$/\1lang="ja" xml:lang="ja"/' "$vm"
+done
+
 echo "[$(date +%T)] run AozoraEpub3"
 (
   cd "$DATA_ROOT/vendor/AozoraEpub3"
